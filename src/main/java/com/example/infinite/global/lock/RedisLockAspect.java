@@ -1,11 +1,11 @@
 package com.example.infinite.global.lock;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.expression.ExpressionParser;
@@ -17,11 +17,16 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
-@RequiredArgsConstructor
 public class RedisLockAspect {
 
     private final LockService lockService;
     private final ExpressionParser parser = new SpelExpressionParser();
+
+    // @Qualifier를 생성자 파라미터에 직접 명시 (Lombok @RequiredArgsConstructor 미사용)
+    // Lombok은 @Qualifier를 생성자 파라미터에 복사하지 않으므로 직접 작성
+    public RedisLockAspect(@Qualifier("redissonLockService") LockService lockService) {
+        this.lockService = lockService;
+    }
 
     @Around("@annotation(redisLock)")
     public Object around(ProceedingJoinPoint joinPoint, RedisLock redisLock) throws Throwable {

@@ -55,6 +55,7 @@ dependencies {
 
     // 4. Redis 분산 락 및 로컬 캐싱
     implementation 'org.redisson:redisson-spring-boot-starter:4.0.0'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'com.github.ben-manes.caffeine:caffeine'
 
