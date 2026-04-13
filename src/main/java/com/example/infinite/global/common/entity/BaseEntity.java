@@ -1,4 +1,4 @@
-package com.example.infinite.global.common;
+package com.example.infinite.global.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
@@ -21,4 +21,11 @@ public abstract class BaseEntity {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
 }
