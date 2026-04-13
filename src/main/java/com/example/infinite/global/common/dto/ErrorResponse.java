@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Getter
 @Builder
 @Schema(description = "공통 에러 응답")
-// 에러가 발생했을 때 클라이언트에게 전송할 구체적인 에러내용들을 담은 JSON
+// 예외 발생 시 클라이언트에 내려줄 표준 에러 본문이다.
 public class ErrorResponse {
     @Schema(description = "에러 발생 시각", example = "2026-04-10T14:30:00")
     private final LocalDateTime timestamp; // 에러가 발생한 시간

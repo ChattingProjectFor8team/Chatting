@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import java.util.List;
 
 @Schema(description = "페이징 응답")
+// Spring Page 객체를 클라이언트 친화적인 응답 형태로 변환한다.
 public record PageResponse<T>(
         @Schema(description = "현재 페이지 데이터")
         List<T> content,
@@ -21,6 +22,7 @@ public record PageResponse<T>(
         boolean isLast
 ) {
     public PageResponse(Page<T> page) {
+        // Spring 내부 0-based 페이지 번호를 응답에서는 1-based로 맞춘다.
         this(
                 page.getContent(),
                 page.getNumber() + 1,
