@@ -23,7 +23,7 @@ local i = redis.call('INCR', KEYS[2])
 -- 3. Reservoir Sampling 확률 판정 (1/i 확률로 교체)
 local rand = tonumber(ARGV[2])
 if rand < (1 / i) then
-    redis.call('SET', KEYS[3], ARGV[1])
+    redis.call('SET', KEYS[3], ARGV[1], 'KEEPTTL')
     return {i, 1}
 end
 

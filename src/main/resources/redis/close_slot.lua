@@ -10,7 +10,7 @@
 -- 반환값: {candidate(string), count(int)}
 --   candidate가 없으면 빈 문자열 ''
 
-redis.call('SET', KEYS[1], 1)
+redis.call('SET', KEYS[1], 1, 'EX', 86400)
 
 local candidate = redis.call('GET', KEYS[2])
 local count = redis.call('GET', KEYS[3])
