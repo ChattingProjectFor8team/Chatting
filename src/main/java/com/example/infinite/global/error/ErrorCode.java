@@ -6,21 +6,24 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 @RequiredArgsConstructor
-public enum CommonError {
+public enum ErrorCode {
 
     // 1. Common (공통)
-    COMMON_INVALID_AUTHENTICATION(HttpStatus.UNAUTHORIZED, "C001", "인증이 필요합니다. (로그인 만료 포함)"),
-    COMMON_ACCESS_DENIED(HttpStatus.FORBIDDEN, "C002", "해당 기능에 대한 접근 권한이 없습니다."),
-    COMMON_INVALID_REQUEST(HttpStatus.BAD_REQUEST, "C003", "잘못된 요청 형식 또는 파라미터입니다."),
-    COMMON_RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "C004", "요청한 리소스를 찾을 수 없습니다."),
-    COMMON_INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C005", "서버 내부 오류가 발생했습니다."),
-    COMMON_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "C006", "도배 방지를 위해 요청 횟수가 제한되었습니다."),
+    INVALID_AUTHENTICATION(HttpStatus.UNAUTHORIZED, "C001", "인증이 필요합니다. (로그인 만료 포함)"),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "C002", "해당 기능에 대한 접근 권한이 없습니다."),
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "C003", "잘못된 요청 형식 또는 파라미터입니다."),
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "C004", "요청한 리소스를 찾을 수 없습니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C005", "서버 내부 오류가 발생했습니다."),
+    RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "C006", "도배 방지를 위해 요청 횟수가 제한되었습니다."),
+    INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C007", "잘못된 입력값입니다."),
 
     // 2. Auth (인증/인가)
     AUTH_DUPLICATE_EMAIL(HttpStatus.BAD_REQUEST, "A001", "이미 가입된 이메일 주소입니다."),
     AUTH_PENDING_APPROVAL(HttpStatus.FORBIDDEN, "A002", "관리자(Admin)의 승인이 대기 중인 계정입니다."),
     AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A003", "이메일 또는 비밀번호가 일치하지 않습니다."),
     AUTH_BANNED_USER(HttpStatus.FORBIDDEN, "A004", "운영 정책 위반으로 제재를 받은 계정입니다."),
+    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "A005", "회원을 찾을 수 없습니다."),
+    STATE_NOT_LOGIN(HttpStatus.UNAUTHORIZED, "A006", "로그인되어 있지 않습니다."),
 
     // 3. Payment / Jelly (결제 및 재화)
     JELLY_INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, "P001", "보유한 젤리 잔액이 부족합니다."),
