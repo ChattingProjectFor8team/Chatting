@@ -15,6 +15,8 @@ public enum CommonError {
     COMMON_RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "C004", "요청한 리소스를 찾을 수 없습니다."),
     COMMON_INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C005", "서버 내부 오류가 발생했습니다."),
     COMMON_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "C006", "도배 방지를 위해 요청 횟수가 제한되었습니다."),
+    COMMON_INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C007", "잘못된 입력값입니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C008", "서버 내부 오류입니다."),
 
     // 2. Auth (인증/인가)
     AUTH_DUPLICATE_EMAIL(HttpStatus.BAD_REQUEST, "A001", "이미 가입된 이메일 주소입니다."),
