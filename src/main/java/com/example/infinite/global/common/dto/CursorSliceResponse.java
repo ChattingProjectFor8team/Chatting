@@ -22,6 +22,7 @@ public record CursorSliceResponse<T>(
             int size,
             Function<T, Long> cursorExtractor
     ) {
+        // limit + 1 방식으로 한 건 더 조회해 다음 slice 존재 여부를 계산한다.
         boolean hasNext = rows.size() > size;
         List<T> content = hasNext ? rows.subList(0, size) : rows;
         Long nextCursor = content.isEmpty() ? null : cursorExtractor.apply(content.get(content.size() - 1));
