@@ -16,8 +16,8 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ApiResponse<?>> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         log.error("handleMethodArgumentNotValidException", e);
         return ResponseEntity
-                .status(CommonError.INVALID_INPUT_VALUE.getStatus())
-                .body(ApiResponse.fail(CommonError.INVALID_INPUT_VALUE.getCode(), CommonError.INVALID_INPUT_VALUE.getMessage()));
+                .status(CommonError.COMMON_INVALID_INPUT_VALUE.getStatus())
+                .body(ApiResponse.fail(CommonError.COMMON_INVALID_INPUT_VALUE.getCode(), CommonError.COMMON_INVALID_INPUT_VALUE.getMessage()));
     }
 
     // 서버 내부에서 발생하는 모든 예외 처리
@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ApiResponse<?>> handleException(Exception e) {
         log.error("handleException", e);
         return ResponseEntity
-                .status(CommonError.INTERNAL_SERVER_ERROR.getStatus())
-                .body(ApiResponse.fail(CommonError.INTERNAL_SERVER_ERROR.getCode(), CommonError.INTERNAL_SERVER_ERROR.getMessage()));
+                .status(CommonError.COMMON_INTERNAL_SERVER_ERROR.getStatus())
+                .body(ApiResponse.fail(CommonError.COMMON_INTERNAL_SERVER_ERROR.getCode(), CommonError.COMMON_INVALID_INPUT_VALUE.getMessage()));
     }
 }
