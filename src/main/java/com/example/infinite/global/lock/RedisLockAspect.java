@@ -13,9 +13,6 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-
 @Slf4j
 @Aspect
 @Component
@@ -40,13 +37,12 @@ public class RedisLockAspect {
 
     private String resolveKey(ProceedingJoinPoint joinPoint, String keyExpression) {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        Method method = signature.getMethod();
-        Parameter[] parameters = method.getParameters();
+        String[] paramNames = signature.getParameterNames();
         Object[] args = joinPoint.getArgs();
 
         StandardEvaluationContext context = new StandardEvaluationContext();
-        for (int i = 0; i < parameters.length; i++) {
-            context.setVariable(parameters[i].getName(), args[i]);
+        for (int i = 0; i < paramNames.length; i++) {
+            context.setVariable(paramNames[i], args[i]);
         }
 
         return parser.parseExpression(keyExpression).getValue(context, String.class);
