@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 
 @Slf4j
 @RestControllerAdvice
+// 애플리케이션 전역 예외를 공통 응답 형식으로 변환한다.
 public class GlobalExceptionHandler {
 
 
@@ -116,6 +117,7 @@ public class GlobalExceptionHandler {
      * ErrorResponse 객체를 생성하는 유틸리티 메서드입니다.
      */
     private ErrorResponse buildErrorResponse(ErrorCode errorCode, String message, String path) {
+        // 컨트롤러 밖에서도 동일한 에러 응답 구조를 유지하기 위한 조립 메서드다.
         return ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(errorCode.getStatus().value())

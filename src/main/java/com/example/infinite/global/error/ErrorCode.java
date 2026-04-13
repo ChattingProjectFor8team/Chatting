@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 @RequiredArgsConstructor
+// HTTP 상태, 서비스 코드, 사용자 메시지를 한 곳에서 관리한다.
 public enum ErrorCode {
 
     // 1. Common (공통)

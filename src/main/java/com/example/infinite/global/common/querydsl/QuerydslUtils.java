@@ -23,7 +23,6 @@ public class QuerydslUtils {
     ) {
         List<OrderSpecifier<T>> orders = sort.stream()
                 .map(order -> {
-
                     Expression<?> expr = sortMap.get(order.getProperty());
                     if (expr == null) return null;
 
