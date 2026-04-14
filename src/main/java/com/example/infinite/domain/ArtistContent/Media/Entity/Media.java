@@ -1,7 +1,7 @@
-package com.example.infinite.domain.ArtistContent.Media.Entity;
+package com.example.infinite.domain.artistcontent.media.entity;
 
-import com.example.infinite.domain.ArtistContent.Media.enums.MediaType;
-import com.example.infinite.domain.ArtistContent.Post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.media.enums.MediaType;
+import com.example.infinite.domain.artistcontent.post.eunms.PostType;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

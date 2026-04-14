@@ -1,4 +1,4 @@
-package com.example.infinite.domain.DM.Entity;
+package com.example.infinite.domain.dm.entity;
 
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.Entity;

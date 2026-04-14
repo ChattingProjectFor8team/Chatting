@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Follow.Controller;
+package com.example.infinite.domain.artistcontent.follow.controller;
 
 public class FollowController {
 }

@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Member.error;
+package com.example.infinite.domain.member.error;
 
 import com.example.infinite.global.error.ErrorCodeType;
 import lombok.Getter;

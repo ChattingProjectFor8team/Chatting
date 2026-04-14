@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.FanPost.Repository;
+package com.example.infinite.domain.artistcontent.post.fanpost.repository;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;

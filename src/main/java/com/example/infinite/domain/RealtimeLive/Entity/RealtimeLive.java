@@ -1,4 +1,4 @@
-package com.example.infinite.domain.RealtimeLive.Entity;
+package com.example.infinite.domain.realtimelive.entity;
 
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.Entity;

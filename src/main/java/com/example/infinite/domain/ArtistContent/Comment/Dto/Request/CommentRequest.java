@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Comment.Dto.Request;
+package com.example.infinite.domain.artistcontent.comment.dto.request;
 
 public class CommentRequest {
 }

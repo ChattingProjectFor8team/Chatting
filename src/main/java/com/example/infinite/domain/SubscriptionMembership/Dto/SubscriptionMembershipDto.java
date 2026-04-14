@@ -1,4 +1,4 @@
-package com.example.infinite.domain.SubscriptionMembership.Dto;
+package com.example.infinite.domain.subscriptionmembership.dto;
 
 public class SubscriptionMembershipDto {
 }

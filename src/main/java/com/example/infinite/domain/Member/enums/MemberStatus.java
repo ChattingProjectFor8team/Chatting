@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Member.enums;
+package com.example.infinite.domain.member.enums;
 
 public enum MemberStatus {
     ACTIVE,

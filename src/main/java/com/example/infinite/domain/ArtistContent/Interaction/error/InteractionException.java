@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Interaction.error;
+package com.example.infinite.domain.artistcontent.interaction.error;
 
 import com.example.infinite.global.error.ErrorCodeType;
 import lombok.Getter;

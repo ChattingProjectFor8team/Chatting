@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.eunms;
+package com.example.infinite.domain.artistcontent.post.eunms;
 
 public enum PostVisibility {
     FOLLOWER_ONLY,

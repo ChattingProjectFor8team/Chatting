@@ -1,8 +1,8 @@
-package com.example.infinite.domain.Raffle;
+package com.example.infinite.domain.raffle;
 
-import com.example.infinite.domain.Raffle.Service.ReservoirSampler;
-import com.example.infinite.domain.Raffle.Service.ReservoirSampler.EntryResult;
-import com.example.infinite.domain.Raffle.Service.ReservoirSampler.SlotCloseResult;
+import com.example.infinite.domain.raffle.service.ReservoirSampler;
+import com.example.infinite.domain.raffle.service.reservoirsampler.EntryResult;
+import com.example.infinite.domain.raffle.service.reservoirsampler.SlotCloseResult;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

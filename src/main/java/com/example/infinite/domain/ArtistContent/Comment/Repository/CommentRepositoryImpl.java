@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Comment.Repository;
+package com.example.infinite.domain.artistcontent.comment.repository;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;

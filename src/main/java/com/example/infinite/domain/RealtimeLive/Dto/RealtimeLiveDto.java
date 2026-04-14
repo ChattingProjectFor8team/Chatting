@@ -1,4 +1,4 @@
-package com.example.infinite.domain.RealtimeLive.Dto;
+package com.example.infinite.domain.realtimelive.dto;
 
 public class RealtimeLiveDto {
 }

@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.FanPost.Controller;
+package com.example.infinite.domain.artistcontent.post.fanpost.controller;
 
 public class FanPostController {
 }

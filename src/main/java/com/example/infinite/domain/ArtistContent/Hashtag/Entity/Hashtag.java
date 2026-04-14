@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Hashtag.Entity;
+package com.example.infinite.domain.artistcontent.hashtag.entity;
 
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;

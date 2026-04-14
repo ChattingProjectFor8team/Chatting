@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Raffle.Entity;
+package com.example.infinite.domain.raffle.entity;
 
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.Entity;

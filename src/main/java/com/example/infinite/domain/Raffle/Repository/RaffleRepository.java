@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Raffle.Repository;
+package com.example.infinite.domain.raffle.repository;
 
 public class RaffleRepository {
 }

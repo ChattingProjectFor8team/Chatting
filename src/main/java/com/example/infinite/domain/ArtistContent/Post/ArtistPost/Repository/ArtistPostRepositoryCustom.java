@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.ArtistPost.Repository;
+package com.example.infinite.domain.artistcontent.post.artistpost.repository;
 
 public interface ArtistPostRepositoryCustom {
 }

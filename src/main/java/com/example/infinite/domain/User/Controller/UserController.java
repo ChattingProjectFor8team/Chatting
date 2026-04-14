@@ -1,4 +1,4 @@
-package com.example.infinite.domain.User.Controller;
+package com.example.infinite.domain.user.controller;
 
 public class UserController {
 }

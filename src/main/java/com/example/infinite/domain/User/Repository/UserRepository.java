@@ -1,4 +1,4 @@
-package com.example.infinite.domain.User.Repository;
+package com.example.infinite.domain.user.repository;
 
 public class UserRepository {
 }

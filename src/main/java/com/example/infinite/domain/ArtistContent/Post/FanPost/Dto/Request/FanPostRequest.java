@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.FanPost.Dto.Request;
+package com.example.infinite.domain.artistcontent.post.fanpost.dto.request;
 
 public class FanPostRequest {
 }

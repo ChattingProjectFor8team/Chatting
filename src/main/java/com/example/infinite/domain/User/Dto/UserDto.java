@@ -1,4 +1,4 @@
-package com.example.infinite.domain.User.Dto;
+package com.example.infinite.domain.user.dto;
 
 public class UserDto {
 }

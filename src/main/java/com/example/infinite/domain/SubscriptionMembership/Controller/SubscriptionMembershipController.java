@@ -1,4 +1,4 @@
-package com.example.infinite.domain.SubscriptionMembership.Controller;
+package com.example.infinite.domain.subscriptionmembership.controller;
 
 public class SubscriptionMembershipController {
 }

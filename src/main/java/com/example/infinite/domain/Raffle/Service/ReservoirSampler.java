@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Raffle.Service;
+package com.example.infinite.domain.raffle.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;

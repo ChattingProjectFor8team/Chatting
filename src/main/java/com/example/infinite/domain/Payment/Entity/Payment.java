@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Payment.Entity;
+package com.example.infinite.domain.payment.entity;
 
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.Entity;
