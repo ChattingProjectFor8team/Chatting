@@ -8,5 +8,5 @@ spring:
 
 # JWT
 jwt:
-  secret: L0Ed2+fnIDuWObMrF/oLcFYsKl58Wwo3R/oQQws+X0o=
+  secret: 
   expiration: 3600000
