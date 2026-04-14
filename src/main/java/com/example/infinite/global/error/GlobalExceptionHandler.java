@@ -1,5 +1,10 @@
 package com.example.infinite.global.error;
 
+import com.example.infinite.domain.ArtistContent.error.ArtistContentException;
+import com.example.infinite.domain.Interaction.error.InteractionException;
+import com.example.infinite.domain.Member.error.ArtistException;
+import com.example.infinite.domain.Member.error.MemberErrorCode;
+import com.example.infinite.domain.Member.error.MemberException;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +40,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException e, HttpServletRequest request) {
         log.warn("IllegalStateException : {}", e.getMessage());
-        ErrorCode errorCode = ErrorCode.MEMBER_NOT_FOUND;
+        ErrorCodeType errorCode = MemberErrorCode.MEMBER_NOT_FOUND;
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ApiResponse.fail(buildErrorResponse(errorCode, e.getMessage(), request.getRequestURI())));
@@ -170,7 +175,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         log.warn("AuthorizationDeniedException : {}", e.getMessage());
-        ErrorCode errorCode = ErrorCode.ACCESS_DENIED;
+        ErrorCodeType errorCode = ErrorCode.ACCESS_DENIED;
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ApiResponse.fail(buildErrorResponse(errorCode, errorCode.getMessage(), request.getRequestURI())));
@@ -192,7 +197,7 @@ public class GlobalExceptionHandler {
     /**
      * ErrorResponse 객체를 생성하는 유틸리티 메서드입니다.
      */
-    private ErrorResponse buildErrorResponse(ErrorCode errorCode, String message, String path) {
+    private ErrorResponse buildErrorResponse(ErrorCodeType errorCode, String message, String path) {
         // 컨트롤러 밖에서도 동일한 에러 응답 구조를 유지하기 위한 조립 메서드다.
         return ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -209,7 +214,7 @@ public class GlobalExceptionHandler {
      */
     private ResponseEntity<ApiResponse<Void>> handleCustomException(
             String exceptionName,
-            ErrorCode errorCode,
+            ErrorCodeType errorCode,
             RuntimeException e,
             HttpServletRequest request
     ) {
