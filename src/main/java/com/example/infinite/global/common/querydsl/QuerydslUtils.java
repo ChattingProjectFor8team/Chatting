@@ -15,7 +15,12 @@ import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
+// Offset 기반 Page 조회에서 정렬과 조건식 조합을 도와주는 공통 유틸이다.
 public class QuerydslUtils {
+    private QuerydslUtils() {
+    }
+
+    // Offset 기반 페이지 정렬에서 사용하는 유틸이다.
     public static <T extends Comparable> OrderSpecifier<?>[] getSort(
             Sort sort,
             Map<String, Expression<?>> sortMap,
@@ -24,9 +29,11 @@ public class QuerydslUtils {
         List<OrderSpecifier<T>> orders = sort.stream()
                 .map(order -> {
                     Expression<?> expr = sortMap.get(order.getProperty());
-                    if (expr == null) return null;
+                    if (expr == null) {
+                        return null;
+                    }
 
-                    return new OrderSpecifier<T>(
+                    return new OrderSpecifier<>(
                             order.isAscending() ? Order.ASC : Order.DESC,
                             (Expression<T>) expr
                     );

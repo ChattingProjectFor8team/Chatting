@@ -1,1 +1,7 @@
-spring.application.name=demo
+spring:
+  application:
+    name: demo
+  data:
+    redis:
+      host: localhost
+      port: 6379
