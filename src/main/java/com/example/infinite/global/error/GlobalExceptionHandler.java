@@ -18,7 +18,6 @@ import java.time.LocalDateTime;
 // 애플리케이션 전역 예외를 공통 응답 형식으로 변환한다.
 public class GlobalExceptionHandler {
 
-
     /**
      * 400: 잘못된 요청을 공통 에러 응답으로 반환
      */
@@ -78,11 +77,88 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnauthorizedException(UnauthorizedException e, HttpServletRequest request) {
-        log.warn("UnauthorizedException : {}", e.getMessage());
-        ErrorCode errorCode = ErrorCode.STATE_NOT_LOGIN;
-        return ResponseEntity
-                .status(errorCode.getStatus())
-                .body(ApiResponse.fail(buildErrorResponse(errorCode, e.getMessage(), request.getRequestURI())));
+        // 인증 관련 커스텀 예외는 예외 내부의 ErrorCode를 그대로 응답에 사용한다.
+        return handleCustomException("UnauthorizedException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 회원 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(MemberException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMemberException(MemberException e, HttpServletRequest request) {
+        return handleCustomException("MemberException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 일반 사용자 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(UserException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUserException(UserException e, HttpServletRequest request) {
+        return handleCustomException("UserException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 아티스트 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(ArtistException.class)
+    public ResponseEntity<ApiResponse<Void>> handleArtistException(ArtistException e, HttpServletRequest request) {
+        return handleCustomException("ArtistException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 아티스트 콘텐츠 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(ArtistContentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleArtistContentException(ArtistContentException e, HttpServletRequest request) {
+        return handleCustomException("ArtistContentException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: DM 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(DMException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDMException(DMException e, HttpServletRequest request) {
+        return handleCustomException("DMException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 커뮤니티 상호작용 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(InteractionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInteractionException(InteractionException e, HttpServletRequest request) {
+        return handleCustomException("InteractionException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 결제 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePaymentException(PaymentException e, HttpServletRequest request) {
+        return handleCustomException("PaymentException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 래플 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(RaffleException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRaffleException(RaffleException e, HttpServletRequest request) {
+        return handleCustomException("RaffleException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 라이브 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(RealtimeLiveException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRealtimeLiveException(RealtimeLiveException e, HttpServletRequest request) {
+        return handleCustomException("RealtimeLiveException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 구독/멤버십 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(SubscriptionMembershipException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSubscriptionMembershipException(SubscriptionMembershipException e, HttpServletRequest request) {
+        return handleCustomException("SubscriptionMembershipException", e.getErrorCode(), e, request);
     }
 
     /**
@@ -126,6 +202,21 @@ public class GlobalExceptionHandler {
                 .message(message)
                 .path(path)
                 .build();
+    }
+
+    /**
+     * ErrorCode를 가진 커스텀 예외는 이 메서드로 공통 응답 형식을 맞춘다.
+     */
+    private ResponseEntity<ApiResponse<Void>> handleCustomException(
+            String exceptionName,
+            ErrorCode errorCode,
+            RuntimeException e,
+            HttpServletRequest request
+    ) {
+        log.warn("{} : {}", exceptionName, e.getMessage());
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.fail(buildErrorResponse(errorCode, e.getMessage(), request.getRequestURI())));
     }
 }
 
