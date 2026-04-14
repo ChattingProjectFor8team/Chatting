@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Raffle.Service;
+package com.example.infinite.domain.raffle.service;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

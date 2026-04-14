@@ -1,4 +1,4 @@
-package com.example.infinite.domain.SubscriptionMembership.Service;
+package com.example.infinite.domain.subscriptionmembership.service;
 
 public class SubscriptionMembershipService {
 }

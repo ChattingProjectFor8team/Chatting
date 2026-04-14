@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Follow.Dto.Response;
+package com.example.infinite.domain.artistcontent.follow.dto.response;
 
 public class FollowResponse {
 }

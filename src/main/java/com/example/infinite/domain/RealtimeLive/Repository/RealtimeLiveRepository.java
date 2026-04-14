@@ -1,4 +1,4 @@
-package com.example.infinite.domain.RealtimeLive.Repository;
+package com.example.infinite.domain.realtimelive.repository;
 
 public class RealtimeLiveRepository {
 }

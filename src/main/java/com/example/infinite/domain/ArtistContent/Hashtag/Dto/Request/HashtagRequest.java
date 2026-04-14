@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Hashtag.Dto.Request;
+package com.example.infinite.domain.artistcontent.hashtag.dto.request;
 
 public class HashtagRequest {
 }

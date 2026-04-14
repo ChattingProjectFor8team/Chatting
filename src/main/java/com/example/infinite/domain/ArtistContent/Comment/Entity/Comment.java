@@ -1,7 +1,7 @@
-package com.example.infinite.domain.ArtistContent.Comment.Entity;
+package com.example.infinite.domain.artistcontent.comment.entity;
 
-import com.example.infinite.domain.ArtistContent.Post.eunms.PostType;
-import com.example.infinite.domain.Member.Entity.Member;
+import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.member.entity.Member;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Interaction.enums;
+package com.example.infinite.domain.artistcontent.interaction.enums;
 
 public enum ReactionType {
     LIKE

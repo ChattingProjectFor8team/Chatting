@@ -1,4 +1,4 @@
-package com.example.infinite.domain.RealtimeLive.Controller;
+package com.example.infinite.domain.realtimelive.controller;
 
 public class RealtimeLiveController {
 }

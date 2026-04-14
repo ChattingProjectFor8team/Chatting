@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Interaction.Service;
+package com.example.infinite.domain.artistcontent.interaction.service;
 
 public class InteractionService {
 }

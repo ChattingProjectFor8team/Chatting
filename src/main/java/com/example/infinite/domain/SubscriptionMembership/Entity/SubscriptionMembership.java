@@ -1,4 +1,4 @@
-package com.example.infinite.domain.SubscriptionMembership.Entity;
+package com.example.infinite.domain.subscriptionmembership.entity;
 
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.Entity;

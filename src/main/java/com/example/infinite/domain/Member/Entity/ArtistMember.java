@@ -1,6 +1,6 @@
-package com.example.infinite.domain.Member.Entity;
+package com.example.infinite.domain.member.entity;
 
-import com.example.infinite.domain.Member.enums.MemberStatus;
+import com.example.infinite.domain.member.enums.MemberStatus;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

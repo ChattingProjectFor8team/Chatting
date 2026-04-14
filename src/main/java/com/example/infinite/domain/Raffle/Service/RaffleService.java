@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Raffle.Service;
+package com.example.infinite.domain.raffle.service;
 
 public class RaffleService {
 }

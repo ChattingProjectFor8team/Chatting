@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Interaction.Controller;
+package com.example.infinite.domain.artistcontent.interaction.controller;
 
 public class InteractionController {
 }

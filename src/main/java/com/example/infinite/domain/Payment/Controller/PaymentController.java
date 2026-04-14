@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Payment.Controller;
+package com.example.infinite.domain.payment.controller;
 
 public class PaymentController {
 }

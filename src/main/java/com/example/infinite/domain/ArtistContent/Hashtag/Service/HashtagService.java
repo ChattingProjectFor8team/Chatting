@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Hashtag.Service;
+package com.example.infinite.domain.artistcontent.hashtag.service;
 
 public class HashtagService {
 }

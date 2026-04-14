@@ -1,4 +1,4 @@
-package com.example.infinite.domain.DM.Dto;
+package com.example.infinite.domain.dm.dto;
 
 public class DMDto {
 }

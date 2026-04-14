@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.FanLetter.Dto.Response;
+package com.example.infinite.domain.artistcontent.post.fanletter.dto.response;
 
 public class FanLetterResponse {
 }

@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.FanPost.Service;
+package com.example.infinite.domain.artistcontent.post.fanpost.service;
 
 public class FanPostService {
 }

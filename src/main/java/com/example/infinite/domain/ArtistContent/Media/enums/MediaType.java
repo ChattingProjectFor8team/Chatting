@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Media.enums;
+package com.example.infinite.domain.artistcontent.media.enums;
 
 public enum MediaType {
     IMAGE,

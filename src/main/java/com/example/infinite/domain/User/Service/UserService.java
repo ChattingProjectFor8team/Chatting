@@ -1,4 +1,4 @@
-package com.example.infinite.domain.User.Service;
+package com.example.infinite.domain.user.service;
 
 public class UserService {
 }

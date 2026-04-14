@@ -1,4 +1,4 @@
-package com.example.infinite.domain.DM.Controller;
+package com.example.infinite.domain.dm.controller;
 
 public class DMController {
 }

@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Hashtag.Dto.Response;
+package com.example.infinite.domain.artistcontent.hashtag.dto.response;
 
 public class HashtagResponse {
 }

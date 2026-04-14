@@ -1,6 +1,6 @@
-package com.example.infinite.domain.ArtistContent.Follow.Entity;
+package com.example.infinite.domain.artistcontent.follow.entity;
 
-import com.example.infinite.domain.Member.Entity.Member;
+import com.example.infinite.domain.member.entity.Member;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

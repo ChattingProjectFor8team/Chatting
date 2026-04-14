@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Interaction.Dto.Request;
+package com.example.infinite.domain.artistcontent.interaction.dto.request;
 
 public class InteractionRequest {
 }

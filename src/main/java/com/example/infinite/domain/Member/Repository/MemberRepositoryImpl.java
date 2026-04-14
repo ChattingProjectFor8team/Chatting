@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Member.Repository;
+package com.example.infinite.domain.member.repository;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;

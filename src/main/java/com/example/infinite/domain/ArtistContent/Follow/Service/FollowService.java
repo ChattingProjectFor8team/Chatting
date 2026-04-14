@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Follow.Service;
+package com.example.infinite.domain.artistcontent.follow.service;
 
 public class FollowService {
 }

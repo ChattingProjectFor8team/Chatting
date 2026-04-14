@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Comment.Dto.Response;
+package com.example.infinite.domain.artistcontent.comment.dto.response;
 
 public class CommentResponse {
 }

@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Post.error;
+package com.example.infinite.domain.artistcontent.post.error;
 
 import com.example.infinite.global.error.ErrorCodeType;
 import lombok.Getter;

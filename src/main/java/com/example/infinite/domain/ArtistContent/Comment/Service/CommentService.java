@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Comment.Service;
+package com.example.infinite.domain.artistcontent.comment.service;
 
 public class CommentService {
 }

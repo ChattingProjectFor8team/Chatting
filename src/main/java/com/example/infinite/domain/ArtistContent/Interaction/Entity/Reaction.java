@@ -1,8 +1,8 @@
-package com.example.infinite.domain.ArtistContent.Interaction.Entity;
+package com.example.infinite.domain.artistcontent.interaction.entity;
 
-import com.example.infinite.domain.ArtistContent.Post.eunms.PostType;
-import com.example.infinite.domain.ArtistContent.Interaction.enums.ReactionType;
-import com.example.infinite.domain.Member.enums.MemberType;
+import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
+import com.example.infinite.domain.member.enums.MemberType;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

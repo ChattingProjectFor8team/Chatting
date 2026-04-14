@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Media.Controller;
+package com.example.infinite.domain.artistcontent.media.controller;
 
 public class MediaController {
 }

@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Payment.Dto;
+package com.example.infinite.domain.payment.dto;
 
 public class PaymentDto {
 }

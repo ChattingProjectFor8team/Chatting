@@ -1,4 +1,4 @@
-package com.example.infinite.domain.ArtistContent.Follow.Repository;
+package com.example.infinite.domain.artistcontent.follow.repository;
 
 public class FollowRepository {
 }
