@@ -1,10 +1,10 @@
 package com.example.infinite.global.error;
 
-import com.example.infinite.domain.ArtistContent.error.ArtistContentException;
-import com.example.infinite.domain.Interaction.error.InteractionException;
+import com.example.infinite.domain.ArtistContent.Interaction.error.InteractionException;
 import com.example.infinite.domain.Member.error.ArtistException;
 import com.example.infinite.domain.Member.error.MemberErrorCode;
 import com.example.infinite.domain.Member.error.MemberException;
+import com.example.infinite.domain.ArtistContent.Post.error.ArtistContentException;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
