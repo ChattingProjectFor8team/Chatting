@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "user_jelly_balances")
+@Table(name = "user_jelly_wallet")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserJellyBalance {
 
