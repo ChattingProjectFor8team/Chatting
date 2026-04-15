@@ -14,10 +14,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum UserRole {
 
-    SUPER_ADMIN("ROLE_SUPER_ADMIN", "시스템 관리자"),
-    ARTIST_ADMIN("ROLE_ARTIST_ADMIN", "아티스트 및 멤버"),
-    SUBSCRIBER("ROLE_SUBSCRIBER", "유료 구독 팬"),
-    USER("ROLE_USER", "일반 팬");
+    ROLE_SUPER_ADMIN("ROLE_SUPER_ADMIN", "시스템 관리자"),
+    ROLE_ARTIST_ADMIN("ROLE_ARTIST_ADMIN", "아티스트 및 멤버"),
+    ROLE_SUBSCRIBER("ROLE_SUBSCRIBER", "유료 구독 팬"),
+    ROLE_USER("ROLE_USER", "일반 팬");
 
     private final String authority; // 시큐리티 인증용 (ROLE_ 접두사 포함)
     private final String description; // 설명용

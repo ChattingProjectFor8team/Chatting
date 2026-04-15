@@ -1,6 +1,9 @@
 package com.example.infinite.global.auth;
 
+import com.example.infinite.global.error.ErrorCode;
+import com.example.infinite.global.exception.BusinessException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -26,7 +29,6 @@ import java.util.List;
 public class JwtTokenProvider {
 
     private final UserDetailsService userDetailsService;
-
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -83,8 +85,7 @@ public class JwtTokenProvider {
             }
 
             return claims; // 검증 성공 시 Claims 반환
-        }
-        catch (io.jsonwebtoken.security.SignatureException e) {
+        } catch (io.jsonwebtoken.security.SignatureException e) {
             log.warn("잘못된 JWT 서명입니다: {}", e.getMessage());
             throw e;
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
@@ -104,26 +105,34 @@ public class JwtTokenProvider {
 
     // 3. 인증 객체 생성
 
-
     public Authentication getAuthentication(String token) {
-        Claims claims = getClaims(token);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(claims.getSubject());
+        // 가. 토큰에서 클레임(정보)을 복호화해서 가져옴
+        Claims claims = parseClaims(token);
 
-        // 토큰에 담긴 role을 꺼내서 시큐리티 권한 객체로 변환
-        String role = claims.get("role", String.class);
-        List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
+        // 나. 클레임에서 권한 정보 가져오기 (토큰 생성 시 "auth"라는 키로 role을 넣었다고 가정)
+        if (claims.get("auth") == null) {
+            throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
+        }
 
-        // Principal에 이메일을 넣고, 권한 리스트를 부여
-        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        // 다. DB 조회 없이 토큰에 담긴 정보로만 인증 객체 생성
+        UserDetails userDetails = UserDetailsImpl.fromToken(
+                claims.getSubject(),             // email
+                claims.get("auth").toString()    // role
+        );
+        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 
-    private Claims getClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+    private Claims parseClaims(String accessToken) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(key) //
+                    .build()
+                    .parseSignedClaims(accessToken)
+                    .getPayload();
+        } catch (ExpiredJwtException e) {
+            return e.getClaims();
+        }
+
+
     }
-
-
 }

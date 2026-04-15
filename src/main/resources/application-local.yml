@@ -3,8 +3,11 @@ spring:
     url: jdbc:mysql://localhost:3306/infinite_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
     username: root
     password: 12345678
-    driver-class-name: com.mysql.cj.jdbc.Driver
 
+  data:
+    redis:
+      repositories:
+        enabled: false # Redis 리포지토리 기능 비활성화
   jpa:
     hibernate:
       ddl-auto: update
@@ -20,5 +23,6 @@ spring:
       password: test
 
 jwt:
-  secret: ${JWT_SECRET_KEY}
-  expiration: ${JWT_EXPIRATION}
+  secret: hPMxL5f4sKurvQQV4CdVCnD0a8cPNWKEgWge5nxELBw=
+  expiration: 1800000
+

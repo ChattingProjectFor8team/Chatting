@@ -59,7 +59,7 @@ public class User extends BaseEntity {
                 email,
                 password,
                 phoneNumber,
-                UserRole.USER,      // 초기 가입 시 기본 권한 설정
+                UserRole.ROLE_USER,      // 초기 가입 시 기본 권한 설정
                 "ACTIVE",           // 초기 상태
                 nickname,
                 "NONE"              // 초기 구독 상태
