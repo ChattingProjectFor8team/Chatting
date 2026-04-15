@@ -1,6 +1,6 @@
-package com.example.infinite.domain.Payment.Dto.Response;
+package com.example.infinite.domain.payment.dto.response;
 
-import com.example.infinite.domain.Payment.Entity.UserJellyBalance;
+import com.example.infinite.domain.payment.entity.UserJellyBalance;
 
 public record JellyBalance(
         Long userId,

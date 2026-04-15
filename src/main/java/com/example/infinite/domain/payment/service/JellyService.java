@@ -1,13 +1,13 @@
-package com.example.infinite.domain.Payment.Service;
+package com.example.infinite.domain.payment.service;
 
-import com.example.infinite.domain.Payment.Dto.Response.JellyBalance;
-import com.example.infinite.domain.Payment.Dto.Response.JellyHistory;
-import com.example.infinite.domain.Payment.Entity.JellyTransaction;
-import com.example.infinite.domain.Payment.Entity.UserJellyBalance;
-import com.example.infinite.domain.Payment.Enums.ReferenceType;
-import com.example.infinite.domain.Payment.Enums.TransactionType;
-import com.example.infinite.domain.Payment.Repository.JellyTransactionRepository;
-import com.example.infinite.domain.Payment.Repository.UserJellyBalanceRepository;
+import com.example.infinite.domain.payment.dto.response.JellyBalance;
+import com.example.infinite.domain.payment.dto.response.JellyHistory;
+import com.example.infinite.domain.payment.entity.JellyTransaction;
+import com.example.infinite.domain.payment.entity.UserJellyBalance;
+import com.example.infinite.domain.payment.enums.ReferenceType;
+import com.example.infinite.domain.payment.enums.TransactionType;
+import com.example.infinite.domain.payment.repository.JellyTransactionRepository;
+import com.example.infinite.domain.payment.repository.UserJellyBalanceRepository;
 import com.example.infinite.global.error.ErrorCode;
 import com.example.infinite.global.error.PaymentException;
 import lombok.RequiredArgsConstructor;

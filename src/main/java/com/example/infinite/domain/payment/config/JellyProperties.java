@@ -1,4 +1,4 @@
-package com.example.infinite.domain.Payment.Config;
+package com.example.infinite.domain.payment.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

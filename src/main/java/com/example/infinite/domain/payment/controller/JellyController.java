@@ -1,8 +1,8 @@
-package com.example.infinite.domain.Payment.Controller;
+package com.example.infinite.domain.payment.controller;
 
-import com.example.infinite.domain.Payment.Dto.Response.JellyBalance;
-import com.example.infinite.domain.Payment.Dto.Response.JellyHistory;
-import com.example.infinite.domain.Payment.Service.JellyService;
+import com.example.infinite.domain.payment.dto.response.JellyBalance;
+import com.example.infinite.domain.payment.dto.response.JellyHistory;
+import com.example.infinite.domain.payment.service.JellyService;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.PageResponse;
 import lombok.RequiredArgsConstructor;

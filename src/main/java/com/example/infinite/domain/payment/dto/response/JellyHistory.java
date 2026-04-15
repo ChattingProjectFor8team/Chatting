@@ -1,8 +1,8 @@
-package com.example.infinite.domain.Payment.Dto.Response;
+package com.example.infinite.domain.payment.dto.response;
 
-import com.example.infinite.domain.Payment.Entity.JellyTransaction;
-import com.example.infinite.domain.Payment.Enums.ReferenceType;
-import com.example.infinite.domain.Payment.Enums.TransactionType;
+import com.example.infinite.domain.payment.entity.JellyTransaction;
+import com.example.infinite.domain.payment.enums.ReferenceType;
+import com.example.infinite.domain.payment.enums.TransactionType;
 
 import java.time.LocalDateTime;
 
