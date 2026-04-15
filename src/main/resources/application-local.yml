@@ -23,6 +23,6 @@ spring:
       password: test
 
 jwt:
-  secret: hPMxL5f4sKurvQQV4CdVCnD0a8cPNWKEgWge5nxELBw=
+  secret: ${JWT_SECRET_KEY}
   expiration: 1800000
 

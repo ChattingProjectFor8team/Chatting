@@ -41,40 +41,27 @@ public class SecurityConfig {
                 // 2. 요청 권한 설정 (화이트리스트 운영)
                 // TODO : 너무 초안이라 반드시 수정해야함
                 .authorizeHttpRequests(auth -> auth
-                                // 1. 전체 공개 (인증 없이 접근 가능)
+                                // 1. 전체 공개
                                 .requestMatchers("/api/auth/v1/**", "/h2-console/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artist-posts/**").permitAll() // 게시글 조회는 비로그인도 가능할 경우
+                                .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
 
-                                // 2. 슈퍼 어드민 전용 (전체 관리)
-                                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                                .requestMatchers("/api/payment/v1/charge/settings/**").hasRole("ADMIN")
-
-                                // 3. 아티스트 및 어드민 (콘텐츠 생성 및 라이브 관리)
-                                .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "ADMIN")
-                                .requestMatchers("/api/v1/admin/lives/**", "/api/v1/admin/raffles/**").hasAnyRole("ARTIST", "ADMIN")
-
-                                // 4. 구독팬 전용 (팬레터 작성, DM 등 유료 서비스)
-                                .requestMatchers("/api/post/v1/fan-letters/**").hasAnyRole("SUBSCRIBER", "ARTIST", "ADMIN")
-                                .requestMatchers("/api/payment/v1/subscription/**").hasRole("SUBSCRIBER")
-
-                                // 5. 일반 팬 (멤버십 가입자 및 미가입자 공통 - 포스트 작성, 댓글, 좋아요)
-                                .requestMatchers("/api/post/v1/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
-                                .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
-                                .requestMatchers("/api/myinfo/v1/**", "/api/payment/v1/jelly/**").authenticated()
-
-                                // 미디어 조회는 전체 공개 (또는 로그인 유저 전체)
-                                .requestMatchers(HttpMethod.GET, "/api/media/v1/**").permitAll()
-
-                                // 유튜브 연동 및 미디어 관리 (아티스트/어드민 전용)
+                                // 2. 어드민 및 관리자 전용
+                                .requestMatchers("/api/v1/admin/**", "/api/payment/v1/charge/settings/**").hasRole("ADMIN")
+                                .requestMatchers("/api/post/v1/artist-posts", "/api/v1/admin/lives/**", "/api/v1/admin/raffles/**").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
 
-                                // 구독 관련 정보 및 이력 조회 (구독팬 전용)
-                                .requestMatchers("/api/payment/v1/subscription/**").hasAnyRole("SUBSCRIBER", "ARTIST", "ADMIN")
+                                // 3. 유료 서비스 (구독팬 전용)
+                                .requestMatchers("/api/post/v1/fan-letters/**", "/api/payment/v1/subscription/**").hasAnyRole("SUBSCRIBER", "ARTIST", "ADMIN")
 
-                                // 알림 및 소켓 연결 권한
-                                .requestMatchers("/sub/user/{userId}/notifications").authenticated() // 본인 알림은 본인만
+                                // 4. 일반 사용자 및 공통 인증
+                                .requestMatchers("/api/post/v1/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
+                                .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
+                                .requestMatchers("/api/myinfo/v1/**", "/api/payment/v1/jelly/**").authenticated()
+                                .requestMatchers("/sub/user/{userId}/notifications").authenticated()
+
+                                // 5.위에서 걸러지지 않은 모든 요청은 무조건 인증 필요
                                 .anyRequest().authenticated()
                 )
 

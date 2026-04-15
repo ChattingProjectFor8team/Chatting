@@ -1,10 +1,11 @@
-package com.example.infinite.domain.user.controller;
+package com.example.infinite.domain.member.controller;
 
 
-import com.example.infinite.domain.user.service.AuthService;
-import com.example.infinite.domain.user.dto.LoginRequest;
-import com.example.infinite.domain.user.dto.SignUpRequest;
-import com.example.infinite.domain.user.dto.TokenResponse;
+
+import com.example.infinite.domain.member.dto.request.LoginRequest;
+import com.example.infinite.domain.member.dto.request.SignUpRequest;
+import com.example.infinite.domain.member.dto.response.TokenResponse;
+import com.example.infinite.domain.member.service.AuthService;
 import com.example.infinite.global.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;

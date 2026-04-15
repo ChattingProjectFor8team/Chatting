@@ -1,11 +1,13 @@
-package com.example.infinite.domain.user.service;
+package com.example.infinite.domain.member.service;
 
 
-import com.example.infinite.domain.user.dto.LoginRequest;
-import com.example.infinite.domain.user.dto.SignUpRequest;
-import com.example.infinite.domain.user.dto.TokenResponse;
-import com.example.infinite.domain.user.entity.User;
-import com.example.infinite.domain.user.repository.UserRepository;
+
+import com.example.infinite.domain.member.dto.request.LoginRequest;
+import com.example.infinite.domain.member.dto.request.SignUpRequest;
+import com.example.infinite.domain.member.dto.response.TokenResponse;
+import com.example.infinite.domain.member.entity.Member;
+import com.example.infinite.domain.member.enums.MemberRole;
+import com.example.infinite.domain.member.repository.MemberRepository;
 import com.example.infinite.global.auth.JwtTokenProvider;
 import com.example.infinite.global.error.ErrorCode;
 import com.example.infinite.global.exception.BusinessException;
@@ -19,37 +21,38 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AuthService {
 
-    private final UserRepository userRepository;
+    private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
     // 💡 회원가입
     public void signUp(SignUpRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        if (memberRepository.existsByEmail(request.email())) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL); // 이미 있는 이메일 체크
         }
 
-        User user = User.createNewUser(
+        Member member = Member.createNewMember(
                 request.email(),
                 passwordEncoder.encode(request.password()),
                 request.phoneNumber(),
-                request.nickname()
+                request.nickname(),
+                MemberRole.USER
         );
-        userRepository.save(user);
+        memberRepository.save(member);
     }
 
     // 💡 로그인
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        Member member = memberRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.password(), member.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_PASSWORD);
         }
 
         // 토큰 생성 (Subject로 이메일 사용)
-        String accessToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().name());
+        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().name());
         return new TokenResponse(accessToken, "Bearer");
     }
 }

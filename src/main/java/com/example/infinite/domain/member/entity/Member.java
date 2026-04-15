@@ -45,4 +45,16 @@ public class Member extends BaseEntity {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
+
+    public static Member createNewMember(String email, String password, String nickname, String phoneNumber, MemberRole role) {
+        Member member = new Member();
+        member.email = email;
+        member.password = password;
+        member.nickname = nickname;
+        member.phoneNumber = phoneNumber;
+        member.role = role;
+        member.status = MemberStatus.ACTIVE;
+        return member;
+    }
+
 }

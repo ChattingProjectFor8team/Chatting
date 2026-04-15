@@ -115,7 +115,7 @@ public class JwtTokenProvider {
         }
 
         // 다. DB 조회 없이 토큰에 담긴 정보로만 인증 객체 생성
-        UserDetails userDetails = UserDetailsImpl.fromToken(
+        UserDetails userDetails = MemberDetailsImpl.fromToken(
                 claims.getSubject(),             // email
                 claims.get("auth").toString()    // role
         );
@@ -125,14 +125,16 @@ public class JwtTokenProvider {
     private Claims parseClaims(String accessToken) {
         try {
             return Jwts.parser()
-                    .verifyWith(key) //
+                    .verifyWith(key)
                     .build()
                     .parseSignedClaims(accessToken)
                     .getPayload();
         } catch (ExpiredJwtException e) {
-            return e.getClaims();
+            log.error("만료된 JWT 토큰입니다.");
+            throw e;
+        } catch (JwtException e) {
+            log.error("유효하지 않은 JWT 토큰입니다.");
+            throw new RuntimeException("Invalid JWT token");
         }
-
-
     }
 }

@@ -4,4 +4,5 @@ public enum MemberRole {
     USER,
     ARTIST_ADMIN,
     SUPER_ADMIN
+
 }
