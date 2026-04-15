@@ -53,7 +53,15 @@ public enum ErrorCode implements ErrorCodeType {
     // 7. LiveStreaming (라이브)
     LIVE_STREAM_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "진행 중인 라이브 방송 정보를 찾을 수 없습니다."),
     LIVE_THUMBNAIL_REQUIRED(HttpStatus.BAD_REQUEST, "L002", "라이브 송출을 위해 썸네일 등록이 필수입니다."),
-    LIVE_CHAT_NOT_READY(HttpStatus.INTERNAL_SERVER_ERROR, "L003", "라이브 채팅 서버와의 연결에 실패했습니다.");
+    LIVE_CHAT_NOT_READY(HttpStatus.INTERNAL_SERVER_ERROR, "L003", "라이브 채팅 서버와의 연결에 실패했습니다."),
+
+    // 8. User (사용자) 너무 귀찮아서 나중에 쪼개갰습니다 아효
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "해당 사용자를 찾을 수 없습니다."),
+    DUPLICATE_EMAIL(HttpStatus.BAD_REQUEST, "U002", "이미 사용 중인 이메일입니다."),
+    INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "U003", "비밀번호가 일치하지 않습니다."),
+    USER_ALREADY_LOGOUT(HttpStatus.BAD_REQUEST, "U004", "이미 로그아웃된 사용자입니다."),
+    USER_STATUS_INACTIVE(HttpStatus.FORBIDDEN, "U005", "비활성화된 계정입니다. 관리자에게 문의하세요.");
+
 
     private final HttpStatus status;
     private final String code;

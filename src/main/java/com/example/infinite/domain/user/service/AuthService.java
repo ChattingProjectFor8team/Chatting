@@ -1,0 +1,55 @@
+package com.example.infinite.domain.user.service;
+
+
+import com.example.infinite.domain.user.dto.LoginRequest;
+import com.example.infinite.domain.user.dto.SignUpRequest;
+import com.example.infinite.domain.user.dto.TokenResponse;
+import com.example.infinite.domain.user.entity.User;
+import com.example.infinite.domain.user.repository.UserRepository;
+import com.example.infinite.global.auth.JwtTokenProvider;
+import com.example.infinite.global.error.ErrorCode;
+import com.example.infinite.global.exception.BusinessException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
+
+    // 💡 회원가입
+    public void signUp(SignUpRequest request) {
+        if (userRepository.existsByEmail(request.email())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_EMAIL); // 이미 있는 이메일 체크
+        }
+
+        User user = User.createNewUser(
+                request.email(),
+                passwordEncoder.encode(request.password()),
+                request.phoneNumber(),
+                request.nickname()
+        );
+        userRepository.save(user);
+    }
+
+    // 💡 로그인
+    @Transactional(readOnly = true)
+    public TokenResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 토큰 생성 (Subject로 이메일 사용)
+        String accessToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().name());
+        return new TokenResponse(accessToken, "Bearer");
+    }
+}
