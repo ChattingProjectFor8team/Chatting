@@ -79,6 +79,9 @@ dependencies {
 
     // Swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
+
+    //env 설정
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 }
 
 tasks.withType(JavaCompile).configureEach {
