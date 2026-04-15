@@ -34,35 +34,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
-        // 1. 요청 헤더에서 토큰 추출
         String jwt = resolveToken(request);
 
-        // 2. 토큰 유효성 검사 및 인증 처리
         if (StringUtils.hasText(jwt)) {
             try {
-                // [수정 포인트] 이제 boolean 리턴이 아니라 Claims를 가져오거나 예외가 터집니다.
+                // validateToken이 반환한 Claims를 그대로 전달 → 이중 파싱 제거
                 Claims claims = jwtTokenProvider.validateToken(jwt);
-
-                // 3. 유효시 인증 객체 생성 (이미 검증된 claims가 있다면 더 효율적입니다)
-                Authentication authentication = jwtTokenProvider.getAuthentication(jwt);
-
-                // 4. SecurityContext에 인증 정보 저장
+                Authentication authentication = jwtTokenProvider.getAuthentication(claims);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
             } catch (ExpiredJwtException e) {
-                log.warn("만료된 토큰 요청입니다: {}", e.getMessage());
-                // TODO : 필요 시 request.setAttribute("exception", ErrorCode.TOKEN_EXPIRED); 추가
+                log.warn("만료된 토큰: {}", e.getMessage());
             } catch (JwtException | IllegalArgumentException e) {
-                log.warn("유효하지 않은 토큰 요청입니다: {}", e.getMessage());
-                // TODO : 필요 시 request.setAttribute("exception", ErrorCode.INVALID_TOKEN); 추가
+                log.warn("유효하지 않은 토큰: {}", e.getMessage());
             }
         }
 
-        // 5. 다음 필터로 진행
         filterChain.doFilter(request, response);
-    }
 
+    }
 
         // 헤더에서 "Bearer "를 제외한 순수 토큰 문자열만 꺼내오는 로직
         private String resolveToken(HttpServletRequest request) {

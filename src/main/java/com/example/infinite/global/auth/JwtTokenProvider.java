@@ -14,127 +14,102 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
-import java.util.Collections;
 import java.util.Date;
-import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtTokenProvider {
 
-    private final UserDetailsService userDetailsService;
+
+    // ──────────────────────────────────────────────
+    // 1. Claim 키 상수 — 생성과 소비가 반드시 같은 키를 참조
+    // ──────────────────────────────────────────────
+    private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_TYPE = "type";
+    private static final String TOKEN_TYPE_ACCESS = "ACCESS";
 
     @Value("${jwt.secret}")
     private String secretKey;
 
     private SecretKey key;
 
-    @Value("${jwt.expiration:1800000}")
+    @Value("${jwt.expiration}")
     private long validityInMilliseconds;
 
     @PostConstruct
     protected void init() {
-        // 보안상 문자열 키를 바이트 배열로 변환하여 HMAC-SHA 알고리즘 키로 로딩합니다.
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-
-        // 키 길이 검증 (HS256을 위해 최소 256비트/32바이트 확보)
         if (keyBytes.length < 32) {
-            log.error("JWT 시크릿 키가 너무 짧습니다. 최소 32바이트(256비트)가 필요합니다.");
-            throw new IllegalArgumentException("JWT 시크릿 키의 길이가 부족합니다. 현재 길이: " + keyBytes.length);
+            throw new IllegalArgumentException(
+                    "JWT 시크릿 키 길이 부족: 최소 32바이트 필요, 현재 " + keyBytes.length + "바이트");
         }
-
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // 1. 토큰 생성
+    // ──────────────────────────────────────────────
+    // 2. 토큰 생성
+    // ──────────────────────────────────────────────
     public String createToken(String userEmail, String role) {
         Date now = new Date();
         Date validity = new Date(now.getTime() + validityInMilliseconds);
 
-        //TODO : 프로젝트 윤곽이 나왔을때 issuer와 Audience 설정
         return Jwts.builder()
                 .subject(userEmail)
-                .claim("role", role)
-                .claim("type", "ACCESS")
+                .claim(CLAIM_ROLE, role)           // 상수 사용
+                .claim(CLAIM_TYPE, TOKEN_TYPE_ACCESS)
                 .issuedAt(now)
                 .expiration(validity)
-                .signWith(key, Jwts.SIG.HS256) // 알고리즘 명시로 혼동 공격 방어
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 
-    // 2. 토큰 파싱 및 검증 // TODO : 검증 역시 issuer와 Audience 추가 예정
+    // ──────────────────────────────────────────────
+    // 3. 토큰 검증 → Claims 반환
+    //    실패 시 예외를 그대로 throw (Filter에서 catch)
+    // ──────────────────────────────────────────────
     public Claims validateToken(String token) {
-        try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
 
-            // 토큰 타입 검증 (ACCESS 타입이 아니면 예외를 던짐)
-            String type = claims.get("type", String.class);
-            if (!"ACCESS".equals(type)) {
-                log.warn("잘못된 토큰 타입입니다. 기대값: ACCESS, 실제값: {}", type);
-                throw new JwtException("Invalid token type");
-            }
-
-            return claims; // 검증 성공 시 Claims 반환
-        } catch (io.jsonwebtoken.security.SignatureException e) {
-            log.warn("잘못된 JWT 서명입니다: {}", e.getMessage());
-            throw e;
-        } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            log.warn("만료된 JWT 토큰입니다: {}", e.getMessage());
-            throw e;
-        } catch (io.jsonwebtoken.UnsupportedJwtException e) {
-            log.warn("지원되지 않는 JWT 토큰입니다: {}", e.getMessage());
-            throw e;
-        } catch (IllegalArgumentException e) {
-            log.warn("JWT 토큰이 비어있거나 잘못되었습니다: {}", e.getMessage());
-            throw e;
-        } catch (JwtException e) {
-            log.error("JWT 검증 중 예상치 못한 오류 발생: {}", e.getMessage());
-            throw e;
+        // 토큰 타입 검증
+        String type = claims.get(CLAIM_TYPE, String.class);
+        if (!TOKEN_TYPE_ACCESS.equals(type)) {
+            throw new JwtException("Invalid token type: " + type);
         }
+
+        return claims;
     }
 
-    // 3. 인증 객체 생성
+    // ──────────────────────────────────────────────
+    // 4. 인증 객체 생성 — 이미 검증된 Claims를 직접 받음
+    //    ⚠️ 기존: getAuthentication(String token) → 내부에서 또 파싱
+    //    수정: getAuthentication(Claims claims) → 이중 파싱 제거
+    // ──────────────────────────────────────────────
+    public Authentication getAuthentication(Claims claims) {
+        String role = claims.get(CLAIM_ROLE, String.class);   // 상수 사용 → 불일치 원천 차단
 
-    public Authentication getAuthentication(String token) {
-        // 가. 토큰에서 클레임(정보)을 복호화해서 가져옴
-        Claims claims = parseClaims(token);
-
-        // 나. 클레임에서 권한 정보 가져오기 (토큰 생성 시 "auth"라는 키로 role을 넣었다고 가정)
-        if (claims.get("auth") == null) {
+        if (role == null) {
             throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
         }
 
-        // 다. DB 조회 없이 토큰에 담긴 정보로만 인증 객체 생성
         UserDetails userDetails = MemberDetailsImpl.fromToken(
-                claims.getSubject(),             // email
-                claims.get("auth").toString()    // role
+                claims.getSubject(),    // email
+                role                    // role
         );
-        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
+
+        return new UsernamePasswordAuthenticationToken(
+                userDetails, "", userDetails.getAuthorities());
     }
 
-    private Claims parseClaims(String accessToken) {
-        try {
-            return Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(accessToken)
-                    .getPayload();
-        } catch (ExpiredJwtException e) {
-            log.error("만료된 JWT 토큰입니다.");
-            throw e;
-        } catch (JwtException e) {
-            log.error("유효하지 않은 JWT 토큰입니다.");
-            throw new RuntimeException("Invalid JWT token");
-        }
-    }
+
+
+
 }
