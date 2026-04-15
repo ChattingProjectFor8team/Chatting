@@ -28,7 +28,7 @@ public class JwtTokenProvider {
     private final UserDetailsService userDetailsService;
 
 
-    @Value("${JWT_SECRET_KEY}")
+    @Value("${jwt.secret}")
     private String secretKey;
 
     private SecretKey key;
