@@ -61,8 +61,8 @@ public class SecurityConfig {
                                 .requestMatchers("/api/myinfo/v1/**", "/api/payment/v1/jelly/**").authenticated()
                                 .requestMatchers("/sub/user/{userId}/notifications").authenticated()
 
-                                // 5.위에서 걸러지지 않은 모든 요청은 무조건 인증 필요
-                                .anyRequest().authenticated()
+                                // 5. 핸드쉐이크만 허용
+                                .requestMatchers("/ws-stomp/**").permitAll()
                 )
 
                 // 3. 예외 핸들링 (EntryPoint, DeniedHandler 운영)

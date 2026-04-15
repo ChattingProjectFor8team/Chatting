@@ -2,6 +2,7 @@ package com.example.infinite.global.auth;
 
 
 import com.example.infinite.domain.member.entity.Member;
+import com.example.infinite.domain.member.enums.MemberRole;
 import com.example.infinite.domain.member.enums.MemberStatus;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
@@ -10,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+
+import static com.example.infinite.domain.member.entity.QMember.member;
 
 /**
  * Spring Security 인증 객체 내부에서 멤버 정보를 담는 구현체입니다.
@@ -33,8 +36,9 @@ public class MemberDetailsImpl implements UserDetails {
     // 2. 토큰 기반 생성자 (동일하게 처리)
     private MemberDetailsImpl(String email, String role) {
         this.email = email;
-        // 토큰에서 넘어오는 role이 이미 "ROLE_USER"라면 그대로, 아니라면 여기서 가공
+
         this.role = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+
         this.status = MemberStatus.ACTIVE.name();
     }
     /**
