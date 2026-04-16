@@ -24,6 +24,7 @@ public enum ErrorCode implements ErrorCodeType {
     PAYMENT_AUTO_CHARGING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "P003", "월 단위 정기 결제 처리 중 오류가 발생했습니다."),
     JELLY_WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "P004", "사용자의 젤리 지갑 정보를 찾을 수 없습니다."),
     REFUND_NOT_ELIGIBLE(HttpStatus.BAD_REQUEST, "P005", "환불 정책 조건을 충족하지 않습니다."),
+    BILLING_KEY_NOT_FOUND(HttpStatus.NOT_FOUND, "P006", "등록된 카드 정보를 찾을 수 없습니다."), // [추가] 빌링키 도메인 특화 에러코드 - 운영 로그에서 원인 파악 용이
 
     // 3. DM (Direct Message)
     DM_SUBSCRIPTION_REQUIRED(HttpStatus.FORBIDDEN, "D001", "DM 구독 상태인 유저만 이용 가능합니다."),

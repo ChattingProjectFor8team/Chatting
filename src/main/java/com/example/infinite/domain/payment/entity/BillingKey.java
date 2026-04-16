@@ -46,7 +46,13 @@ public class BillingKey extends BaseEntity {
         this.defaultCard = defaultCard;
     }
 
-    public void setDefault(boolean defaultCard) {
-        this.defaultCard = defaultCard;
+    // [추가] 대표 카드 설정 - 의도를 명확히 표현하는 메서드명 사용 (@Setter 지양 컨벤션 준수)
+    public void markAsDefault() {
+        this.defaultCard = true;
+    }
+
+    // [추가] 대표 카드 해제 - setDefault(false) 대신 의도 명확한 메서드로 분리
+    public void unsetDefault() {
+        this.defaultCard = false;
     }
 }
