@@ -1,85 +1,115 @@
 package com.example.infinite.global.auth;
 
+import com.example.infinite.global.error.ErrorCode;
+import com.example.infinite.global.exception.BusinessException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
-import java.util.Collections;
 import java.util.Date;
-import java.util.List;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class JwtTokenProvider {
-    @Value("${JWT_SECRET_KEY}")
+
+
+    // ──────────────────────────────────────────────
+    // 1. Claim 키 상수 — 생성과 소비가 반드시 같은 키를 참조
+    // ──────────────────────────────────────────────
+    private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_TYPE = "type";
+    private static final String TOKEN_TYPE_ACCESS = "ACCESS";
+
+    @Value("${jwt.secret}")
     private String secretKey;
 
     private SecretKey key;
 
-    @Value("${jwt.expiration:1800000}")
+    @Value("${jwt.expiration}")
     private long validityInMilliseconds;
 
     @PostConstruct
     protected void init() {
-        // 보안상 문자열 키를 바이트 배열로 변환하여 HMAC-SHA 알고리즘 키로 로딩합니다.
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException(
+                    "JWT 시크릿 키 길이 부족: 최소 32바이트 필요, 현재 " + keyBytes.length + "바이트");
+        }
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // 1. 토큰 생성
+    // ──────────────────────────────────────────────
+    // 2. 토큰 생성
+    // ──────────────────────────────────────────────
     public String createToken(String userEmail, String role) {
         Date now = new Date();
         Date validity = new Date(now.getTime() + validityInMilliseconds);
 
         return Jwts.builder()
                 .subject(userEmail)
-                .claim("role", role)
+                .claim(CLAIM_ROLE, role)           // 상수 사용
+                .claim(CLAIM_TYPE, TOKEN_TYPE_ACCESS)
                 .issuedAt(now)
                 .expiration(validity)
-                .signWith(key, Jwts.SIG.HS256) // 알고리즘 명시로 혼동 공격 방어
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 
-    // 2. 토큰 파싱 및 검증
-    public boolean validateToken(String token) {
-        try {
-            Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            log.warn("JWT 검증 실패: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    // 3. 인증 객체 생성
-    public Authentication getAuthentication(String token) {
-        Claims claims = getClaims(token);
-
-        // 토큰에 담긴 role을 꺼내서 시큐리티 권한 객체로 변환
-        String role = claims.get("role", String.class);
-        List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
-
-        // Principal에 이메일을 넣고, 권한 리스트를 부여합니다.
-        return new UsernamePasswordAuthenticationToken(claims.getSubject(), "", authorities);
-    }
-
-    private Claims getClaims(String token) {
-        return Jwts.parser()
+    // ──────────────────────────────────────────────
+    // 3. 토큰 검증 → Claims 반환
+    //    실패 시 예외를 그대로 throw (Filter에서 catch)
+    // ──────────────────────────────────────────────
+    public Claims validateToken(String token) {
+        Claims claims = Jwts.parser()
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+
+        // 토큰 타입 검증
+        String type = claims.get(CLAIM_TYPE, String.class);
+        if (!TOKEN_TYPE_ACCESS.equals(type)) {
+            throw new JwtException("Invalid token type: " + type);
+        }
+
+        return claims;
     }
+
+    // ──────────────────────────────────────────────
+    // 4. 인증 객체 생성 — 이미 검증된 Claims를 직접 받음
+    //    ⚠️ 기존: getAuthentication(String token) → 내부에서 또 파싱
+    //    수정: getAuthentication(Claims claims) → 이중 파싱 제거
+    // ──────────────────────────────────────────────
+    public Authentication getAuthentication(Claims claims) {
+        String role = claims.get(CLAIM_ROLE, String.class);   // 상수 사용 → 불일치 원천 차단
+
+        if (role == null) {
+            throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
+        }
+
+        UserDetails userDetails = MemberDetailsImpl.fromToken(
+                claims.getSubject(),    // email
+                role                    // role
+        );
+
+        return new UsernamePasswordAuthenticationToken(
+                userDetails, "", userDetails.getAuthorities());
+    }
+
+
+
+
 }
