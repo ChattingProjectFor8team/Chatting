@@ -66,22 +66,31 @@ public class ChargeService {
     }
 
     // 자동충전 실행 (잔액 부족 시 내부 호출)
+    // 호출 시점: 젤리 사용 후 잔액이 thresholdBalance 이하로 떨어졌을 때
     @Transactional
     public void execute(Long userId) {
         AutoChargeSetting setting = autoChargeSettingRepository.findByUserId(userId)
                 .filter(AutoChargeSetting::isEnabled)
                 .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_AUTO_CHARGING_FAILED));
 
+        // 현재 잔액이 기준치보다 높으면 자동충전 불필요 → 조기 종료
+        // 예: thresholdBalance=10, 현재잔액=15 → 충전하지 않음
+        // 예: thresholdBalance=10, 현재잔액=5  → 충전 진행
+        int currentBalance = jellyService.getBalance(userId).currentBalance();
+        if (currentBalance > setting.getThresholdBalance()) {
+            return;
+        }
+
         try {
-            // 젤리 충전 (JellyService 연동)
+            // 기준치 이하 확인 후 설정된 젤리 수량만큼 충전 (JellyService 위임)
             jellyService.charge(userId, setting.getJellyAmount(),
                     ReferenceType.PAYMENT, setting.getId());
 
-            // 성공 이력 저장
+            // 충전 성공 이력 저장
             saveHistory(userId, setting, true, null);
 
         } catch (Exception e) {
-            // 실패 이력 저장
+            // 충전 실패 이력 저장 후 예외 재발생
             saveHistory(userId, setting, false, e.getMessage());
             throw new PaymentException(ErrorCode.PAYMENT_AUTO_CHARGING_FAILED);
         }
