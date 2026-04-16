@@ -4,7 +4,6 @@ import com.example.infinite.domain.payment.dto.request.ChargeSettingRequest;
 import com.example.infinite.domain.payment.dto.response.AutoChargeHistoryResponse;
 import com.example.infinite.domain.payment.dto.response.ChargeSettingResponse;
 import com.example.infinite.domain.payment.entity.AutoChargeSetting;
-import com.example.infinite.domain.payment.entity.AutoChargeHistory;
 import com.example.infinite.domain.payment.entity.BillingKey;
 import com.example.infinite.domain.payment.enums.ReferenceType;
 import com.example.infinite.domain.payment.repository.AutoChargeHistoryRepository;
@@ -12,6 +11,7 @@ import com.example.infinite.domain.payment.repository.AutoChargeSettingRepositor
 import com.example.infinite.domain.payment.repository.BillingKeyRepository;
 import com.example.infinite.global.error.ErrorCode;
 import com.example.infinite.global.error.PaymentException;
+import com.example.infinite.global.lock.RedisLock; // [추가] 이중 청구 방지용 분산락 import
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +26,7 @@ public class ChargeService {
     private final AutoChargeHistoryRepository autoChargeHistoryRepository;
     private final BillingKeyRepository billingKeyRepository;
     private final JellyService jellyService;
+    private final ChargeHistoryService chargeHistoryService; // [추가] 이력 저장 전담 서비스 주입
 
     // 자동충전 설정 등록 또는 수정
     @Transactional
@@ -67,13 +68,16 @@ public class ChargeService {
 
     // 자동충전 실행 (잔액 부족 시 내부 호출)
     // 호출 시점: 젤리 사용 후 잔액이 thresholdBalance 이하로 떨어졌을 때
+    // [수정] @RedisLock 추가 - 동일 유저의 동시 호출을 직렬화해 이중 청구 방지
+    // waitTime=3s: 락 획득 대기, leaseTime=10s: 락 최대 점유 시간
+    @RedisLock(key = "'auto-charge:' + #userId", waitTime = 3, leaseTime = 10)
     @Transactional
     public void execute(Long userId) {
         AutoChargeSetting setting = autoChargeSettingRepository.findByUserId(userId)
                 .filter(AutoChargeSetting::isEnabled)
                 .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_AUTO_CHARGING_FAILED));
 
-        // 현재 잔액이 기준치보다 높으면 자동충전 불필요 → 조기 종료
+        // [수정] 락 획득 후 잔액 재조회 - 락 대기 중 다른 스레드가 이미 충전했을 수 있으므로 재검증
         // 예: thresholdBalance=10, 현재잔액=15 → 충전하지 않음
         // 예: thresholdBalance=10, 현재잔액=5  → 충전 진행
         int currentBalance = jellyService.getBalance(userId).currentBalance();
@@ -86,12 +90,12 @@ public class ChargeService {
             jellyService.charge(userId, setting.getJellyAmount(),
                     ReferenceType.PAYMENT, setting.getId());
 
-            // 충전 성공 이력 저장
-            saveHistory(userId, setting, true, null);
+            // [수정] 성공 이력 저장 - chargeHistoryService에 위임 (기존 트랜잭션 참여)
+            chargeHistoryService.saveSuccess(userId, setting);
 
         } catch (Exception e) {
-            // 충전 실패 이력 저장 후 예외 재발생
-            saveHistory(userId, setting, false, e.getMessage());
+            // [수정] 실패 이력 저장 - REQUIRES_NEW 독립 트랜잭션으로 롤백과 무관하게 DB에 기록됨
+            chargeHistoryService.saveFailure(userId, setting, e.getMessage());
             throw new PaymentException(ErrorCode.PAYMENT_AUTO_CHARGING_FAILED);
         }
     }
@@ -103,15 +107,5 @@ public class ChargeService {
                 .map(AutoChargeHistoryResponse::from);
     }
 
-    // 이력 저장 (공통 메서드)
-    private void saveHistory(Long userId, AutoChargeSetting setting,
-                             boolean success, String failReason) {
-        autoChargeHistoryRepository.save(AutoChargeHistory.builder()
-                .userId(userId)
-                .billingKey(setting.getBillingKey())
-                .jellyAmount(setting.getJellyAmount())
-                .success(success)
-                .failReason(failReason)
-                .build());
-    }
+    // [삭제] saveHistory() private 메서드 → ChargeHistoryService로 이전
 }
