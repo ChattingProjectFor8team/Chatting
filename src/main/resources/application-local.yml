@@ -18,3 +18,5 @@ spring:
     user:
       name: test
       password: test
+  portone:
+    api-secret: store-8fb16e35-199d-4c65-b31f-78b7d4557e62
