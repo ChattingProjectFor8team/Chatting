@@ -12,8 +12,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 
-import static com.example.infinite.domain.member.entity.QMember.member;
-
 /**
  * Spring Security 인증 객체 내부에서 멤버 정보를 담는 구현체입니다.
  * 리더님의 설계에 따라 DB 조회 기반 생성과 토큰 정보 기반 생성을 모두 지원합니다.
