@@ -1,9 +1,9 @@
 package com.example.infinite.global.error;
 
 import com.example.infinite.domain.artistcontent.interaction.error.InteractionException;
-import com.example.infinite.domain.member.error.ArtistException;
-import com.example.infinite.domain.member.error.MemberErrorCode;
-import com.example.infinite.domain.member.error.MemberException;
+import com.example.infinite.domain.member.artist.error.ArtistException;
+import com.example.infinite.domain.member.member.error.MemberErrorCode;
+import com.example.infinite.domain.member.member.error.MemberException;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.ErrorResponse;

@@ -1,9 +1,9 @@
 package com.example.infinite.global.auth;
 
 
-import com.example.infinite.domain.member.entity.Member;
-import com.example.infinite.domain.member.enums.MemberRole;
-import com.example.infinite.domain.member.enums.MemberStatus;
+import com.example.infinite.domain.member.member.entity.Member;
+import com.example.infinite.domain.member.member.enums.MemberRole;
+import com.example.infinite.domain.member.member.enums.MemberStatus;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -12,7 +12,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 
-import static com.example.infinite.domain.member.entity.QMember.member;
+import static com.example.infinite.domain.member.member.entity.QMember.member;
 
 /**
  * Spring Security 인증 객체 내부에서 멤버 정보를 담는 구현체입니다.

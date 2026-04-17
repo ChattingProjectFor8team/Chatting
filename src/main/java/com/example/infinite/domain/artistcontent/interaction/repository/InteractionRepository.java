@@ -3,7 +3,7 @@ package com.example.infinite.domain.artistcontent.interaction.repository;
 import com.example.infinite.domain.artistcontent.interaction.entity.Reaction;
 import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
-import com.example.infinite.domain.member.enums.MemberType;
+import com.example.infinite.domain.member.member.enums.MemberType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

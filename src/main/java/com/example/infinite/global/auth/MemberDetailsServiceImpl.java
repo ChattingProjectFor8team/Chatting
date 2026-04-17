@@ -2,8 +2,8 @@ package com.example.infinite.global.auth;
 
 
 
-import com.example.infinite.domain.member.entity.Member;
-import com.example.infinite.domain.member.repository.MemberRepository;
+import com.example.infinite.domain.member.member.entity.Member;
+import com.example.infinite.domain.member.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;

@@ -1,7 +1,7 @@
-package com.example.infinite.domain.artistcontent.post.fanletter.entity;
+package com.example.infinite.domain.member.artist.entity;
 
-import com.example.infinite.domain.member.artist.entity.Artist;
 import com.example.infinite.domain.member.member.entity.Member;
+import com.example.infinite.domain.member.member.enums.MemberStatus;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -12,11 +12,11 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Entity
-@Table(name = "fan_letter")
+@Table(name = "artist_members")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLDelete(sql = "UPDATE fan_letter SET deleted_at = current_timestamp WHERE id = ?")
+@SQLDelete(sql = "UPDATE artist_members SET deleted_at = current_timestamp WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
-public class FanLetter extends BaseEntity {
+public class ArtistMember extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,13 +28,19 @@ public class FanLetter extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "member_id", nullable = false)
-    private Member writer;
+    private Member member;
 
-    @Column(nullable = false)
-    private long likeCount = 0L;
+    @Column(name = "stage_name", nullable = false, length = 100)
+    private String stageName;
 
-    public void changeLikeCountBy(int delta) {
-        this.likeCount = Math.max(0, this.likeCount + delta);
-    }
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private MemberStatus status;
+
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
 
 }

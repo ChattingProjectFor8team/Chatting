@@ -9,6 +9,7 @@ import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringPath;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,25 @@ public class QuerydslUtils {
     }
 
     public static BooleanExpression like(StringPath field, String val) {
-        return val != null ? field.contains(val) : null;
+        return StringUtils.hasText(val) ? field.containsIgnoreCase(val) : null;
+    }
+
+    public static BooleanExpression likeAnyOf(String val, StringPath... fields) {
+        if (!StringUtils.hasText(val) || fields == null || fields.length == 0) {
+            return null;
+        }
+
+        BooleanExpression predicate = null;
+        for (StringPath field : fields) {
+            if (field == null) {
+                continue;
+            }
+
+            BooleanExpression expression = field.containsIgnoreCase(val);
+            predicate = predicate == null ? expression : predicate.or(expression);
+        }
+
+        return predicate;
     }
 
     public static BooleanExpression eq(NumberPath<Long> field, Long val) {
