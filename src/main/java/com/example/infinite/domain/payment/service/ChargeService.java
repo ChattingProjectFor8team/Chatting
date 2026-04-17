@@ -1,5 +1,7 @@
 package com.example.infinite.domain.payment.service;
 
+import com.example.infinite.domain.payment.client.PortOneClient;
+import com.example.infinite.domain.payment.config.JellyProperties;
 import com.example.infinite.domain.payment.dto.request.ChargeSettingRequest;
 import com.example.infinite.domain.payment.dto.response.AutoChargeHistoryResponse;
 import com.example.infinite.domain.payment.dto.response.ChargeSettingResponse;
@@ -11,7 +13,7 @@ import com.example.infinite.domain.payment.repository.AutoChargeSettingRepositor
 import com.example.infinite.domain.payment.repository.BillingKeyRepository;
 import com.example.infinite.global.error.ErrorCode;
 import com.example.infinite.global.error.PaymentException;
-import com.example.infinite.global.lock.RedisLock; // [추가] 이중 청구 방지용 분산락 import
+import com.example.infinite.global.lock.RedisLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,7 +28,9 @@ public class ChargeService {
     private final AutoChargeHistoryRepository autoChargeHistoryRepository;
     private final BillingKeyRepository billingKeyRepository;
     private final JellyService jellyService;
-    private final ChargeHistoryService chargeHistoryService; // [추가] 이력 저장 전담 서비스 주입
+    private final ChargeHistoryService chargeHistoryService;
+    private final PortOneClient portOneClient;
+    private final JellyProperties jellyProperties;
 
     // 자동충전 설정 등록 또는 수정
     @Transactional
@@ -85,16 +89,17 @@ public class ChargeService {
             return;
         }
 
-        try {
-            // 기준치 이하 확인 후 설정된 젤리 수량만큼 충전 (JellyService 위임)
-            jellyService.charge(userId, setting.getJellyAmount(),
-                    ReferenceType.PAYMENT, setting.getId());
+        int chargeAmount = setting.getJellyAmount() * jellyProperties.pricePerUnit();
+        BillingKey billingKey = setting.getBillingKey();
 
-            // [수정] 성공 이력 저장 - chargeHistoryService에 위임 (기존 트랜잭션 참여)
+        try {
+            // PortOne 실결제 후 젤리 지급
+            portOneClient.charge(billingKey.getBillingKey(), chargeAmount, userId);
+            jellyService.charge(userId, setting.getJellyAmount(),
+                    ReferenceType.AUTO_CHARGE, setting.getId());
             chargeHistoryService.saveSuccess(userId, setting);
 
         } catch (Exception e) {
-            // [수정] 실패 이력 저장 - REQUIRES_NEW 독립 트랜잭션으로 롤백과 무관하게 DB에 기록됨
             chargeHistoryService.saveFailure(userId, setting, e.getMessage());
             throw new PaymentException(ErrorCode.PAYMENT_AUTO_CHARGING_FAILED);
         }
