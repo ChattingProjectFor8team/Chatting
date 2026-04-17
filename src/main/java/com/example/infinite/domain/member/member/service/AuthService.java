@@ -6,7 +6,6 @@ import com.example.infinite.domain.member.member.dto.request.LoginRequest;
 import com.example.infinite.domain.member.member.dto.request.SignUpRequest;
 import com.example.infinite.domain.member.member.dto.response.TokenResponse;
 import com.example.infinite.domain.member.member.entity.Member;
-import com.example.infinite.domain.member.member.enums.MemberRole;
 import com.example.infinite.domain.member.member.repository.MemberRepository;
 import com.example.infinite.global.auth.JwtTokenProvider;
 import com.example.infinite.global.error.ErrorCode;
@@ -34,9 +33,8 @@ public class AuthService {
         Member member = Member.createNewMember(
                 request.email(),
                 passwordEncoder.encode(request.password()),
-                request.phoneNumber(),
                 request.nickname(),
-                MemberRole.USER
+                request.phoneNumber()
         );
         memberRepository.save(member);
     }
@@ -52,7 +50,7 @@ public class AuthService {
         }
 
         // 토큰 생성 (Subject로 이메일 사용)
-        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().name());
+        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().getSecurityName());
         return new TokenResponse(accessToken, "Bearer");
     }
 }

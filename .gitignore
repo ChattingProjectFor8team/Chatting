@@ -44,3 +44,4 @@ HANDOFF_revised.md
 ### Local environment (contains credentials)
 src/main/resources/application-local.yml
 .env
+docker-compose.yml

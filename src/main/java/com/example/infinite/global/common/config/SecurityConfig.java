@@ -46,8 +46,10 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
 
                                 // 2. 어드민 및 관리자 전용
-                                .requestMatchers("/api/v1/admin/**", "/api/payment/v1/charge/settings/**").hasRole("ADMIN")
-                                .requestMatchers("/api/post/v1/artist-posts", "/api/v1/admin/lives/**", "/api/v1/admin/raffles/**").hasAnyRole("ARTIST", "ADMIN")
+                                // ADMIN 권한은 현재 MemberRole.SUPER_ADMIN만 가지므로
+                                // `/api/{server}/admin/{version}/...` 경로는 SUPER_ADMIN 전용이다.
+                                .requestMatchers("/api/member/admin/v1/**", "/api/payment/v1/charge/settings/**").hasRole("ADMIN")
+                                .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
@@ -58,7 +60,7 @@ public class SecurityConfig {
                                 // 4. 일반 사용자 및 공통 인증
                                 .requestMatchers("/api/post/v1/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
                                 .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
-                                .requestMatchers("/api/myinfo/v1/**", "/api/payment/v1/jelly/**").authenticated()
+                                .requestMatchers("/api/member/v1/**", "/api/payment/v1/jelly/**").authenticated()
                                 .requestMatchers("/sub/user/{userId}/notifications").authenticated()
 
                                 // 5. 핸드쉐이크만 허용

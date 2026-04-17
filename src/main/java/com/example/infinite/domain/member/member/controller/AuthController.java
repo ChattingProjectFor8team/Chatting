@@ -8,6 +8,7 @@ import com.example.infinite.domain.member.member.dto.response.TokenResponse;
 import com.example.infinite.domain.member.member.service.AuthService;
 import com.example.infinite.global.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,14 +22,14 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ApiResponse<Void> signUp(@RequestBody SignUpRequest request) {
+    public ResponseEntity<ApiResponse<Void>> signUp(@RequestBody SignUpRequest request) {
         authService.signUp(request);
-        return ApiResponse.success(null);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @PostMapping("/login")
-    public ApiResponse<TokenResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<TokenResponse>> login(@RequestBody LoginRequest request) {
         TokenResponse response = authService.login(request);
-        return ApiResponse.success(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

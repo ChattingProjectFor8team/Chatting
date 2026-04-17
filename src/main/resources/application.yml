@@ -1,6 +1,9 @@
 spring:
   application:
     name: demo
+  # 로컬 전용 설정 파일이 있으면 기본 설정 위에 덮어쓴다.
+  config:
+    import: optional:classpath:application-local.yml
   data:
     redis:
       host: localhost
