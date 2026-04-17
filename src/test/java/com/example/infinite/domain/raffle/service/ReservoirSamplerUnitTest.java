@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.*;
 class ReservoirSamplerUnitTest {
 
     // Redis 의존성 없이 순수 로직만 테스트
-    private final ReservoirSampler sampler = new ReservoirSampler(null);
+    private final ReservoirSampler sampler = new ReservoirSampler(null, null);
 
     @Test
     @DisplayName("첫 번째 참여자는 무조건 후보로 선정된다")
