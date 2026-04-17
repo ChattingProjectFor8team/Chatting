@@ -44,3 +44,7 @@ out/
 src/main/resources/application-local.yml
 .env
 
+### Claude Code local memory (not for team sharing)
+CLAUDE_MEMORY.md
+TEAM_DOMAINS.md
+
