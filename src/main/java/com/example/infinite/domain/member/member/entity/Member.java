@@ -46,6 +46,7 @@ public class Member extends BaseEntity {
     private String profileImageUrl;
 
 
+
     // 1. private 생성자 — 모든 필수 필드를 강제
     private Member(String email, String password, String nickname,
                    String phoneNumber) {
