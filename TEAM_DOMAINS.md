@@ -6,7 +6,9 @@
 #     분석하여 업데이트하는 파일입니다.
 #     정민교 작업 로그는 CLAUDE_MEMORY.md 참고.
 #
-# 업데이트 기록: 2026-04-17 최초 작성 (pull 기준)
+# 업데이트 기록
+# - 2026-04-17 14:00 최초 작성
+# - 2026-04-17 14:30 fix/env 머지 반영 (JWT_SECRET_KEY .env 주입), 래플 도메인 구조 확인
 # ═══════════════════════════════════════════════
 
 ---
@@ -16,20 +18,24 @@
 ### 패키지
 `domain/member/`
 
-### 구현 현황 (2026-04-17 기준)
+### 구현 현황 (2026-04-17 14:30 기준)
 | 파일 | 상태 |
 |------|------|
 | `Artist` 엔티티 | ✅ 구현됨 — soft delete(@SQLDelete), BaseEntity 상속 |
 | `ArtistMember` 엔티티 | ✅ 존재 |
+| `JwtTokenProvider` | ✅ 구현됨 — JWT 발급/검증, `@Value("${jwt.secret}")` |
+| `JwtAuthenticationFilter` | ✅ 구현됨 |
+| `MemberDetailsImpl` | ✅ 구현됨 — DB조회 / 토큰 기반 생성 모두 지원 |
 | `MemberService` | ❌ 껍데기 |
 | `MemberController` | ❌ 껍데기 |
 | `MemberRepositoryCustom/Impl` | ✅ QueryDSL 커스텀 구조 존재 |
 
 ### 사용 기술
-- Spring Security (인증/인가 예정)
+- Spring Security + JWT (`io.jsonwebtoken`)
 - JPA + `@SQLDelete` (soft delete)
 - QueryDSL (동적 쿼리)
 - `BaseEntity` 공통 상속 구조
+- `.env` 파일로 `JWT_SECRET_KEY` 주입 (2026-04-17 머지)
 
 ### 나(정민교)와의 관계
 - `DmSubscription`, `FanMembership` 저장 시 → `user_id`(Member), `artist_id`(Artist) FK 참조
@@ -44,20 +50,25 @@
 ### 패키지
 `domain/dm/`
 
-### 구현 현황 (2026-04-17 기준)
+### 구현 현황 (2026-04-17 14:30 기준)
 | 파일 | 상태 |
 |------|------|
 | `DMController` | ✅ 존재 |
 | `DMService` | ❌ 껍데기 |
 | `DMRepository` | ✅ 존재 |
 | `DMDto` | ✅ 존재 |
-| 래플(Raffle) | ❌ 아직 미확인 (별도 패키지 없음) |
-| 스트리밍(Streaming) | ❌ 아직 미확인 |
+| `Raffle` 엔티티 | ✅ 존재 (shell) — `domain/raffle/entity/` |
+| `RaffleService` | ❌ 껍데기 |
+| `ReservoirSampler` | ✅ 구현됨 — Reservoir Sampling 알고리즘, Redis 기반 분산 응모 |
+| `RaffleAuditLogger` | ⏳ PR 리뷰 완료, 머지 대기 중 — Redis Streams XADD 감사 로그 |
+| `RaffleAuditConsumer` | ⏳ PR 리뷰 완료, 머지 대기 중 — XREADGROUP Consumer Group |
+| 스트리밍(Streaming) | ❌ 미구현 |
 
-### 사용 기술 (예정)
-- WebSocket / STOMP (실시간 채팅)
-- Redis Pub/Sub (다중 서버 채팅 전파)
-- Redisson 분산락 (DM 구독 동시성 제어)
+### 사용 기술
+- Redis Streams (`XADD`, `XREADGROUP`, `ACK`) — 감사 로그
+- Reservoir Sampling 알고리즘 (균등 분포 추첨)
+- Testcontainers (Redis 통합 테스트)
+- WebSocket / STOMP (DM 실시간 채팅, 예정)
 
 ### 나(정민교)와의 관계
 - `DmSubscription` (내 도메인) → DM 입장 권한 체크 주체

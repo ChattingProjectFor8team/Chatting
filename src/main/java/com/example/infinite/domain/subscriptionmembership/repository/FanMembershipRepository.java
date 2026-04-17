@@ -6,6 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface FanMembershipRepository extends JpaRepository<FanMembership, Long> {
@@ -13,4 +15,6 @@ public interface FanMembershipRepository extends JpaRepository<FanMembership, Lo
     Optional<FanMembership> findByUserIdAndArtistIdAndStatus(Long userId, Long artistId, SubscriptionStatus status);
 
     Page<FanMembership> findByUserId(Long userId, Pageable pageable);
+
+    List<FanMembership> findByStatusAndExpiredAtBefore(SubscriptionStatus status, LocalDateTime now);
 }

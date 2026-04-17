@@ -1,6 +1,8 @@
 spring:
   application:
     name: demo
+  config:
+    import: optional:dotenv:.env
   data:
     redis:
       host: localhost
@@ -8,5 +10,15 @@ spring:
 
 # JWT
 jwt:
-  secret: ${JWT_SECRET_KEY}
+  secret: ${JWT_SECRET_KEY:aW5maW5pdGVMb2NhbERldlNlY3JldEtleU1pbmltdW0zMkJ5dGVz}
   expiration: 3600000
+
+# PortOne
+portone:
+  api-secret: ${PORTONE_API_SECRET:test_dummy_secret_for_local}
+
+# Jelly
+jelly:
+  price-per-unit: 300
+  fan-membership-cost: 9
+  dm-subscription-cost: 15
