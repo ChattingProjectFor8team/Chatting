@@ -1,7 +1,7 @@
-package com.example.infinite.domain.payment.repository;
+package com.example.infinite.domain.subscriptionmembership.repository;
 
-import com.example.infinite.domain.payment.entity.DmSubscription;
-import com.example.infinite.domain.payment.enums.SubscriptionStatus;
+import com.example.infinite.domain.subscriptionmembership.entity.DmSubscription;
+import com.example.infinite.domain.subscriptionmembership.enums.SubscriptionStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
