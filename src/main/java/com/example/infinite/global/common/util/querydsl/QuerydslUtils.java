@@ -1,4 +1,4 @@
-package com.example.infinite.global.common.querydsl;
+package com.example.infinite.global.common.util.querydsl;
 
 import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.Order;

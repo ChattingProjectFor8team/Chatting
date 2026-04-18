@@ -9,6 +9,8 @@ public interface MemberRepository extends JpaRepository<Member, Long>, MemberRep
 
     boolean existsByEmailAndIdNot(String email, Long id);
 
+    boolean existsByPhoneNumber(String phoneNumber);
+
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, Long id);
 
     Optional<Member> findByEmail(String email);

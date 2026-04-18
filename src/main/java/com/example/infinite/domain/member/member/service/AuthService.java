@@ -30,6 +30,13 @@ public class AuthService {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL); // 이미 있는 이메일 체크
         }
 
+        // 전화번호도 유니크 정책으로 관리해 동일 번호 재가입을 막는다.
+        if (memberRepository.existsByPhoneNumber(request.phoneNumber())) {
+            throw new com.example.infinite.domain.member.member.error.MemberException(
+                    com.example.infinite.domain.member.member.error.MemberErrorCode.MEMBER_DUPLICATE_PHONE_NUMBER
+            );
+        }
+
         Member member = Member.createNewMember(
                 request.email(),
                 passwordEncoder.encode(request.password()),

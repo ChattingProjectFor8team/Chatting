@@ -43,4 +43,25 @@ public class ArtistMember extends BaseEntity {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    private ArtistMember(Artist artist, Member member, String stageName, String profileImageUrl, int sortOrder) {
+        this.artist = artist;
+        this.member = member;
+        this.stageName = stageName;
+        this.profileImageUrl = profileImageUrl;
+        this.status = MemberStatus.ACTIVE;
+        this.sortOrder = sortOrder;
+    }
+
+    public static ArtistMember create(Artist artist, Member member, String stageName, String profileImageUrl, int sortOrder) {
+        // 아티스트 생성자를 첫 멤버로 즉시 연결해 이후 권한 판단의 기준점으로 사용한다.
+        return new ArtistMember(artist, member, stageName, profileImageUrl, sortOrder);
+    }
+
+    public void updateProfile(String stageName, String profileImageUrl, MemberStatus status, int sortOrder) {
+        // 아티스트 멤버 프로필/상태/정렬값을 한 번에 갱신한다.
+        this.stageName = stageName;
+        this.profileImageUrl = profileImageUrl;
+        this.status = status;
+        this.sortOrder = sortOrder;
+    }
 }

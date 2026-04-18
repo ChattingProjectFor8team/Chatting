@@ -44,6 +44,8 @@ public class SecurityConfig {
                                 // 1. 전체 공개
                                 .requestMatchers("/api/auth/v1/**", "/h2-console/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/member/v1/artists/{artistId}").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/member/v2/artists/{artistId}").permitAll()
 
                                 // 2. 어드민 및 관리자 전용
                                 // ADMIN 권한은 현재 MemberRole.SUPER_ADMIN만 가지므로

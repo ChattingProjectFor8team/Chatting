@@ -1,8 +1,10 @@
 package com.example.infinite.domain.member.artist.repository;
 
+import com.example.infinite.domain.member.artist.dto.response.ArtistDetailRow;
 import com.example.infinite.domain.member.artist.dto.response.ArtistSearchResponse;
 import com.example.infinite.domain.member.artist.entity.QArtist;
-import com.example.infinite.global.common.querydsl.QuerydslUtils;
+import com.example.infinite.domain.member.artist.entity.QArtistMember;
+import com.example.infinite.global.common.util.querydsl.QuerydslUtils;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -47,5 +49,36 @@ public class ArtistRepositoryImpl implements ArtistRepositoryCustom {
                 .fetchOne();
 
         return new PageImpl<>(content, pageRequest, total == null ? 0L : total);
+    }
+
+    @Override
+    public List<ArtistDetailRow> findArtistDetailRows(Long artistId) {
+        QArtist artist = QArtist.artist;
+        QArtistMember artistMember = QArtistMember.artistMember;
+
+        // 아티스트 상세와 전체 artist-member 목록을 한 번에 조회해 N+1을 방지한다.
+        return queryFactory
+                .select(Projections.constructor(
+                        ArtistDetailRow.class,
+                        artist.id,
+                        artist.name,
+                        artist.slug,
+                        artist.profileImageUrl,
+                        artist.coverImageUrl,
+                        artist.intro,
+                        artist.status,
+                        artist.createdAt,
+                        artistMember.id,
+                        artistMember.member.id,
+                        artistMember.stageName,
+                        artistMember.profileImageUrl,
+                        artistMember.status,
+                        artistMember.sortOrder
+                ))
+                .from(artist)
+                .leftJoin(artistMember).on(artistMember.artist.id.eq(artist.id))
+                .where(artist.id.eq(artistId))
+                .orderBy(artistMember.sortOrder.asc(), artistMember.id.asc())
+                .fetch();
     }
 }
