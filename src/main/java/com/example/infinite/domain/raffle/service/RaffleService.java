@@ -1,14 +1,21 @@
 package com.example.infinite.domain.raffle.service;
 
 import com.example.infinite.domain.raffle.dto.CreateRaffleRequest;
+import com.example.infinite.domain.raffle.dto.MyEntryResultResponse;
+import com.example.infinite.domain.raffle.dto.MyRaffleEntryResponse;
+import com.example.infinite.domain.raffle.dto.RaffleDetailResponse;
 import com.example.infinite.domain.raffle.dto.RaffleResponse;
+import com.example.infinite.domain.raffle.dto.SlotStatusResponse;
 import com.example.infinite.domain.raffle.entity.Raffle;
+import com.example.infinite.domain.raffle.entity.RaffleEntry;
 import com.example.infinite.domain.raffle.entity.RaffleSlot;
 import com.example.infinite.domain.raffle.entity.RaffleSlotWinner;
 import com.example.infinite.domain.raffle.enums.RaffleStatus;
+import com.example.infinite.domain.raffle.enums.RewardStatus;
 import com.example.infinite.domain.raffle.enums.RewardType;
 import com.example.infinite.domain.raffle.error.RaffleErrorCode;
 import com.example.infinite.domain.raffle.error.RaffleException;
+import com.example.infinite.domain.raffle.repository.RaffleEntryRepository;
 import com.example.infinite.domain.raffle.repository.RaffleRepository;
 import com.example.infinite.domain.raffle.repository.RaffleSlotRepository;
 import com.example.infinite.domain.raffle.repository.RaffleSlotWinnerRepository;
@@ -22,6 +29,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -32,6 +40,7 @@ public class RaffleService {
     private final RaffleRepository raffleRepository;
     private final RaffleSlotRepository raffleSlotRepository;
     private final RaffleSlotWinnerRepository raffleSlotWinnerRepository;
+    private final RaffleEntryRepository raffleEntryRepository;
     private final ReservoirSampler reservoirSampler;
     private final RaffleSchedulerService schedulerService;
     private final StringRedisTemplate stringRedisTemplate;
@@ -220,5 +229,82 @@ public class RaffleService {
             throw new RaffleException(RaffleErrorCode.RAFFLE_ARTIST_MISMATCH);
         }
         return raffle;
+    }
+
+    // ─── 사용자: 래플 목록 조회 ───
+
+    public List<RaffleResponse> getRafflesByArtist(Long artistId) {
+        List<Raffle> raffles = raffleRepository.findByArtistIdAndStatusIn(
+                artistId, List.of(RaffleStatus.PENDING, RaffleStatus.ACTIVE));
+        return raffles.stream().map(RaffleResponse::from).toList();
+    }
+
+    // ─── 사용자: 래플 상세 조회 ───
+
+    public RaffleDetailResponse getRaffleDetail(Long artistId, Long raffleId, Long userId) {
+        Raffle raffle = findRaffleWithArtistCheck(artistId, raffleId);
+        boolean entered = raffleEntryRepository.existsByRaffleIdAndUserId(raffleId, userId);
+        return RaffleDetailResponse.of(raffle, entered);
+    }
+
+    // ─── 사용자: 본인 당첨 결과 조회 ───
+
+    public MyEntryResultResponse getMyResult(Long artistId, Long raffleId, Long userId) {
+        findRaffleWithArtistCheck(artistId, raffleId);
+
+        boolean entered = raffleEntryRepository.existsByRaffleIdAndUserId(raffleId, userId);
+        if (!entered) {
+            return MyEntryResultResponse.notEntered(raffleId);
+        }
+
+        return raffleSlotWinnerRepository.findByRaffleIdAndUserId(raffleId, userId)
+                .map(winner -> MyEntryResultResponse.won(raffleId, winner))
+                .orElse(MyEntryResultResponse.enteredNotWon(raffleId));
+    }
+
+    // ─── 사용자: 내 응모 내역 목록 ───
+
+    public List<MyRaffleEntryResponse> getMyEntries(Long userId) {
+        List<RaffleEntry> entries = raffleEntryRepository.findByUserIdOrderByEnteredAtDesc(userId);
+        return entries.stream().map(entry -> {
+            String title = raffleRepository.findById(entry.getRaffleId())
+                    .map(Raffle::getTitle).orElse("삭제된 래플");
+            boolean won = raffleSlotWinnerRepository
+                    .findByRaffleIdAndUserId(entry.getRaffleId(), entry.getUserId())
+                    .isPresent();
+            return new MyRaffleEntryResponse(entry.getRaffleId(), title, entry.getEnteredAt(), won);
+        }).toList();
+    }
+
+    // ─── 관리자: 슬롯 현황 조회 ───
+
+    public List<SlotStatusResponse> getSlotStatuses(Long artistId, Long raffleId) {
+        Raffle raffle = findRaffleWithArtistCheck(artistId, raffleId);
+        List<RaffleSlot> slots = raffleSlotRepository.findByRaffleOrderBySlotIndex(raffle);
+        List<RaffleSlotWinner> winners = raffleSlotWinnerRepository.findByRaffleId(raffleId);
+
+        Map<Long, Long> slotWinnerMap = winners.stream()
+                .collect(Collectors.toMap(
+                        w -> w.getSlot().getId(), RaffleSlotWinner::getUserId));
+
+        return slots.stream()
+                .map(slot -> SlotStatusResponse.of(slot, slotWinnerMap.get(slot.getId())))
+                .toList();
+    }
+
+    // ─── 관리자: 보상 상태 변경 ───
+
+    @Transactional
+    public void updateRewardStatus(Long artistId, Long raffleId, Long winnerId, RewardStatus rewardStatus) {
+        findRaffleWithArtistCheck(artistId, raffleId);
+
+        RaffleSlotWinner winner = raffleSlotWinnerRepository.findById(winnerId)
+                .orElseThrow(() -> new RaffleException(RaffleErrorCode.RAFFLE_WINNER_NOT_FOUND));
+
+        if (rewardStatus == RewardStatus.GRANTED) {
+            winner.grant();
+        } else if (rewardStatus == RewardStatus.FAILED) {
+            winner.fail();
+        }
     }
 }

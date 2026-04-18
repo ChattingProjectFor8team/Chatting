@@ -9,4 +9,6 @@ import java.util.List;
 public interface RaffleRepository extends JpaRepository<Raffle, Long> {
 
     List<Raffle> findByStatus(RaffleStatus status);
+
+    List<Raffle> findByArtistIdAndStatusIn(Long artistId, List<RaffleStatus> statuses);
 }
