@@ -4,6 +4,7 @@ import com.example.infinite.global.common.constant.CacheNames;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -36,6 +37,7 @@ import java.util.Map;
 public class RedisCacheConfig {
 
     @Bean
+    @Primary
     public RedisCacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
         // 값 직렬화는 JSON으로 맞춰 캐시 내용을 사람이 읽고 디버깅할 수 있게 한다.
         GenericJacksonJsonRedisSerializer jsonSerializer = GenericJacksonJsonRedisSerializer.create(builder -> {

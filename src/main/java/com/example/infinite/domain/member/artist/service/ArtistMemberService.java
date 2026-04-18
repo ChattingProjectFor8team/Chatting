@@ -54,7 +54,7 @@ public class ArtistMemberService {
                         request.profileImageUrl(),
                         () -> new ArtistException(ArtistErrorCode.MEDIA_PROFILE_REQUIRED)
                 ),
-                request.sortOrder()
+                validateSortOrder(request.sortOrder())
         ));
 
         return ArtistMemberResponse.from(artistMember);
@@ -76,7 +76,7 @@ public class ArtistMemberService {
                 resolveOptionalValue(request.stageName(), artistMember.getStageName()),
                 resolveOptionalValue(request.profileImageUrl(), artistMember.getProfileImageUrl()),
                 request.status() != null ? request.status() : artistMember.getStatus(),
-                request.sortOrder() != null ? request.sortOrder() : artistMember.getSortOrder()
+                resolveSortOrder(request.sortOrder(), artistMember.getSortOrder())
         );
 
         return ArtistMemberResponse.from(artistMember);
@@ -93,6 +93,7 @@ public class ArtistMemberService {
         validateArtistMemberManagePermission(actor.getId(), artistId);
 
         ArtistMember artistMember = artistReader.findArtistMemberByIdAndArtistIdOrThrow(artistMemberId, artistId);
+        validateDeletableArtistMember(artistId);
         artistMember.delete();
     }
 
@@ -116,5 +117,23 @@ public class ArtistMemberService {
     private String resolveOptionalValue(String requestedValue, String currentValue) {
         String normalized = MemberInputSupport.trimToNull(requestedValue);
         return normalized != null ? normalized : currentValue;
+    }
+
+    private int resolveSortOrder(Integer requestedSortOrder, int currentSortOrder) {
+        return requestedSortOrder != null ? validateSortOrder(requestedSortOrder) : currentSortOrder;
+    }
+
+    private int validateSortOrder(Integer sortOrder) {
+        if (sortOrder == null || sortOrder < 1) {
+            throw new ArtistException(ArtistErrorCode.ARTIST_MEMBER_SORT_ORDER_INVALID);
+        }
+        return sortOrder;
+    }
+
+    private void validateDeletableArtistMember(Long artistId) {
+        // 아티스트를 고아 상태로 두지 않기 위해 마지막 멤버 삭제는 막는다.
+        if (artistMemberRepository.countByArtistId(artistId) <= 1) {
+            throw new ArtistException(ArtistErrorCode.ARTIST_MEMBER_LAST_DELETE_NOT_ALLOWED);
+        }
     }
 }

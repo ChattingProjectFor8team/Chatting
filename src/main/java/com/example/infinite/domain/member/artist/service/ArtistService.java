@@ -27,12 +27,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ArtistService {
 
+    private static final Pattern ARTIST_SLUG_PATTERN = Pattern.compile("^[a-z0-9-]+$");
     private static final int ARTIST_SEARCH_SIZE = 10;
     private static final int CREATOR_SORT_ORDER = 1;
 
@@ -67,10 +70,7 @@ public class ArtistService {
                 request.profileImageUrl(),
                 () -> new ArtistException(ArtistErrorCode.MEDIA_PROFILE_REQUIRED)
         );
-        String normalizedSlug = MemberInputSupport.requireTrimmed(
-                request.slug(),
-                () -> new IllegalArgumentException("아티스트 slug는 필수입니다.")
-        );
+        String normalizedSlug = normalizeRequiredSlug(request.slug());
         if (artistRepository.existsBySlug(normalizedSlug)) {
             throw new ArtistException(ArtistErrorCode.ARTIST_SLUG_DUPLICATED);
         }
@@ -179,7 +179,7 @@ public class ArtistService {
     }
 
     private String resolveNextSlug(Artist artist, String slug) {
-        String normalizedSlug = MemberInputSupport.trimToNull(slug);
+        String normalizedSlug = normalizeOptionalSlug(slug);
         if (normalizedSlug == null) {
             return artist.getSlug();
         }
@@ -188,6 +188,33 @@ public class ArtistService {
             throw new ArtistException(ArtistErrorCode.ARTIST_SLUG_DUPLICATED);
         }
         return normalizedSlug;
+    }
+
+    private String normalizeRequiredSlug(String slug) {
+        String normalizedSlug = MemberInputSupport.requireTrimmed(
+                slug,
+                () -> new IllegalArgumentException("아티스트 slug는 필수입니다.")
+        ).toLowerCase(Locale.ROOT);
+        validateSlugFormat(normalizedSlug);
+        return normalizedSlug;
+    }
+
+    private String normalizeOptionalSlug(String slug) {
+        String normalizedSlug = MemberInputSupport.trimToNull(slug);
+        if (normalizedSlug == null) {
+            return null;
+        }
+
+        normalizedSlug = normalizedSlug.toLowerCase(Locale.ROOT);
+        validateSlugFormat(normalizedSlug);
+        return normalizedSlug;
+    }
+
+    private void validateSlugFormat(String slug) {
+        // slug는 표시용 이름이 아니라 URL 식별자이므로 영문/숫자/하이픈 범위만 허용한다.
+        if (!ARTIST_SLUG_PATTERN.matcher(slug).matches()) {
+            throw new ArtistException(ArtistErrorCode.ARTIST_SLUG_INVALID);
+        }
     }
 
     private String resolveOptionalValue(String requestedValue, String currentValue) {

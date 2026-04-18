@@ -15,5 +15,7 @@ public interface ArtistMemberRepository extends JpaRepository<ArtistMember, Long
 
     Optional<ArtistMember> findByArtistIdAndMemberId(Long artistId, Long memberId);
 
+    long countByArtistId(Long artistId);
+
     List<ArtistMember> findAllByArtistId(Long artistId);
 }
