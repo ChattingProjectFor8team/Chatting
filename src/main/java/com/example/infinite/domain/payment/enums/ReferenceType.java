@@ -3,5 +3,6 @@ package com.example.infinite.domain.payment.enums;
 public enum ReferenceType {
     PAYMENT,      // PortOne 결제
     DM_SUB,       // DM 구독권
-    MEMBERSHIP    // 팬 멤버십
+    MEMBERSHIP,   // 팬 멤버십
+    AUTO_CHARGE   // 자동충전
 }

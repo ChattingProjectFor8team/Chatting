@@ -53,6 +53,10 @@ public class AutoChargeSetting extends BaseEntity {
         this.thresholdBalance = thresholdBalance;
     }
 
+    public void enable() {
+        this.enabled = true;
+    }
+
     public void disable() {
         this.enabled = false;
     }
