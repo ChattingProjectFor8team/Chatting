@@ -52,9 +52,8 @@ public class SecurityConfig {
 
                                 // 3. ARTIST + SUPER_ADMIN
                                 .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "SUPER_ADMIN")
-                                .requestMatchers("/api/v1/admin/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
-                                .requestMatchers("/api/v1/admin/raffles/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
-                                .requestMatchers("/api/v1/admin/artists/*/raffles").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                                .requestMatchers("/api/v1/admin/artists/*/raffles/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                                .requestMatchers("/api/v1/admin/artists/*/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                                 .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "SUPER_ADMIN")
                                 .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                                 .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")

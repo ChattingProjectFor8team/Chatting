@@ -39,6 +39,8 @@ out/
 ### AI Agents & Prompts
 .claude/
 260413_*.md
+260418_*.md
+md_file_storage/
 
 ### Local environment (contains credentials)
 src/main/resources/application-local.yml
