@@ -5,6 +5,7 @@ import com.example.infinite.domain.member.error.ArtistException;
 import com.example.infinite.domain.member.error.MemberErrorCode;
 import com.example.infinite.domain.member.error.MemberException;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
+import com.example.infinite.domain.raffle.error.RaffleException;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;

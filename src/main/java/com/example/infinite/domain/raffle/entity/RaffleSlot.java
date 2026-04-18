@@ -28,10 +28,10 @@ public class RaffleSlot {
     @Column(name = "slot_index", nullable = false)
     private Integer slotIndex;
 
-    @Column(name = "slot_start_at", nullable = false)
+    @Column(name = "slot_start_at")
     private LocalDateTime slotStartAt;
 
-    @Column(name = "slot_end_at", nullable = false)
+    @Column(name = "slot_end_at")
     private LocalDateTime slotEndAt;
 
     @Column(name = "target_winner_count", nullable = false)
@@ -45,16 +45,20 @@ public class RaffleSlot {
     private RaffleSlotStatus status;
 
     @Builder
-    private RaffleSlot(Raffle raffle, Integer slotIndex,
-                       LocalDateTime slotStartAt, LocalDateTime slotEndAt,
-                       Integer targetWinnerCount) {
+    private RaffleSlot(Raffle raffle, Integer slotIndex, Integer targetWinnerCount) {
         this.raffle = raffle;
         this.slotIndex = slotIndex;
-        this.slotStartAt = slotStartAt;
-        this.slotEndAt = slotEndAt;
         this.targetWinnerCount = targetWinnerCount;
         this.carryOverCount = 0;
         this.status = RaffleSlotStatus.WAITING;
+    }
+
+    /**
+     * 래플 시작(start) 시점에 호출. PENDING 상태에서는 시각이 null이다.
+     */
+    public void fillTimes(LocalDateTime startAt, LocalDateTime endAt) {
+        this.slotStartAt = startAt;
+        this.slotEndAt = endAt;
     }
 
     public void activate() {
