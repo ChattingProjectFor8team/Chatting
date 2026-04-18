@@ -65,6 +65,8 @@ public class SecurityConfig {
                                 .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
                                 .requestMatchers("/api/myinfo/v1/**", "/api/payment/v1/jelly/**").authenticated()
                                 .requestMatchers("/sub/user/{userId}/notifications").authenticated()
+                                .requestMatchers("/api/v1/artists/*/raffles/**").authenticated()
+                                .requestMatchers("/api/v1/users/me/raffle-entries").authenticated()
 
                                 // 5. WebSocket 핸드쉐이크
                                 .requestMatchers("/ws-stomp/**").permitAll()
