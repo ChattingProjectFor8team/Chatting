@@ -48,6 +48,26 @@ public class FanPost extends BaseEntity {
     @Column(nullable = false)
     private int mediaCount;
 
+    private FanPost(Artist artist, Member writer, String content) {
+        this.artist = artist;
+        this.writer = writer;
+        // 현재 정책상 팬 게시글은 항상 공개이므로 엔티티 내부에서 고정값으로 관리한다.
+        this.visibility = PostVisibility.PUBLIC;
+        this.content = content;
+        this.mediaCount = 0;
+    }
+
+    public static FanPost create(Artist artist, Member writer, String content) {
+        // 팬 게시글은 현재 정책상 항상 공개이므로 공개 여부 입력을 받지 않는다.
+        return new FanPost(artist, writer, content);
+    }
+
+    public void update(String content) {
+        // 팬 게시글은 항상 공개이므로 수정 시 본문만 바꾼다.
+        this.visibility = PostVisibility.PUBLIC;
+        this.content = content;
+    }
+
     /**
      * [Day 12 Step 3] 좋아요 추가 시 +1, 취소 시 -1.
      * 취소 후 음수 방지(비정규화/실패 시나리오에서 최소 0 유지).

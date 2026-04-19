@@ -1,4 +1,4 @@
-package com.example.infinite.domain.member.support;
+package com.example.infinite.domain.member.member.support;
 
 import com.example.infinite.domain.member.member.error.MemberErrorCode;
 import com.example.infinite.domain.member.member.error.MemberException;
