@@ -13,6 +13,7 @@ import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPo
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;
 import com.example.infinite.domain.artistcontent.post.fanpost.repository.FanPostRepository;
+import com.example.infinite.domain.artistcontent.post.fanpost.support.FanPostReader;
 import com.example.infinite.domain.member.artist.entity.Artist;
 import com.example.infinite.domain.member.artist.support.ArtistReader;
 import com.example.infinite.domain.member.member.entity.Member;
@@ -42,6 +43,7 @@ public class FanPostService {
     private final MediaRepository mediaRepository;
     private final MemberReader memberReader;
     private final ArtistReader artistReader;
+    private final FanPostReader fanPostReader;
 
     @Transactional
     public FanPostCreateResponse create(MemberDetailsImpl memberDetails, Long artistId, FanPostCreateRequest request) {
@@ -121,8 +123,7 @@ public class FanPostService {
     }
 
     private FanPost findOwnedFanPost(Long memberId, Long artistId, Long fanPostId) {
-        FanPost fanPost = fanPostRepository.findByIdAndArtistId(fanPostId, artistId)
-                .orElseThrow(() -> new ArtistContentException(ArtistContentErrorCode.POST_NOT_FOUND));
+        FanPost fanPost = fanPostReader.findByIdAndArtistIdOrThrow(fanPostId, artistId);
 
         // 팬 게시글 수정/삭제는 작성자 본인만 허용한다.
         if (!fanPost.getWriter().getId().equals(memberId)) {

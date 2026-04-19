@@ -5,10 +5,9 @@ import com.example.infinite.domain.artistcontent.interaction.entity.Reaction;
 import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.interaction.repository.InteractionRepository;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
-import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;
-import com.example.infinite.domain.artistcontent.post.fanpost.repository.FanPostRepository;
+import com.example.infinite.domain.artistcontent.post.fanpost.support.FanPostReader;
 import com.example.infinite.domain.member.member.entity.Member;
 import com.example.infinite.domain.member.member.support.MemberInputSupport;
 import com.example.infinite.domain.member.member.support.MemberReader;
@@ -23,15 +22,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class InteractionService {
 
     private final InteractionRepository interactionRepository;
-    private final FanPostRepository fanPostRepository;
+    private final FanPostReader fanPostReader;
     private final MemberReader memberReader;
 
     @Transactional
     public InteractionResponse toggleFanPostLike(MemberDetailsImpl memberDetails, Long artistId, Long fanPostId) {
         // 좋아요 토글은 로그인 principal을 Member로 확정한 뒤 대상 팬포스트를 조회한다.
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
-        FanPost fanPost = fanPostRepository.findByIdAndArtistId(fanPostId, artistId)
-                .orElseThrow(() -> new ArtistContentException(ArtistContentErrorCode.POST_NOT_FOUND));
+        FanPost fanPost = fanPostReader.findByIdAndArtistIdOrThrow(fanPostId, artistId);
 
         return interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
                         PostType.FAN_POST,
