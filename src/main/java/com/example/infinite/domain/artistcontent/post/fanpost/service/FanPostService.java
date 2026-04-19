@@ -104,8 +104,8 @@ public class FanPostService {
             FanPostUpdateRequest request
     ) {
         // 수정은 작성자 본인 글인지 먼저 확인한 뒤 본문만 변경한다.
-        Member actor = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
-        FanPost fanPost = findOwnedFanPost(actor.getId(), artistId, fanPostId);
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        FanPost fanPost = findOwnedFanPost(member.getId(), artistId, fanPostId);
 
         fanPost.update(resolveUpdatedContent(request.content(), fanPost.getContent()));
 
@@ -115,17 +115,17 @@ public class FanPostService {
     @Transactional
     public void delete(MemberDetailsImpl memberDetails, Long artistId, Long fanPostId) {
         // 삭제도 동일한 소유자 검증 흐름을 재사용한다.
-        Member actor = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
-        FanPost fanPost = findOwnedFanPost(actor.getId(), artistId, fanPostId);
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        FanPost fanPost = findOwnedFanPost(member.getId(), artistId, fanPostId);
         fanPost.delete();
     }
 
-    private FanPost findOwnedFanPost(Long actorId, Long artistId, Long fanPostId) {
+    private FanPost findOwnedFanPost(Long memberId, Long artistId, Long fanPostId) {
         FanPost fanPost = fanPostRepository.findByIdAndArtistId(fanPostId, artistId)
                 .orElseThrow(() -> new ArtistContentException(ArtistContentErrorCode.POST_NOT_FOUND));
 
         // 팬 게시글 수정/삭제는 작성자 본인만 허용한다.
-        if (!fanPost.getWriter().getId().equals(actorId)) {
+        if (!fanPost.getWriter().getId().equals(memberId)) {
             throw new ArtistContentException(ArtistContentErrorCode.POST_PERMISSION_DENIED);
         }
         return fanPost;
