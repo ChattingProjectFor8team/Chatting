@@ -43,7 +43,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                                 // 1. 전체 공개
                                 .requestMatchers("/api/auth/v1/**", "/h2-console/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artists/*/fan-posts/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artists/*/fan-posts/**", "/api/post/v1/hashtags/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/member/v1/artists/{artistId}").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/member/v2/artists/{artistId}").permitAll()
 

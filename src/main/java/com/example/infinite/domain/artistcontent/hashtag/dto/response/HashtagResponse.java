@@ -1,4 +1,7 @@
 package com.example.infinite.domain.artistcontent.hashtag.dto.response;
 
-public class HashtagResponse {
+public record HashtagResponse(
+        String hashtagName,
+        long usageCount
+) {
 }
