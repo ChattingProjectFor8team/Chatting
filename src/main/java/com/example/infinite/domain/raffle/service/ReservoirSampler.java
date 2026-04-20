@@ -180,6 +180,20 @@ public class ReservoirSampler {
     }
 
     /**
+     * 래플 완료 시 슬롯 키에 TTL을 설정한다.
+     * 즉시 삭제 대신 TTL로 지연 응모 요청을 방어한 뒤 자연 소멸시킨다.
+     */
+    public void setSlotKeysTtl(long raffleId, int slotIndex, Duration ttl) {
+        String closedKey = String.format(CLOSED_KEY_FORMAT, raffleId, slotIndex);
+        String countKey = String.format(COUNT_KEY_FORMAT, raffleId, slotIndex);
+        String candidateKey = String.format(CANDIDATE_KEY_FORMAT, raffleId, slotIndex);
+
+        stringRedisTemplate.expire(closedKey, ttl);
+        stringRedisTemplate.expire(countKey, ttl);
+        stringRedisTemplate.expire(candidateKey, ttl);
+    }
+
+    /**
      * Reservoir Sampling 확률 판정 (k=1) — 단위 테스트 전용 순수 함수.
      *
      * 실제 응모 경로에서는 이 메서드를 사용하지 않는다.

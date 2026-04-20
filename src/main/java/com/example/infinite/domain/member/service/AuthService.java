@@ -36,7 +36,7 @@ public class AuthService {
                 passwordEncoder.encode(request.password()),
                 request.phoneNumber(),
                 request.nickname(),
-                MemberRole.USER
+                MemberRole.MEMBER
         );
         memberRepository.save(member);
     }

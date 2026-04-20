@@ -39,29 +39,36 @@ public class SecurityConfig {
                 )
 
                 // 2. 요청 권한 설정 (화이트리스트 운영)
-                // TODO : 너무 초안이라 반드시 수정해야함
+                //    MemberRole enum name과 hasRole 값 정합성 유지 (MEMBER / ARTIST / SUPER_ADMIN)
+                //    SUBSCRIBER는 Role이 아니라 구독 상태이므로 서비스 레이어에서 검증
                 .authorizeHttpRequests(auth -> auth
                                 // 1. 전체 공개
                                 .requestMatchers("/api/auth/v1/**", "/h2-console/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
 
-                                // 2. 어드민 및 관리자 전용
-                                .requestMatchers("/api/v1/admin/**", "/api/payment/v1/charge/settings/**").hasRole("ADMIN")
-                                .requestMatchers("/api/post/v1/artist-posts", "/api/v1/admin/lives/**", "/api/v1/admin/raffles/**").hasAnyRole("ARTIST", "ADMIN")
-                                .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "ADMIN")
-                                .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
-                                .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
+                                // 2. SUPER_ADMIN 전용
+                                .requestMatchers("/api/v1/admin/members/**").hasRole("SUPER_ADMIN")
+                                .requestMatchers("/api/payment/v1/charge/settings/**").hasRole("SUPER_ADMIN")
 
-                                // 3. 유료 서비스 (구독팬 전용)
-                                .requestMatchers("/api/post/v1/fan-letters/**", "/api/payment/v1/subscription/**").hasAnyRole("SUBSCRIBER", "ARTIST", "ADMIN")
+                                // 3. ARTIST + SUPER_ADMIN
+                                .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                                .requestMatchers("/api/v1/admin/artists/*/raffles/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                                .requestMatchers("/api/v1/admin/artists/*/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                                .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                                .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                                .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
 
-                                // 4. 일반 사용자 및 공통 인증
-                                .requestMatchers("/api/post/v1/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
+                                // 4. 인증된 사용자 (구독 검증은 서비스 레이어에서)
+                                .requestMatchers("/api/post/v1/fan-letters/**").authenticated()
+                                .requestMatchers("/api/payment/v1/subscription/**").authenticated()
+                                .requestMatchers("/api/post/v1/fan-posts").authenticated()
                                 .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
                                 .requestMatchers("/api/myinfo/v1/**", "/api/payment/v1/jelly/**").authenticated()
                                 .requestMatchers("/sub/user/{userId}/notifications").authenticated()
+                                .requestMatchers("/api/v1/artists/*/raffles/**").authenticated()
+                                .requestMatchers("/api/v1/users/me/raffle-entries").authenticated()
 
-                                // 5. 핸드쉐이크만 허용
+                                // 5. WebSocket 핸드쉐이크
                                 .requestMatchers("/ws-stomp/**").permitAll()
                 )
 
