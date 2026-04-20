@@ -38,4 +38,15 @@ public class ContentHashtag extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "hashtag_id", nullable = false)
     private Hashtag hashtag;
+
+    private ContentHashtag(PostType targetType, Long targetId, Hashtag hashtag) {
+        this.targetType = targetType;
+        this.targetId = targetId;
+        this.hashtag = hashtag;
+    }
+
+    public static ContentHashtag create(PostType targetType, Long targetId, Hashtag hashtag) {
+        // 게시글-해시태그 연결은 양방향 컬렉션 없이 매핑 테이블 행만 생성한다.
+        return new ContentHashtag(targetType, targetId, hashtag);
+    }
 }

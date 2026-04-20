@@ -2,6 +2,7 @@ package com.example.infinite.domain.artistcontent.hashtag.entity;
 
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,4 +29,24 @@ public class Hashtag extends BaseEntity {
 
     @Column(name = "usage_count", nullable = false)
     private long usageCount = 0L;
+
+    @Builder
+    private Hashtag(String name) {
+        // 해시태그 저장 키는 항상 정규화된 이름을 사용한다.
+        this.name = name;
+    }
+
+    public static Hashtag create(String normalizedName) {
+        return Hashtag.builder()
+                .name(normalizedName)
+                .build();
+    }
+
+    public void incrementUsageCount() {
+        this.usageCount++;
+    }
+
+    public void decrementUsageCount() {
+        this.usageCount = Math.max(0L, this.usageCount - 1);
+    }
 }

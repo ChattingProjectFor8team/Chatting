@@ -16,9 +16,10 @@ public record FanPostResponse(
         long commentCount,
         int mediaCount,
         List<FanPostMediaResponse> media,
+        List<String> hashtags,
         LocalDateTime createdAt
 ) {
-    public static FanPostResponse from(FanPostReadRow row, List<FanPostMediaResponse> media) {
+    public static FanPostResponse from(FanPostReadRow row, List<FanPostMediaResponse> media, List<String> hashtags) {
         // projection row와 media 목록을 최종 API 응답 구조로 합친다.
         return new FanPostResponse(
                 row.fanPostId(),
@@ -34,6 +35,7 @@ public record FanPostResponse(
                 row.commentCount() == null ? 0L : row.commentCount(),
                 row.mediaCount() == null ? 0 : row.mediaCount(),
                 media,
+                hashtags,
                 row.createdAt()
         );
     }

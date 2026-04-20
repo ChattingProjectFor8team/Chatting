@@ -5,6 +5,7 @@ import com.example.infinite.domain.artistcontent.media.repository.MediaRepositor
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.hashtag.service.HashtagService;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostCreateRequest;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostUpdateRequest;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostCreateResponse;
@@ -24,7 +25,6 @@ import com.example.infinite.global.common.dto.CursorSliceResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.util.Collection;
 import java.util.List;
@@ -44,6 +44,7 @@ public class FanPostService {
     private final MemberReader memberReader;
     private final ArtistReader artistReader;
     private final FanPostReader fanPostReader;
+    private final HashtagService hashtagService;
 
     @Transactional
     public FanPostCreateResponse create(MemberDetailsImpl memberDetails, Long artistId, FanPostCreateRequest request) {
@@ -54,8 +55,10 @@ public class FanPostService {
         FanPost fanPost = fanPostRepository.save(FanPost.create(
                 artist,
                 writer,
-                requireContent(request.content())
+                normalizeContent(request.content())
         ));
+        // 팬포스트 id가 생성된 뒤에야 content_hashtag.target_id를 채울 수 있으므로 저장 직후 sync를 호출한다.
+        hashtagService.syncHashtags(PostType.FAN_POST, fanPost.getId(), fanPost.getContent());
 
         return FanPostCreateResponse.from(fanPost);
     }
@@ -75,15 +78,7 @@ public class FanPostService {
         List<FanPostReadRow> visibleRows = hasNext ? rows.subList(0, FAN_POST_SLICE_SIZE) : rows;
 
         // 본문 row와 media를 분리 조회한 뒤 서비스에서 합쳐 N+1 없이 응답을 조립한다.
-        Map<Long, List<FanPostMediaResponse>> mediaMap = loadMediaMap(extractPostIds(visibleRows));
-        List<FanPostResponse> responses = visibleRows.stream()
-                .map(row -> FanPostResponse.from(row, mediaMap.getOrDefault(row.fanPostId(), List.of())))
-                .toList();
-        Long nextCursor = hasNext && !visibleRows.isEmpty()
-                ? visibleRows.get(visibleRows.size() - 1).fanPostId()
-                : null;
-
-        return new CursorSliceResponse<>(responses, nextCursor, hasNext, FAN_POST_SLICE_SIZE);
+        return toCursorSliceResponse(visibleRows, hasNext);
     }
 
     public FanPostResponse getFanPost(Long artistId, Long fanPostId) {
@@ -94,8 +89,10 @@ public class FanPostService {
                 .orElseThrow(() -> new ArtistContentException(ArtistContentErrorCode.POST_NOT_FOUND));
         // 상세는 단건이지만 media 조합 방식은 목록과 동일하게 유지해 응답 구조를 맞춘다.
         List<FanPostMediaResponse> media = loadMediaMap(List.of(fanPostId)).getOrDefault(fanPostId, List.of());
+        List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, List.of(fanPostId))
+                .getOrDefault(fanPostId, List.of());
 
-        return FanPostResponse.from(row, media);
+        return FanPostResponse.from(row, media, hashtags);
     }
 
     @Transactional
@@ -110,6 +107,8 @@ public class FanPostService {
         FanPost fanPost = findOwnedFanPost(member.getId(), artistId, fanPostId);
 
         fanPost.update(resolveUpdatedContent(request.content(), fanPost.getContent()));
+        // 수정은 "기존 매핑 제거 -> 수정된 본문 기준 재생성" 규칙을 그대로 따른다.
+        hashtagService.syncHashtags(PostType.FAN_POST, fanPost.getId(), fanPost.getContent());
 
         return getFanPost(artistId, fanPostId);
     }
@@ -119,6 +118,8 @@ public class FanPostService {
         // 삭제도 동일한 소유자 검증 흐름을 재사용한다.
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
         FanPost fanPost = findOwnedFanPost(member.getId(), artistId, fanPostId);
+        // soft delete 전에 매핑을 먼저 비워야 usageCount와 hashtag 검색 결과가 즉시 일치한다.
+        hashtagService.syncHashtags(PostType.FAN_POST, fanPost.getId(), null);
         fanPost.delete();
     }
 
@@ -137,15 +138,13 @@ public class FanPostService {
         if (requestedContent == null) {
             return currentContent;
         }
-        return requireContent(requestedContent);
+        return normalizeContent(requestedContent);
     }
 
-    private String requireContent(String content) {
-        // 게시글 본문은 사용자 입력 원문을 보존하고, 공백만 있는 값만 막는다.
-        if (!StringUtils.hasText(content)) {
-            throw new IllegalArgumentException("팬 게시글 내용은 필수입니다.");
-        }
-        return content;
+    private String normalizeContent(String content) {
+        // 사진/영상만 있는 글을 허용하기 위해 본문은 선택값으로 두고, 없으면 빈 문자열로 저장한다.
+        // TODO: media write path가 붙으면 "본문 또는 미디어 중 하나는 반드시 존재" 규칙으로 검증한다.
+        return content == null ? "" : content;
     }
 
     private List<Long> extractPostIds(List<FanPostReadRow> rows) {
@@ -153,6 +152,28 @@ public class FanPostService {
         return rows.stream()
                 .map(FanPostReadRow::fanPostId)
                 .toList();
+    }
+
+    private CursorSliceResponse<FanPostResponse> toCursorSliceResponse(List<FanPostReadRow> visibleRows, boolean hasNext) {
+        List<Long> postIds = extractPostIds(visibleRows);
+        // 응답 조립은 "본문 row / media / hashtag"를 각각 배치 조회한 뒤 메모리에서 합친다.
+        // 이렇게 해야 게시글별 media/hashtag 개별 조회로 인한 N+1을 피할 수 있다.
+        Map<Long, List<FanPostMediaResponse>> mediaMap = loadMediaMap(postIds);
+        Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, postIds);
+
+        List<FanPostResponse> responses = visibleRows.stream()
+                .map(row -> FanPostResponse.from(
+                        row,
+                        mediaMap.getOrDefault(row.fanPostId(), List.of()),
+                        hashtagMap.getOrDefault(row.fanPostId(), List.of())
+                ))
+                .toList();
+        // nextCursor는 실제 응답에 포함된 마지막 fanPostId를 기준으로 만든다.
+        Long nextCursor = hasNext && !visibleRows.isEmpty()
+                ? visibleRows.get(visibleRows.size() - 1).fanPostId()
+                : null;
+
+        return new CursorSliceResponse<>(responses, nextCursor, hasNext, FAN_POST_SLICE_SIZE);
     }
 
     private Map<Long, List<FanPostMediaResponse>> loadMediaMap(Collection<Long> fanPostIds) {
