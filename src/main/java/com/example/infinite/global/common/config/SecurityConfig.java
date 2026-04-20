@@ -100,6 +100,10 @@ public class SecurityConfig {
                         // 팬레터 (구독 검증은 서비스 레이어에서 수행)
                         .requestMatchers("/api/post/v1/fan-letters/**").authenticated()
 
+                        // 웹훅 — PortOne 서버가 JWT 없이 직접 호출하므로 인증 제외
+                        // 위변조 방지는 Controller의 HMAC-SHA256 서명 검증으로 수행
+                        .requestMatchers("/api/payment/v1/payments/webhook").permitAll()
+
                         // 회원, 결제, 구독, 알림
                         .requestMatchers("/api/member/v1/**").authenticated()
                         .requestMatchers("/api/payment/v1/**").authenticated()
