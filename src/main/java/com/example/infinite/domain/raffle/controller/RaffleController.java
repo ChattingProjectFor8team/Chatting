@@ -1,7 +1,5 @@
 package com.example.infinite.domain.raffle.controller;
 
-import com.example.infinite.domain.member.member.support.MemberInputSupport;
-import com.example.infinite.domain.member.member.support.MemberReader;
 import com.example.infinite.domain.raffle.dto.EntryResponse;
 import com.example.infinite.domain.raffle.dto.MyEntryResultResponse;
 import com.example.infinite.domain.raffle.dto.MyRaffleEntryResponse;
@@ -25,14 +23,13 @@ public class RaffleController {
 
     private final RaffleEntryService raffleEntryService;
     private final RaffleService raffleService;
-    private final MemberReader memberReader;
 
     @PostMapping("/api/v1/artists/{artistId}/raffles/{raffleId}/entries")
     public ResponseEntity<ApiResponse<EntryResponse>> enter(
             @PathVariable Long artistId,
             @PathVariable Long raffleId,
             @AuthenticationPrincipal MemberDetailsImpl memberDetails) {
-        Long userId = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails)).getId();
+        Long userId = memberDetails.getMemberId();
         EntryResponse response = raffleEntryService.enter(artistId, raffleId, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
@@ -49,7 +46,7 @@ public class RaffleController {
             @PathVariable Long artistId,
             @PathVariable Long raffleId,
             @AuthenticationPrincipal MemberDetailsImpl memberDetails) {
-        Long userId = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails)).getId();
+        Long userId = memberDetails.getMemberId();
         RaffleDetailResponse response = raffleService.getRaffleDetail(artistId, raffleId, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -59,7 +56,7 @@ public class RaffleController {
             @PathVariable Long artistId,
             @PathVariable Long raffleId,
             @AuthenticationPrincipal MemberDetailsImpl memberDetails) {
-        Long userId = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails)).getId();
+        Long userId = memberDetails.getMemberId();
         MyEntryResultResponse response = raffleService.getMyResult(artistId, raffleId, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -67,7 +64,7 @@ public class RaffleController {
     @GetMapping("/api/v1/users/me/raffle-entries")
     public ResponseEntity<ApiResponse<List<MyRaffleEntryResponse>>> getMyEntries(
             @AuthenticationPrincipal MemberDetailsImpl memberDetails) {
-        Long userId = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails)).getId();
+        Long userId = memberDetails.getMemberId();
         List<MyRaffleEntryResponse> response = raffleService.getMyEntries(userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }

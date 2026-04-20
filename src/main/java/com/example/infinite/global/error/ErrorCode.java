@@ -26,6 +26,9 @@ public enum ErrorCode implements ErrorCodeType {
     REFUND_NOT_ELIGIBLE(HttpStatus.BAD_REQUEST, "P005", "환불 정책 조건을 충족하지 않습니다."),
     BILLING_KEY_NOT_FOUND(HttpStatus.NOT_FOUND, "P006", "등록된 카드 정보를 찾을 수 없습니다."),
     AUTO_CHARGE_SETTING_NOT_FOUND(HttpStatus.NOT_FOUND, "P007", "자동충전 설정 정보를 찾을 수 없습니다."),
+    PAYMENT_ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "P008", "결제 주문 정보를 찾을 수 없습니다."),
+    PAYMENT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "P009", "이미 처리된 결제 주문입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "P010", "실제 결제 금액과 주문 금액이 일치하지 않습니다."),
 
     // 3. DM (Direct Message)
     DM_SUBSCRIPTION_REQUIRED(HttpStatus.FORBIDDEN, "D001", "DM 구독 상태인 유저만 이용 가능합니다."),
