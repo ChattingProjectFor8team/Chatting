@@ -43,7 +43,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                                 // 1. 전체 공개
                                 .requestMatchers("/api/auth/v1/**", "/h2-console/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artists/*/fan-posts/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/member/v1/artists/{artistId}").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/member/v2/artists/{artistId}").permitAll()
 
@@ -52,6 +52,8 @@ public class SecurityConfig {
                                 // `/api/{server}/admin/{version}/...` 경로는 SUPER_ADMIN 전용이다.
                                 .requestMatchers("/api/member/admin/v1/**", "/api/payment/v1/charge/settings/**").hasRole("ADMIN")
                                 .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "ADMIN")
+                                .requestMatchers(HttpMethod.PATCH, "/api/post/v1/artists/*/fan-posts/*").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
+                                .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/fan-posts/*").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
                                 .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
                                 .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
@@ -60,6 +62,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/post/v1/fan-letters/**", "/api/payment/v1/subscription/**").hasAnyRole("SUBSCRIBER", "ARTIST", "ADMIN")
 
                                 // 4. 일반 사용자 및 공통 인증
+                                .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
                                 .requestMatchers("/api/post/v1/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
                                 .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
                                 .requestMatchers("/api/member/v1/**", "/api/payment/v1/jelly/**").authenticated()

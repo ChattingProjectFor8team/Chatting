@@ -12,7 +12,7 @@ import com.example.infinite.domain.member.artist.support.ArtistReader;
 import com.example.infinite.domain.member.member.entity.Member;
 import com.example.infinite.domain.member.member.enums.MemberRole;
 import com.example.infinite.domain.member.member.support.MemberReader;
-import com.example.infinite.domain.member.support.MemberInputSupport;
+import com.example.infinite.domain.member.member.support.MemberInputSupport;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.constant.CacheNames;
 import lombok.RequiredArgsConstructor;

@@ -14,7 +14,7 @@ import com.example.infinite.domain.member.member.error.MemberException;
 import com.example.infinite.domain.member.member.enums.MemberRole;
 import com.example.infinite.domain.member.member.repository.MemberRepository;
 import com.example.infinite.domain.member.member.support.MemberReader;
-import com.example.infinite.domain.member.support.MemberInputSupport;
+import com.example.infinite.domain.member.member.support.MemberInputSupport;
 import com.example.infinite.global.auth.JwtTokenProvider;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import lombok.RequiredArgsConstructor;
