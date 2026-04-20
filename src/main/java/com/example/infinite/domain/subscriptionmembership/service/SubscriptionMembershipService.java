@@ -43,6 +43,7 @@ public class SubscriptionMembershipService {
                 .artistId(artistId)
                 .startedAt(now)
                 .expiredAt(now.plusDays(30))
+                .jellyAmount(jellyProperties.dmSubscriptionCost())
                 .build());
     }
 
@@ -60,6 +61,7 @@ public class SubscriptionMembershipService {
                 .artistId(artistId)
                 .startedAt(now)
                 .expiredAt(now.plusDays(30))
+                .jellyAmount(jellyProperties.fanMembershipCost())
                 .build());
     }
 
