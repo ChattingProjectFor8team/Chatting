@@ -9,19 +9,19 @@ import java.util.Optional;
 
 public interface InteractionRepository extends JpaRepository<Reaction, Long>, InteractionRepositoryCustom {
 
-    // 반응 중복 여부는 Member(actorId) + target + reactionType 조합으로 판단한다.
-    boolean existsByTargetTypeAndTargetIdAndActorIdAndReactionType(
+    // 반응 중복 여부는 Member(memberId) + target + reactionType 조합으로 판단한다.
+    boolean existsByTargetTypeAndTargetIdAndMemberIdAndReactionType(
             PostType targetType,
             Long targetId,
-            Long actorId,
+            Long memberId,
             ReactionType reactionType
     );
 
-    // 팬레터 특수 좋아요 여부도 같은 Reaction 레코드를 조회한 뒤 actor의 role로 해석한다.
-    Optional<Reaction> findByTargetTypeAndTargetIdAndActorIdAndReactionType(
+    // 팬레터 특수 좋아요 여부도 같은 Reaction 레코드를 조회한 뒤 member의 role로 해석한다.
+    Optional<Reaction> findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
             PostType targetType,
             Long targetId,
-            Long actorId,
+            Long memberId,
             ReactionType reactionType
     );
 

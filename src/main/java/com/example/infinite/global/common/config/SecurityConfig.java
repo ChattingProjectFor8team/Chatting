@@ -64,6 +64,7 @@ public class SecurityConfig {
                                 // 4. 일반 사용자 및 공통 인증
                                 .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
                                 .requestMatchers("/api/post/v1/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
+                                .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/likes/toggle").authenticated()
                                 .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
                                 .requestMatchers("/api/member/v1/**", "/api/payment/v1/jelly/**").authenticated()
                                 .requestMatchers("/sub/user/{userId}/notifications").authenticated()

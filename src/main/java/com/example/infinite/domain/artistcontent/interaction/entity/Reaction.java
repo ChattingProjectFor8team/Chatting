@@ -14,13 +14,13 @@ import lombok.NoArgsConstructor;
         name = "reactions",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_reaction_member_target_type",
-                columnNames = {"actor_id", "target_type", "target_id", "reaction_type"}
+                columnNames = {"member_id", "target_type", "target_id", "reaction_type"}
         ),
         indexes = {
                 @Index(name = "idx_reaction_target", columnList = "target_type, target_id"),
                 @Index(name = "idx_reaction_target_type", columnList = "target_type, target_id, reaction_type"),
-                // 반응 주체는 이제 Member 단일 축으로 보므로 actor_id만 인덱스로 둔다.
-                @Index(name = "idx_reaction_actor", columnList = "actor_id")
+                // 반응 주체는 Member 단일 축이므로 member_id 단일 인덱스를 둔다.
+                @Index(name = "idx_reaction_member", columnList = "member_id")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -38,11 +38,22 @@ public class Reaction extends BaseEntity {
     private Long targetId;
 
     // 반응 주체는 Member 단일 principal 기준으로 저장한다.
-    // 팬레터의 아티스트 특수 표시는 별도 type 컬럼이 아니라 Member role / ArtistMember 연결로 판단한다.
-    @Column(name = "actor_id", nullable = false)
-    private Long actorId;
+    @Column(name = "member_id", nullable = false)
+    private Long memberId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "reaction_type", nullable = false, length = 30)
     private ReactionType reactionType;
+
+    private Reaction(PostType targetType, Long targetId, Long memberId, ReactionType reactionType) {
+        this.targetType = targetType;
+        this.targetId = targetId;
+        this.memberId = memberId;
+        this.reactionType = reactionType;
+    }
+
+    public static Reaction create(PostType targetType, Long targetId, Long memberId, ReactionType reactionType) {
+        // 대상 타입과 대상 id를 함께 고정해 중복 반응을 유니크 제약과 함께 막는다.
+        return new Reaction(targetType, targetId, memberId, reactionType);
+    }
 }
