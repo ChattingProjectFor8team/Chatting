@@ -46,6 +46,7 @@ dependencies {
     // 3. Database & JPA (Hibernate 7 호환)
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     runtimeOnly 'com.mysql:mysql-connector-j'
+    runtimeOnly 'com.h2database:h2'
 
     // QueryDSL (Jakarta 분류기 필수 탑재)
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'

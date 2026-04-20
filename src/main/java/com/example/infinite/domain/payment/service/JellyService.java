@@ -10,18 +10,30 @@ import com.example.infinite.domain.payment.repository.JellyTransactionRepository
 import com.example.infinite.domain.payment.repository.UserJellyBalanceRepository;
 import com.example.infinite.global.error.ErrorCode;
 import com.example.infinite.global.error.PaymentException;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class JellyService {
 
     private final UserJellyBalanceRepository jellyWalletRepository;
     private final JellyTransactionRepository jellyTransactionRepository;
+    private final AutoChargeService autoChargeService;
+
+    // AutoChargeService 와 순환 참조가 발생하므로 @Lazy 로 프록시 주입
+    // (AutoChargeService → JellyService → AutoChargeService)
+    public JellyService(UserJellyBalanceRepository jellyWalletRepository,
+                        JellyTransactionRepository jellyTransactionRepository,
+                        @Lazy AutoChargeService autoChargeService) {
+        this.jellyWalletRepository = jellyWalletRepository;
+        this.jellyTransactionRepository = jellyTransactionRepository;
+        this.autoChargeService = autoChargeService;
+    }
 
     // 잔액 조회 (읽기 전용)
     @Transactional(readOnly = true)
@@ -56,6 +68,14 @@ public class JellyService {
 
         saveTransaction(userId, TransactionType.USE, referenceType, relatedId,
                 amount, wallet.getCurrentBalance());
+
+        // 자동충전 트리거 — REQUIRES_NEW 트랜잭션으로 독립 실행되므로
+        // 자동충전이 실패해도 여기서 예외를 잡아 젤리 사용 트랜잭션은 롤백되지 않음
+        try {
+            autoChargeService.execute(userId);
+        } catch (Exception e) {
+            log.warn("자동충전 트리거 실패 (무시): userId={}, error={}", userId, e.getMessage());
+        }
     }
 
     // 젤리 환불 - 비관적 락 적용 (내부: 환불 서비스에서 호출)

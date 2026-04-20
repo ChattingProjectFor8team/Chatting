@@ -82,7 +82,7 @@ jobs:
             '{diff:$diff, pr_title:$pr_title, pr_author:$pr_author, repo:$repo, pr_number:$pr_num, base_branch:$base, previous_reviews:$previous_reviews}')
 
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 90 \
-            -X POST "${REVIEW_SERVER_URL}/review" \
+            -X POST "${REVIEW_SERVER_URL}/review/" \
             -H "Content-Type: application/json" \
             -H "x-review-secret: ${REVIEW_SECRET}" \
             -H "x-github-repo: ${PR_REPO}" \
@@ -153,8 +153,8 @@ jobs:
             --argjson pr_num "$PR_NUM" \
             '{review_text:$review_text, diff:$diff, repo:$repo, pr_number:$pr_num}')
 
-          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 --retry 2 --retry-delay 5 \
-            -X POST "${REVIEW_SERVER_URL}/review/rebuttal" \
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 \
+            -X POST "${REVIEW_SERVER_URL}/review/rebuttal/" \
             -H "Content-Type: application/json" \
             -H "x-review-secret: ${REVIEW_SECRET}" \
             -H "x-github-repo: ${PR_REPO}" \
@@ -176,6 +176,7 @@ jobs:
 
       - name: Post Rebuttal Comment
         if: steps.rebuttal.outputs.rebuttal != ''
+        continue-on-error: true
         uses: actions/github-script@v7
         env:
           REBUTTAL_TEXT: ${{ steps.rebuttal.outputs.rebuttal }}
@@ -235,120 +236,98 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const commentId = context.payload.comment.id;
-            const eventType = context.eventName;
-            if (eventType === 'issue_comment') {
-              await github.rest.reactions.createForIssueComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: commentId,
-                content: 'eyes'
-              });
-            } else {
-              await github.rest.reactions.createForPullRequestReviewComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: commentId,
-                content: 'eyes'
-              });
-            }
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
 
       - name: Get PR info
-        if: steps.check.outputs.skip == 'false'
         id: pr-info
+        if: steps.check.outputs.skip == 'false'
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.payload.pull_request?.number
-              || context.payload.issue?.number;
+            const prNumber = context.payload.pull_request?.number || context.payload.issue?.number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            const diffResp = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
 
-            const prTitle = context.payload.pull_request?.title || '';
-            const prAuthor = context.payload.pull_request?.user?.login
-              || context.payload.comment?.user?.login || '';
-
-            // PR diff 조회
-            let diff = '';
-            try {
-              const { data } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber,
-                mediaType: { format: 'diff' }
-              });
-              diff = typeof data === 'string' ? data : JSON.stringify(data);
-            } catch (e) {
-              core.warning('Failed to fetch PR diff: ' + e.message);
-            }
-
-            // 기존 봇 리뷰 코멘트 조회
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
               per_page: 100
             });
 
-            const botReviews = comments
+            const botReviews = comments.data
               .filter(c => c.user.type === 'Bot' && c.body.includes('AI 코드리뷰'))
-              .map(c => c.body)
-              .slice(-5);
+              .map(c => c.body
+                .replace(/## 🤖 AI 코드리뷰\n?/, '')
+                .replace(/\n---\n> \*AI 리뷰는.*$/, ''))
+              .slice(-3);
 
-            // 대화 히스토리 (이전 @sparta Q&A)
-            const userQuestions = comments
+            const reviewComments = comments.data
+              .filter(c => c.user.type === 'Bot' && c.body.includes('AI 답변'));
+
+            const userQuestions = comments.data
               .filter(c => c.user.type !== 'Bot' && c.body.includes('@sparta'))
-              .map(c => ({ user: c.user.login, question: c.body.replace('@sparta', '').trim(), time: c.created_at }))
-              .slice(-10);
+              .map(c => ({ user: c.user.login, question: c.body.replace('@sparta', '').trim(), time: c.created_at }));
 
-            const botReplies = comments
-              .filter(c => c.user.type === 'Bot' && c.body.includes('AI 답변'))
-              .map(c => c.body)
-              .slice(-10);
+            const conversationHistory = userQuestions.slice(-5).map((q, i) => {
+              const reply = i < reviewComments.length ? reviewComments[i].body : '';
+              return { ...q, answer: reply };
+            });
 
-            const history = userQuestions.map((q, i) => ({
-              ...q,
-              answer: botReplies[i] || ''
-            }));
-
-            core.setOutput('pr_number', String(prNumber));
-            core.setOutput('pr_title', prTitle);
-            core.setOutput('pr_author', prAuthor);
-            core.setOutput('diff', diff);
+            core.setOutput('diff', JSON.stringify(diffResp.data.map(f => f.patch || '').join('\n')));
             core.setOutput('review_comments', JSON.stringify(botReviews));
-            core.setOutput('history', JSON.stringify(history));
+            core.setOutput('conversation_history', JSON.stringify(conversationHistory));
+            core.setOutput('pr_title', pr.title);
+            core.setOutput('pr_author', pr.user.login);
 
-      - name: Request conversation
+      - name: Request AI conversation
+        id: conversation
         if: steps.check.outputs.skip == 'false'
-        id: conv
+        continue-on-error: true
         env:
           REVIEW_SERVER_URL: ${{ secrets.REVIEW_SERVER_URL }}
-          REVIEW_SECRET: ${{ secrets.REVIEW_SECRET }}
-          QUESTION: ${{ steps.check.outputs.question }}
-          DIFF: ${{ steps.pr-info.outputs.diff }}
-          REVIEW_COMMENTS: ${{ steps.pr-info.outputs.review_comments }}
-          HISTORY: ${{ steps.pr-info.outputs.history }}
-          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
-          PR_TITLE: ${{ steps.pr-info.outputs.pr_title }}
-          PR_AUTHOR: ${{ steps.pr-info.outputs.pr_author }}
-          COMMENT_TYPE: ${{ github.event_name }}
-          GITHUB_REPO: ${{ github.repository }}
+          REVIEW_SECRET:     ${{ secrets.REVIEW_SECRET }}
+          QUESTION:          ${{ steps.check.outputs.question }}
+          GITHUB_REPO:       ${{ github.repository }}
+          PR_DIFF:           ${{ steps.pr-info.outputs.diff }}
+          REVIEW_COMMENTS:   ${{ steps.pr-info.outputs.review_comments }}
+          CONV_HISTORY:      ${{ steps.pr-info.outputs.conversation_history }}
+          PR_TITLE:          ${{ steps.pr-info.outputs.pr_title }}
+          PR_AUTHOR:         ${{ steps.pr-info.outputs.pr_author }}
+          COMMENT_ID:        ${{ github.event.comment.id }}
+          COMMENT_TYPE:      ${{ github.event_name }}
         run: |
-          # diff를 임시 파일로 저장
-          printf '%s' "$DIFF" > /tmp/conv-diff.txt
+          PR_NUMBER="${{ github.event.pull_request.number || github.event.issue.number }}"
 
           PAYLOAD=$(jq -n \
-            --arg question "$QUESTION" \
-            --rawfile diff /tmp/conv-diff.txt \
-            --arg repo "$GITHUB_REPO" \
-            --argjson pr_num "$PR_NUMBER" \
-            --arg pr_title "$PR_TITLE" \
-            --arg pr_author "$PR_AUTHOR" \
-            --arg comment_type "$COMMENT_TYPE" \
+            --arg question      "$QUESTION" \
+            --arg diff          "$PR_DIFF" \
+            --arg repo          "$GITHUB_REPO" \
+            --argjson pr_num    "${PR_NUMBER:-0}" \
+            --arg pr_title      "$PR_TITLE" \
+            --arg pr_author     "$PR_AUTHOR" \
+            --arg comment_type  "$COMMENT_TYPE" \
+            --argjson comment_id "${COMMENT_ID:-0}" \
             --arg review_comments "$REVIEW_COMMENTS" \
-            --arg conversation_history "$HISTORY" \
-            '{question:$question, diff:$diff, repo:$repo, pr_number:$pr_num, pr_title:$pr_title, pr_author:$pr_author, comment_type:$comment_type, review_comments:$review_comments, conversation_history:$conversation_history}')
+            --arg conversation_history "$CONV_HISTORY" \
+            '{question:$question, diff:$diff, repo:$repo, pr_number:$pr_num, pr_title:$pr_title, pr_author:$pr_author, comment_type:$comment_type, comment_id:$comment_id, review_comments:$review_comments, conversation_history:$conversation_history}')
 
-          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 90 \
-            -X POST "${REVIEW_SERVER_URL}/review/conversation" \
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 120 \
+            -X POST "${REVIEW_SERVER_URL}/review/conversation/" \
             -H "Content-Type: application/json" \
             -H "x-review-secret: ${REVIEW_SECRET}" \
             -H "x-github-repo: ${GITHUB_REPO}" \
@@ -358,38 +337,35 @@ jobs:
           HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::warning::대화 응답 서버 오류 (HTTP $HTTP_CODE)"
-            echo "error=⚠️ AI 응답 생성에 실패했습니다. (HTTP ${HTTP_CODE})" >> "$GITHUB_OUTPUT"
+            echo "::warning::대화 서버 오류 (HTTP $HTTP_CODE)"
           else
-            REPLY=$(echo "$HTTP_BODY" | jq -r '.reply // "응답을 가져올 수 없습니다."')
-            {
-              echo "reply<<CONV_EOF"
-              echo "$REPLY"
-              echo "CONV_EOF"
-            } >> "$GITHUB_OUTPUT"
+            REPLY=$(echo "$HTTP_BODY" | jq -r '.reply // empty')
+            if [ -n "$REPLY" ]; then
+              {
+                echo "reply<<REPLY_EOF"
+                echo "$REPLY"
+                echo "REPLY_EOF"
+              } >> "$GITHUB_OUTPUT"
+            fi
           fi
 
-      - name: Post reply
-        if: steps.check.outputs.skip == 'false'
+      - name: Post Reply
+        if: steps.conversation.outputs.reply != ''
+        continue-on-error: true
         uses: actions/github-script@v7
         env:
-          REPLY: ${{ steps.conv.outputs.reply }}
-          ERROR: ${{ steps.conv.outputs.error }}
+          REPLY: ${{ steps.conversation.outputs.reply }}
         with:
           script: |
-            const prNumber = context.payload.pull_request?.number
-              || context.payload.issue?.number;
-
-            let body;
-            if (process.env.ERROR) {
-              body = process.env.ERROR;
-            } else {
-              body = process.env.REPLY + '\n\n---\n> *AI 답변은 참고용입니다.*';
-            }
-
+            const body = [
+              process.env.REPLY,
+              "",
+              "---",
+              "> *AI 답변은 참고용입니다.*"
+            ].join("\n");
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: prNumber,
+              issue_number: context.payload.pull_request.number,
               body
             });
