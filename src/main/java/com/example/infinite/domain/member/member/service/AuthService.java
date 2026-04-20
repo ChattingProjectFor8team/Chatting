@@ -57,7 +57,7 @@ public class AuthService {
         }
 
         // 토큰 생성 (Subject로 이메일 사용)
-        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().name());
+        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().name(), member.getId());
         return new TokenResponse(accessToken, "Bearer");
     }
 }

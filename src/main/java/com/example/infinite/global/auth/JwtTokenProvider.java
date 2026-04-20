@@ -30,6 +30,7 @@ public class JwtTokenProvider {
     // 1. Claim 키 상수 — 생성과 소비가 반드시 같은 키를 참조
     // ──────────────────────────────────────────────
     private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_MEMBER_ID = "memberId";
     private static final String CLAIM_TYPE = "type";
     private static final String TOKEN_TYPE_ACCESS = "ACCESS";
 
@@ -54,13 +55,14 @@ public class JwtTokenProvider {
     // ──────────────────────────────────────────────
     // 2. 토큰 생성
     // ──────────────────────────────────────────────
-    public String createToken(String userEmail, String role) {
+    public String createToken(String userEmail, String role, Long memberId) {
         Date now = new Date();
         Date validity = new Date(now.getTime() + validityInMilliseconds);
 
         return Jwts.builder()
                 .subject(userEmail)
-                .claim(CLAIM_ROLE, role)           // 상수 사용
+                .claim(CLAIM_ROLE, role)
+                .claim(CLAIM_MEMBER_ID, memberId)
                 .claim(CLAIM_TYPE, TOKEN_TYPE_ACCESS)
                 .issuedAt(now)
                 .expiration(validity)
@@ -94,15 +96,17 @@ public class JwtTokenProvider {
     //    수정: getAuthentication(Claims claims) → 이중 파싱 제거
     // ──────────────────────────────────────────────
     public Authentication getAuthentication(Claims claims) {
-        String role = claims.get(CLAIM_ROLE, String.class);   // 상수 사용 → 불일치 원천 차단
+        String role = claims.get(CLAIM_ROLE, String.class);
+        Long memberId = claims.get(CLAIM_MEMBER_ID, Long.class);
 
         if (role == null) {
             throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
         }
 
         UserDetails userDetails = MemberDetailsImpl.fromToken(
-                claims.getSubject(),    // email
-                role                    // role
+                claims.getSubject(),
+                role,
+                memberId
         );
 
         return new UsernamePasswordAuthenticationToken(
