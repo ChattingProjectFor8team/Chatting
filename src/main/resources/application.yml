@@ -17,6 +17,8 @@ jwt:
 # PortOne
 portone:
   api-secret: ${PORTONE_API_SECRET:test_dummy_secret_for_local}
+  # 웹훅 서명 검증용 시크릿 — PortOne 콘솔에서 발급, 운영 환경에서는 반드시 환경변수로 주입
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_dummy_webhook_secret_for_local}
 
 # Jelly
 jelly:
