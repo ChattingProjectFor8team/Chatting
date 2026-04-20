@@ -78,7 +78,7 @@ public class MemberService {
         member.changeEmail(nextEmail);
 
         // JWT subject가 email이므로 이메일 변경 직후 새 토큰을 재발급한다.
-        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().name());
+        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().name(), member.getId());
         return new TokenResponse(accessToken, "Bearer");
     }
 

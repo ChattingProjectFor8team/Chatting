@@ -18,19 +18,22 @@ import java.util.Collections;
 @Getter
 public class MemberDetailsImpl implements UserDetails {
 
+    private final Long memberId;
     private final String email;
     private final String role;
     private final String status;
 
     // 1. DB 엔티티 기반 생성자
     public MemberDetailsImpl(Member member) {
+        this.memberId = member.getId();
         this.email = member.getEmail();
         this.role = "ROLE_" + member.getRole().name();
         this.status = member.getStatus().name();
     }
 
     // 2. 토큰 기반 생성자 (동일하게 처리)
-    private MemberDetailsImpl(String email, String role) {
+    private MemberDetailsImpl(String email, String role, Long memberId) {
+        this.memberId = memberId;
         this.email = email;
 
         this.role = role.startsWith("ROLE_") ? role : "ROLE_" + role;
@@ -41,8 +44,8 @@ public class MemberDetailsImpl implements UserDetails {
      * 토큰에서 추출한 정보만으로 인증 객체를 생성하는 정적 팩토리 메서드입니다.
      * 이 메서드 덕분에 매 요청마다 DB Select 쿼리가 발생하는 부하를 원천 차단합니다.
      */
-    public static MemberDetailsImpl fromToken(String email, String role) {
-        return new MemberDetailsImpl(email, role);
+    public static MemberDetailsImpl fromToken(String email, String role, Long memberId) {
+        return new MemberDetailsImpl(email, role, memberId);
     }
 
     @Override
