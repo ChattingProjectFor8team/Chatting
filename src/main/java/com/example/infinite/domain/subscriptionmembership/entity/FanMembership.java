@@ -1,6 +1,6 @@
-package com.example.infinite.domain.payment.entity;
+package com.example.infinite.domain.subscriptionmembership.entity;
 
-import com.example.infinite.domain.payment.enums.SubscriptionStatus;
+import com.example.infinite.domain.subscriptionmembership.enums.SubscriptionStatus;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -59,7 +59,6 @@ public class FanMembership extends BaseEntity {
     }
 
     public boolean isActive() {
-        // 상태가 ACTIVE이고 만료일이 지나지 않은 경우에만 유효
         return this.status == SubscriptionStatus.ACTIVE
                 && LocalDateTime.now().isBefore(this.expiredAt);
     }

@@ -20,6 +20,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ReservoirSampler {
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final RaffleAuditLogger auditLogger;
 
     // TTL: 현재 하드코딩 24시간. Phase 2에서 래플 duration 기반 동적 TTL로 교체 예정.
     private static final Duration DEFAULT_KEY_TTL = Duration.ofDays(1);
@@ -117,6 +118,9 @@ public class ReservoirSampler {
             stringRedisTemplate.expire(countKey, DEFAULT_KEY_TTL);
             stringRedisTemplate.expire(candidateKey, DEFAULT_KEY_TTL);
         }
+
+        // 감사 로그 발행 (비동기 Batch INSERT의 원천 데이터)
+        auditLogger.log(raffleId, slotIndex, userId, entryOrder, replaced);
 
         log.debug("응모 성공: raffleId={}, slotIndex={}, userId={}, order={}, replaced={}",
                 raffleId, slotIndex, userId, entryOrder, replaced);

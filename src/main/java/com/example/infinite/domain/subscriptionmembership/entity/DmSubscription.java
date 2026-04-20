@@ -1,6 +1,6 @@
-package com.example.infinite.domain.payment.entity;
+package com.example.infinite.domain.subscriptionmembership.entity;
 
-import com.example.infinite.domain.payment.enums.SubscriptionStatus;
+import com.example.infinite.domain.subscriptionmembership.enums.SubscriptionStatus;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
