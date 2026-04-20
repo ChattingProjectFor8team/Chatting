@@ -25,7 +25,7 @@ public class MemberDetailsImpl implements UserDetails {
     // 1. DB 엔티티 기반 생성자
     public MemberDetailsImpl(Member member) {
         this.email = member.getEmail();
-        this.role = "ROLE_" + member.getRole().getSecurityName();
+        this.role = "ROLE_" + member.getRole().name();
         this.status = member.getStatus().name();
     }
 

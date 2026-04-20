@@ -22,7 +22,7 @@ public class AdminMemberController {
     private final MemberService memberService;
 
     // admin 경로는 SecurityConfig에서 hasRole("ADMIN")으로 보호되므로 SUPER_ADMIN만 접근한다.
-    // 현재 과제 규칙상 USER를 ARTIST_ADMIN 또는 SUPER_ADMIN으로만 승격시킨다.
+    // 현재 과제 규칙상 MEMBER를 ARTIST 또는 SUPER_ADMIN으로만 승격시킨다.
     @PatchMapping("v1/members/{memberId}/role")
     public ResponseEntity<ApiResponse<AdminMemberResponse>> changeRole(
             @PathVariable Long memberId,

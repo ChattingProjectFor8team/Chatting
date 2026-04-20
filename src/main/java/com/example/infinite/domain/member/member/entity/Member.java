@@ -54,7 +54,7 @@ public class Member extends BaseEntity {
         this.password = password;
         this.nickname = nickname;
         this.phoneNumber = phoneNumber;
-        this.role = MemberRole.USER;
+        this.role = MemberRole.MEMBER;
         this.status = MemberStatus.ACTIVE;
     }
 

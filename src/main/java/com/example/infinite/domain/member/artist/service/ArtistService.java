@@ -158,7 +158,7 @@ public class ArtistService {
     }
 
     private void validateCreatePermission(Member member) {
-        if (member.getRole() != MemberRole.ARTIST_ADMIN) {
+        if (member.getRole() != MemberRole.ARTIST) {
             throw new ArtistException(ArtistErrorCode.ARTIST_CREATE_ROLE_REQUIRED);
         }
 
