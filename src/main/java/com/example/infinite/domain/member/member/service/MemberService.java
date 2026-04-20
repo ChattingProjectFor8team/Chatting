@@ -78,14 +78,14 @@ public class MemberService {
         member.changeEmail(nextEmail);
 
         // JWT subject가 email이므로 이메일 변경 직후 새 토큰을 재발급한다.
-        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().getSecurityName());
+        String accessToken = jwtTokenProvider.createToken(member.getEmail(), member.getRole().name());
         return new TokenResponse(accessToken, "Bearer");
     }
 
     public AdminMemberResponse changeRole(Long memberId, UpdateMemberRoleRequest request) {
         Member member = memberReader.findByIdOrThrow(memberId);
         // 역할 승격은 SUPER_ADMIN 전용 admin 경로에서만 호출되며,
-        // 현재 정책상 USER -> ARTIST_ADMIN / USER -> SUPER_ADMIN 두 경우만 허용한다.
+        // 현재 정책상 MEMBER -> ARTIST / MEMBER -> SUPER_ADMIN 두 경우만 허용한다.
         validateRoleChange(member.getRole(), request.role());
         member.changeRole(request.role());
         return AdminMemberResponse.from(member);
@@ -111,11 +111,11 @@ public class MemberService {
 
 
     private void validateRoleChange(MemberRole currentRole, MemberRole nextRole) {
-        if (currentRole != MemberRole.USER) {
+        if (currentRole != MemberRole.MEMBER) {
             throw new MemberException(MemberErrorCode.MEMBER_INVALID_ROLE_CHANGE);
         }
 
-        if (nextRole != MemberRole.ARTIST_ADMIN && nextRole != MemberRole.SUPER_ADMIN) {
+        if (nextRole != MemberRole.ARTIST && nextRole != MemberRole.SUPER_ADMIN) {
             throw new MemberException(MemberErrorCode.MEMBER_INVALID_ROLE_CHANGE);
         }
     }

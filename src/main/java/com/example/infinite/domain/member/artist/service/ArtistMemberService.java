@@ -105,7 +105,7 @@ public class ArtistMemberService {
     }
 
     private void validateCreatableMember(Member targetMember) {
-        if (targetMember.getRole() != MemberRole.ARTIST_ADMIN) {
+        if (targetMember.getRole() != MemberRole.ARTIST) {
             throw new ArtistException(ArtistErrorCode.ARTIST_MEMBER_ROLE_REQUIRED);
         }
 

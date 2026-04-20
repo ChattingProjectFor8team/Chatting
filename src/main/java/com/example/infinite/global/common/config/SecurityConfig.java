@@ -38,39 +38,72 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // 2. 요청 권한 설정 (화이트리스트 운영)
-                // TODO : 너무 초안이라 반드시 수정해야함
                 .authorizeHttpRequests(auth -> auth
-                                // 1. 전체 공개
-                                .requestMatchers("/api/auth/v1/**", "/h2-console/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/post/v1/fan-posts/**", "/api/post/v1/artists/*/fan-posts/**", "/api/post/v1/hashtags/**", "/api/post/v1/artist-posts/**", "/api/media/v1/**").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/member/v1/artists/{artistId}").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/member/v2/artists/{artistId}").permitAll()
+                        // ── 1. 전체 공개 ──
+                        .requestMatchers(
+                                "/api/auth/v1/**",
+                                "/h2-console/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
+                        ).permitAll()
 
-                                // 2. 어드민 및 관리자 전용
-                                // ADMIN 권한은 현재 MemberRole.SUPER_ADMIN만 가지므로
-                                // `/api/{server}/admin/{version}/...` 경로는 SUPER_ADMIN 전용이다.
-                                .requestMatchers("/api/member/admin/v1/**", "/api/payment/v1/charge/settings/**").hasRole("ADMIN")
-                                .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "ADMIN")
-                                .requestMatchers(HttpMethod.PATCH, "/api/post/v1/artists/*/fan-posts/*").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
-                                .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/fan-posts/*").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
-                                .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "ADMIN")
-                                .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
-                                .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "ADMIN")
+                        // 공개 GET: 팬포스트, 해시태그, 아티스트 포스트, 미디어, 아티스트 상세
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/post/v1/fan-posts/**",
+                                "/api/post/v1/artists/*/fan-posts/**",
+                                "/api/post/v1/hashtags/**",
+                                "/api/post/v1/artist-posts/**",
+                                "/api/media/v1/**",
+                                "/api/member/v1/artists/{artistId}",
+                                "/api/member/v2/artists/{artistId}"
+                        ).permitAll()
 
-                                // 3. 유료 서비스 (구독팬 전용)
-                                .requestMatchers("/api/post/v1/fan-letters/**", "/api/payment/v1/subscription/**").hasAnyRole("SUBSCRIBER", "ARTIST", "ADMIN")
+                        // 공개 GET: 래플/라이브 목록 및 상세 (비회원도 조회 가능)
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/artists/*/raffles",
+                                "/api/v1/artists/*/raffles/*",
+                                "/api/v1/artists/*/lives",
+                                "/api/v1/artists/*/lives/*",
+                                "/api/v1/artists/*/lives/*/chat/messages"
+                        ).permitAll()
 
-                                // 4. 일반 사용자 및 공통 인증
-                                .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
-                                .requestMatchers("/api/post/v1/fan-posts").hasAnyRole("USER", "SUBSCRIBER", "ARTIST", "ADMIN")
-                                .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/likes/toggle").authenticated()
-                                .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
-                                .requestMatchers("/api/member/v1/**", "/api/payment/v1/jelly/**").authenticated()
-                                .requestMatchers("/sub/user/{userId}/notifications").authenticated()
+                        // WebSocket 핸드쉐이크 (STOMP 연결은 ChannelInterceptor에서 JWT 검증)
+                        .requestMatchers("/ws-stomp/**").permitAll()
 
-                                // 5. 핸드쉐이크만 허용
-                                .requestMatchers("/ws-stomp/**").permitAll()
+                        // ── 2. SUPER_ADMIN 전용 ──
+                        .requestMatchers("/api/member/admin/v1/**").hasRole("SUPER_ADMIN")
+
+
+                        // ── 3. ARTIST + SUPER_ADMIN (관리자) ──
+                        .requestMatchers("/api/v1/admin/artists/*/raffles/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers("/api/v1/admin/artists/*/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+
+                        // ── 4. 인증된 사용자 (로그인 필수) ──
+                        // 래플 응모 및 내 응모 내역
+                        .requestMatchers("/api/v1/artists/*/raffles/*/entries/**").authenticated()
+                        .requestMatchers("/api/v1/users/me/raffle-entries").authenticated()
+
+                        // 팬포스트 CRUD (작성/수정/삭제)
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/post/v1/artists/*/fan-posts/*").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/fan-posts/*").authenticated()
+                        .requestMatchers("/api/post/v1/fan-posts").authenticated()
+
+                        // 좋아요, 댓글
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/likes/toggle").authenticated()
+                        .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
+
+                        // 팬레터 (구독 검증은 서비스 레이어에서 수행)
+                        .requestMatchers("/api/post/v1/fan-letters/**").authenticated()
+
+                        // 회원, 결제, 구독, 알림
+                        .requestMatchers("/api/member/v1/**").authenticated()
+                        .requestMatchers("/api/payment/v1/**").authenticated()
+                        .requestMatchers("/sub/user/{userId}/notifications").authenticated()
                 )
 
                 // 3. 예외 핸들링 (EntryPoint, DeniedHandler 운영)
