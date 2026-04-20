@@ -1,9 +1,8 @@
 package com.example.infinite.global.auth;
 
 
-import com.example.infinite.domain.member.entity.Member;
-import com.example.infinite.domain.member.enums.MemberRole;
-import com.example.infinite.domain.member.enums.MemberStatus;
+import com.example.infinite.domain.member.member.entity.Member;
+import com.example.infinite.domain.member.member.enums.MemberStatus;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -26,8 +25,7 @@ public class MemberDetailsImpl implements UserDetails {
     // 1. DB 엔티티 기반 생성자
     public MemberDetailsImpl(Member member) {
         this.email = member.getEmail();
-        // 💡 팀의 Enum 상수 이름(USER 등) 앞에 "ROLE_"을 직접 붙여줍니다.
-        this.role = "ROLE_" + member.getRole().name();
+        this.role = "ROLE_" + member.getRole().getSecurityName();
         this.status = member.getStatus().name();
     }
 
