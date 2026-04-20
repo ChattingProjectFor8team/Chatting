@@ -53,16 +53,19 @@ public class PaymentService {
     }
 
     // 웹훅 처리 — PortOne 결제 완료 시 호출
+    // paymentId를 메서드 파라미터로 분리한 이유:
+    //   SpEL에서 중첩 record 접근( #request.data().paymentId() )은 프록시 구조상
+    //   컴파일 타임에 파라미터명 바인딩이 불안정할 수 있다.
+    //   최상위 파라미터( #paymentId )로 키를 지정해 확실한 락 동작을 보장한다.
     // @RedisLock: 동일 paymentId 웹훅 중복 수신 시 직렬화하여 이중 지급 방지
-    @RedisLock(key = "'payment:webhook:' + #request.data().paymentId()", waitTime = 3, leaseTime = 10)
+    @RedisLock(key = "'payment:webhook:' + #paymentId", waitTime = 3, leaseTime = 10)
     @Transactional
-    public void handleWebhook(PortOneWebhookRequest request) {
+    public void handleWebhook(String paymentId, PortOneWebhookRequest request) {
         // Transaction.Paid 타입만 처리, 그 외 이벤트(취소 등)는 무시
         if (!"Transaction.Paid".equals(request.type())) {
             return;
         }
 
-        String paymentId = request.data().paymentId();
         PaymentOrder order = paymentOrderRepository.findByPaymentId(paymentId)
                 .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_ORDER_NOT_FOUND));
 
