@@ -82,7 +82,7 @@ jobs:
             '{diff:$diff, pr_title:$pr_title, pr_author:$pr_author, repo:$repo, pr_number:$pr_num, base_branch:$base, previous_reviews:$previous_reviews}')
 
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 90 \
-            -X POST "${REVIEW_SERVER_URL}/review" \
+            -X POST "${REVIEW_SERVER_URL}/review/" \
             -H "Content-Type: application/json" \
             -H "x-review-secret: ${REVIEW_SECRET}" \
             -H "x-github-repo: ${PR_REPO}" \
@@ -154,7 +154,7 @@ jobs:
             '{review_text:$review_text, diff:$diff, repo:$repo, pr_number:$pr_num}')
 
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 \
-            -X POST "${REVIEW_SERVER_URL}/review/rebuttal" \
+            -X POST "${REVIEW_SERVER_URL}/review/rebuttal/" \
             -H "Content-Type: application/json" \
             -H "x-review-secret: ${REVIEW_SECRET}" \
             -H "x-github-repo: ${PR_REPO}" \
@@ -327,7 +327,7 @@ jobs:
             '{question:$question, diff:$diff, repo:$repo, pr_number:$pr_num, pr_title:$pr_title, pr_author:$pr_author, comment_type:$comment_type, comment_id:$comment_id, review_comments:$review_comments, conversation_history:$conversation_history}')
 
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 120 \
-            -X POST "${REVIEW_SERVER_URL}/review/conversation" \
+            -X POST "${REVIEW_SERVER_URL}/review/conversation/" \
             -H "Content-Type: application/json" \
             -H "x-review-secret: ${REVIEW_SECRET}" \
             -H "x-github-repo: ${GITHUB_REPO}" \
