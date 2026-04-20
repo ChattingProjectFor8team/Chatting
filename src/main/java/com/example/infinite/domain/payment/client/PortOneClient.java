@@ -2,9 +2,13 @@ package com.example.infinite.domain.payment.client;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -29,6 +33,30 @@ public class PortOneClient {
                 .baseUrl("https://api.portone.io")
                 .requestFactory(factory)
                 .build();
+    }
+
+    // PortOne 빌링키로 결제 (자동충전)
+    public void charge(String billingKey, int amount, Long userId) {
+        String paymentId = "auto-charge-" + UUID.randomUUID();
+        Map<String, Object> body = Map.of(
+                "billingKey", billingKey,
+                "orderName", "젤리 자동충전",
+                "amount", Map.of("total", amount),
+                "currency", "KRW",
+                "customer", Map.of("id", String.valueOf(userId))
+        );
+        try {
+            restClient.post()
+                    .uri("/payments/{paymentId}/billing-key", paymentId)
+                    .header("Authorization", "PortOne " + apiSecret)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            log.error("PortOne 자동충전 결제 실패: userId={}, amount={}, error={}", userId, amount, e.getMessage());
+            throw e;
+        }
     }
 
     // PortOne 빌링키 삭제 (카드 등록 해제)
