@@ -40,14 +40,18 @@ public class FanMembership extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime expiredAt;
 
+    @Column(nullable = false)
+    private int jellyAmount; // 구매 시점 젤리 차감액 스냅샷 (가격 정책 변경 시에도 이력 보존)
+
     @Builder
     public FanMembership(Long userId, Long artistId,
-                         LocalDateTime startedAt, LocalDateTime expiredAt) {
+                         LocalDateTime startedAt, LocalDateTime expiredAt, int jellyAmount) {
         this.userId = userId;
         this.artistId = artistId;
         this.status = SubscriptionStatus.ACTIVE;
         this.startedAt = startedAt;
         this.expiredAt = expiredAt;
+        this.jellyAmount = jellyAmount;
     }
 
     public void expire() {

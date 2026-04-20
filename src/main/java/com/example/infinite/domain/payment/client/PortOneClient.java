@@ -1,5 +1,6 @@
 package com.example.infinite.domain.payment.client;
 
+import com.example.infinite.domain.payment.dto.response.PortOnePaymentResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -55,6 +56,20 @@ public class PortOneClient {
                     .toBodilessEntity();
         } catch (Exception e) {
             log.error("PortOne 자동충전 결제 실패: userId={}, amount={}, error={}", userId, amount, e.getMessage());
+            throw e;
+        }
+    }
+
+    // PortOne 결제 단건 조회 — 웹훅 수신 후 결제 상태·금액 검증에 사용
+    public PortOnePaymentResponse getPayment(String paymentId) {
+        try {
+            return restClient.get()
+                    .uri("/payments/{paymentId}", paymentId)
+                    .header("Authorization", "PortOne " + apiSecret)
+                    .retrieve()
+                    .body(PortOnePaymentResponse.class);
+        } catch (Exception e) {
+            log.error("PortOne 결제 조회 실패: paymentId={}, error={}", paymentId, e.getMessage());
             throw e;
         }
     }
