@@ -112,11 +112,13 @@ public class HashtagService {
         int safeLimit = normalizeLimit(limit);
         String normalizedKeyword = normalizeSearchToken(keyword);
 
-        // keyword는 필수 입력이므로, 전역 추천은 "name contains + usageCount desc"만 타면 충분하다.
-        List<Hashtag> hashtags = hashtagRepository.findByNameContainingOrderByUsageCountDescNameAsc(
-                normalizedKeyword,
-                PageRequest.of(0, safeLimit)
-        );
+        List<Hashtag> hashtags = normalizedKeyword == null
+                // 입력이 비어 있으면 자동완성 실패 대신 현재 인기 태그 상위 N개를 내려 UX를 자연스럽게 맞춘다.
+                ? hashtagRepository.findAllByOrderByUsageCountDescNameAsc(PageRequest.of(0, safeLimit))
+                : hashtagRepository.findByNameContainingOrderByUsageCountDescNameAsc(
+                        normalizedKeyword,
+                        PageRequest.of(0, safeLimit)
+                );
 
         return hashtags.stream()
                 .map(hashtag -> new HashtagResponse(hashtag.getName(), hashtag.getUsageCount()))
@@ -126,10 +128,7 @@ public class HashtagService {
     public String normalizeSearchToken(String tagName) {
         // 추천 검색어도 저장 키와 동일한 규칙으로 정규화해야 like 검색이 일관된다.
         String normalizedTagName = HashtagParser.normalizeHashtagName(tagName);
-        if (normalizedTagName.isBlank()) {
-            throw new HashtagException(HashtagErrorCode.INVALID_HASHTAG_TOKEN);
-        }
-        return normalizedTagName;
+        return normalizedTagName.isBlank() ? null : normalizedTagName;
     }
 
     private int normalizeLimit(Integer limit) {

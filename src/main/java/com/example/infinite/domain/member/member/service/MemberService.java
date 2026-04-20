@@ -47,6 +47,7 @@ public class MemberService {
         String nextProfileImageUrl = MemberInputSupport.trimToNull(request.profileImageUrl());
 
         // 본인 번호를 제외한 다른 회원의 전화번호와 충돌하면 수정하지 못하게 막는다.
+        validateNicknameDuplication(member.getId(), nextNickname);
         validatePhoneNumberDuplication(member.getId(), nextPhoneNumber);
         member.updateProfile(
                 nextNickname != null ? nextNickname : member.getNickname(),
@@ -117,6 +118,12 @@ public class MemberService {
 
         if (nextRole != MemberRole.ARTIST && nextRole != MemberRole.SUPER_ADMIN) {
             throw new MemberException(MemberErrorCode.MEMBER_INVALID_ROLE_CHANGE);
+        }
+    }
+
+    private void validateNicknameDuplication(Long memberId, String nickname) {
+        if (nickname != null && memberRepository.existsByNicknameAndIdNot(nickname, memberId)) {
+            throw new MemberException(MemberErrorCode.MEMBER_DUPLICATE_NICKNAME);
         }
     }
 

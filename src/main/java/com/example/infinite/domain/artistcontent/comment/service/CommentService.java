@@ -1,4 +1,318 @@
 package com.example.infinite.domain.artistcontent.comment.service;
 
+import com.example.infinite.domain.artistcontent.comment.dto.request.CommentCreateRequest;
+import com.example.infinite.domain.artistcontent.comment.dto.response.CommentMentionResponse;
+import com.example.infinite.domain.artistcontent.comment.dto.response.CommentResponse;
+import com.example.infinite.domain.artistcontent.comment.entity.Comment;
+import com.example.infinite.domain.artistcontent.comment.error.CommentErrorCode;
+import com.example.infinite.domain.artistcontent.comment.error.CommentException;
+import com.example.infinite.domain.artistcontent.comment.repository.CommentRepository;
+import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
+import com.example.infinite.domain.artistcontent.comment.support.MentionParser;
+import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPost;
+import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
+import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;
+import com.example.infinite.domain.artistcontent.post.fanpost.support.FanPostReader;
+import com.example.infinite.domain.member.member.entity.Member;
+import com.example.infinite.domain.member.member.support.MemberInputSupport;
+import com.example.infinite.domain.member.member.support.MemberReader;
+import com.example.infinite.global.auth.MemberDetailsImpl;
+import com.example.infinite.global.common.dto.CursorSliceResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CommentService {
+
+    private static final int COMMENT_SLICE_SIZE = 20;
+    private static final int COMMENT_REPLY_LIMIT = 20;
+
+    private final CommentRepository commentRepository;
+    private final CommentReader commentReader;
+    private final FanPostReader fanPostReader;
+    private final ArtistPostReader artistPostReader;
+    private final CommentMentionService commentMentionService;
+    private final MemberReader memberReader;
+
+    @Transactional
+    public CommentResponse createFanPostComment(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long fanPostId,
+            CommentCreateRequest request
+    ) {
+        return createComment(memberDetails, artistId, fanPostId, request, PostType.FAN_POST);
+    }
+
+    @Transactional
+    public CommentResponse createArtistPostComment(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long artistPostId,
+            CommentCreateRequest request
+    ) {
+        // 아티스트 게시글 댓글도 같은 댓글 정책을 재사용하되 targetType만 다르게 태운다.
+        return createComment(memberDetails, artistId, artistPostId, request, PostType.ARTIST_POST);
+    }
+
+    public CursorSliceResponse<CommentResponse> getFanPostComments(Long fanPostId, Long cursor) {
+        // 팬포스트 상세 댓글 조회는 공통 slice 로직을 FAN_POST 타입으로 실행한다.
+        return getComments(PostType.FAN_POST, fanPostId, cursor);
+    }
+
+    public CursorSliceResponse<CommentResponse> getArtistPostComments(Long artistPostId, Long cursor) {
+        // 아티스트 게시글도 댓글 조회 규칙은 동일하므로 targetType만 바꿔 재사용한다.
+        return getComments(PostType.ARTIST_POST, artistPostId, cursor);
+    }
+
+    public List<CommentResponse> getFanPostReplies(Long artistId, Long fanPostId, Long parentCommentId) {
+        validateCommentTarget(PostType.FAN_POST, artistId, fanPostId);
+        return getReplies(PostType.FAN_POST, fanPostId, parentCommentId);
+    }
+
+    public List<CommentResponse> getArtistPostReplies(Long artistId, Long artistPostId, Long parentCommentId) {
+        validateCommentTarget(PostType.ARTIST_POST, artistId, artistPostId);
+        return getReplies(PostType.ARTIST_POST, artistPostId, parentCommentId);
+    }
+
+    @Transactional
+    public void deleteFanPostComment(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long fanPostId,
+            Long commentId
+    ) {
+        // 삭제 정책도 생성과 동일하게 공통 로직에 FAN_POST 타입만 주입한다.
+        deleteComment(memberDetails, artistId, fanPostId, commentId, PostType.FAN_POST);
+    }
+
+    @Transactional
+    public void deleteArtistPostComment(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long artistPostId,
+            Long commentId
+    ) {
+        // 아티스트 게시글 댓글 삭제도 targetType 기반 공통 로직으로 처리한다.
+        deleteComment(memberDetails, artistId, artistPostId, commentId, PostType.ARTIST_POST);
+    }
+
+    private CommentResponse createComment(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long targetId,
+            CommentCreateRequest request,
+            PostType targetType
+    ) {
+        // 댓글 작성자는 JWT principal(Member) 기준으로 고정하고, 대상 글이 해당 artist 소속인지 먼저 검증한다.
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        validateCommentTarget(targetType, artistId, targetId);
+
+        // 부모 댓글 검증과 멘션 해석은 저장 전에 끝내야 잘못된 스레드 오염을 막을 수 있다.
+        Comment parentComment = resolveParentComment(targetType, request.parentId(), targetId);
+        String mentionNickname = resolveMentionNickname(targetType, request.content(), targetId, parentComment);
+
+        Comment comment = commentRepository.save(Comment.create(
+                targetType,
+                targetId,
+                member,
+                request.content(),
+                parentComment
+        ));
+        // 댓글 생성 시 대상 게시글 카운트를 같은 트랜잭션에서 함께 올린다.
+        changeCommentCount(targetType, artistId, targetId, 1);
+        CommentMentionResponse mentionedMember = commentMentionService.syncMention(comment, mentionNickname);
+        // TODO(subscription 담당자):
+        // 댓글 작성자 닉네임 옆 badge도 FanPost와 같은 contract로 여기서 조립할 예정.
+        // 필요한 contract:
+        // - input: artistId + writerIds(Collection<Long>)
+        // - output: Map<Long, WriterSubscriptionBadge>
+        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
+        // 이후 CommentResponse에 badge 필드를 추가하고 writerId 기준으로 주입한다.
+
+        return CommentResponse.from(comment, mentionedMember);
+    }
+
+    private CursorSliceResponse<CommentResponse> getComments(PostType targetType, Long targetId, Long cursor) {
+        // 댓글 기본 조회는 부모 댓글 slice만 내리고, 대댓글은 별도 endpoint에서 온디맨드로 조회한다.
+        List<Comment> rootComments = commentRepository.findRootSliceByTargetTypeAndTargetId(
+                targetType,
+                targetId,
+                cursor,
+                COMMENT_SLICE_SIZE + 1
+        );
+        boolean hasNext = rootComments.size() > COMMENT_SLICE_SIZE;
+        List<Comment> visibleRootComments = hasNext ? rootComments.subList(0, COMMENT_SLICE_SIZE) : rootComments;
+
+        List<Long> rootCommentIds = visibleRootComments.stream()
+                .map(Comment::getId)
+                .toList();
+        Map<Long, Integer> replyCountsByParentId = commentRepository.findReplyCountsByParentIds(rootCommentIds);
+        // TODO(subscription 담당자):
+        // root comment writerId 전체를 모아 badge를 한 번에 조회한 뒤 응답 조립 단계에서 주입할 예정.
+        // 필요한 contract:
+        // - input: artistId + writerIds(Collection<Long>)
+        // - output: Map<Long, WriterSubscriptionBadge>
+        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
+        // 누락된 writerId는 false/false 로 간주 가능해야 하고 FanPost 쪽과 동일 contract를 써야 한다.
+
+        List<CommentResponse> content = visibleRootComments.stream()
+                .map(rootComment -> CommentResponse.from(
+                        rootComment,
+                        replyCountsByParentId.getOrDefault(rootComment.getId(), 0),
+                        null
+                ))
+                .toList();
+
+        Long nextCursor = hasNext && !visibleRootComments.isEmpty()
+                ? visibleRootComments.get(visibleRootComments.size() - 1).getId()
+                : null;
+
+        return new CursorSliceResponse<>(content, nextCursor, hasNext, COMMENT_SLICE_SIZE);
+    }
+
+    // 대댓글조회
+    private List<CommentResponse> getReplies(PostType targetType, Long targetId, Long parentCommentId) {
+        Comment parentComment = commentReader.findByIdAndTargetTypeAndTargetIdOrThrow(parentCommentId, targetType, targetId);
+        if (!parentComment.isRootComment()) {
+            throw new CommentException(CommentErrorCode.INVALID_PARENT_COMMENT);
+        }
+
+        List<Comment> replies = commentRepository.findRepliesByParentId(parentCommentId, COMMENT_REPLY_LIMIT);
+        Map<Long, CommentMentionResponse> mentionsByCommentId = loadMentionsByCommentId(replies);
+
+        // TODO(subscription 담당자):
+        // 대댓글 조회도 같은 writer badge contract를 재사용해 writerId 기준으로 주입할 예정.
+        // 필요한 contract:
+        // - input: artistId + writerIds(Collection<Long>)
+        // - output: Map<Long, WriterSubscriptionBadge>
+        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
+        return replies.stream()
+                .map(reply -> CommentResponse.from(
+                        reply,
+                        0,
+                        mentionsByCommentId.get(reply.getId())
+                ))
+                .toList();
+    }
+
+    private void deleteComment(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long targetId,
+            Long commentId,
+            PostType targetType
+    ) {
+        // 삭제 시에도 대상 글 소속을 먼저 확인해 다른 게시글의 commentId를 우회 호출하지 못하게 한다.
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        validateCommentTarget(targetType, artistId, targetId);
+        Comment comment = commentReader.findByIdAndTargetTypeAndTargetIdOrThrow(commentId, targetType, targetId);
+
+        if (!comment.isOwnedBy(member.getId())) {
+            throw new CommentException(CommentErrorCode.COMMENT_PERMISSION_DENIED);
+        }
+
+        int deletedCommentCount = 1;
+        if (comment.isRootComment()) {
+            // 2뎁스 정책이므로 루트 삭제 시 그 아래 대댓글도 함께 지워야 commentCount와 스레드 구조가 맞는다.
+            List<Comment> replies = commentRepository.findByParentIdOrderByIdAsc(comment.getId());
+            for (Comment reply : replies) {
+                reply.delete();
+            }
+            deletedCommentCount += replies.size();
+        }
+
+        comment.delete();
+        changeCommentCount(targetType, artistId, targetId, -deletedCommentCount);
+    }
+
+    private Comment resolveParentComment(PostType targetType, Long parentId, Long targetId) {
+        if (parentId == null) {
+            return null;
+        }
+
+        // 부모 댓글은 같은 targetType/targetId 스레드 안에서만 허용해 다른 글 댓글에 대댓글을 다는 것을 막는다.
+        Comment parentComment = commentReader.findByIdAndTargetTypeAndTargetIdOrThrow(parentId, targetType, targetId);
+        // 부모도 댓글이고 또 그 아래에 달면 3뎁스가 되므로 원댓글만 부모로 허용한다.
+        if (!parentComment.isRootComment()) {
+            throw new CommentException(CommentErrorCode.COMMENT_DEPTH_EXCEEDED);
+        }
+        return parentComment;
+    }
+
+    private String resolveMentionNickname(
+            PostType targetType,
+            String content,
+            Long targetId,
+            Comment parentComment
+    ) {
+        List<String> mentionedNicknames = MentionParser.extractMentionedNicknames(content);
+        if (mentionedNicknames.isEmpty()) {
+            return null;
+        }
+
+        if (parentComment == null) {
+            // 멘션은 3뎁스 대체 규칙상 대댓글에서만 해석하고, 원댓글의 @텍스트는 일반 본문으로 둔다.
+            return null;
+        }
+
+        // 허용 멘션 범위는 "같은 루트 댓글 스레드 참여자"로 제한해 3-depth 대체 규칙을 유지한다.
+        List<Comment> threadComments = commentRepository.findThreadCommentsByRootCommentId(
+                targetType,
+                targetId,
+                parentComment.getId()
+        );
+        Set<String> allowedNicknames = threadComments.stream()
+                .map(comment -> comment.getWriter().getNickname())
+                .map(nickname -> nickname.strip().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        // 대댓글 멘션은 최대 1명만 허용하므로, 스레드 참여자 범위 안의 첫 번째 닉네임만 멘션으로 인정한다.
+        return mentionedNicknames.stream()
+                .filter(allowedNicknames::contains)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void validateCommentTarget(PostType targetType, Long artistId, Long targetId) {
+        // 댓글 대상 검증은 targetType별 reader로 위임해 fan-post / artist-post 분기를 한곳에 모은다.
+        switch (targetType) {
+            case FAN_POST -> fanPostReader.findByIdAndArtistIdOrThrow(targetId, artistId);
+            case ARTIST_POST -> artistPostReader.findByIdAndArtistIdOrThrow(targetId, artistId);
+            default -> throw new IllegalArgumentException("지원하지 않는 댓글 대상 타입입니다: " + targetType);
+        }
+    }
+
+    private void changeCommentCount(PostType targetType, Long artistId, Long targetId, int delta) {
+        // 댓글 수 비정규화 컬럼도 targetType별 엔티티에 맞춰 같은 트랜잭션 안에서 함께 반영한다.
+        switch (targetType) {
+            case FAN_POST -> {
+                FanPost fanPost = fanPostReader.findByIdAndArtistIdOrThrow(targetId, artistId);
+                fanPost.changeCommentCountBy(delta);
+            }
+            case ARTIST_POST -> {
+                ArtistPost artistPost = artistPostReader.findByIdAndArtistIdOrThrow(targetId, artistId);
+                artistPost.changeCommentCountBy(delta);
+            }
+            default -> throw new IllegalArgumentException("지원하지 않는 댓글 대상 타입입니다: " + targetType);
+        }
+    }
+
+    private Map<Long, CommentMentionResponse> loadMentionsByCommentId(List<Comment> comments) {
+        List<Long> commentIds = comments.stream()
+                .map(Comment::getId)
+                .toList();
+        return commentMentionService.findMentionResponsesByCommentIds(commentIds);
+    }
 }

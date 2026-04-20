@@ -1,5 +1,7 @@
 package com.example.infinite.global.error;
 
+import com.example.infinite.domain.artistcontent.comment.error.CommentException;
+import com.example.infinite.domain.artistcontent.hashtag.error.HashtagException;
 import com.example.infinite.domain.artistcontent.interaction.error.InteractionException;
 import com.example.infinite.domain.member.artist.error.ArtistException;
 import com.example.infinite.domain.member.member.error.MemberErrorCode;
@@ -117,6 +119,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ArtistContentException.class)
     public ResponseEntity<ApiResponse<Void>> handleArtistContentException(ArtistContentException e, HttpServletRequest request) {
         return handleCustomException("ArtistContentException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 댓글 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(CommentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCommentException(CommentException e, HttpServletRequest request) {
+        return handleCustomException("CommentException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 해시태그 도메인 커스텀 예외 처리
+     */
+    @ExceptionHandler(HashtagException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHashtagException(HashtagException e, HttpServletRequest request) {
+        return handleCustomException("HashtagException", e.getErrorCode(), e, request);
     }
 
     /**

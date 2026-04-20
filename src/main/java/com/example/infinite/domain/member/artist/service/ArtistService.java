@@ -66,10 +66,7 @@ public class ArtistService {
         validateCreatePermission(member);
 
         // 생성 직전 입력을 정규화해 빈 문자열/중복 slug를 한 번에 방어한다.
-        String normalizedProfileImageUrl = MemberInputSupport.requireTrimmed(
-                request.profileImageUrl(),
-                () -> new ArtistException(ArtistErrorCode.MEDIA_PROFILE_REQUIRED)
-        );
+        String normalizedProfileImageUrl = MemberInputSupport.trimToNull(request.profileImageUrl());
         String normalizedSlug = normalizeRequiredSlug(request.slug());
         if (artistRepository.existsBySlug(normalizedSlug)) {
             throw new ArtistException(ArtistErrorCode.ARTIST_SLUG_DUPLICATED);
@@ -131,11 +128,6 @@ public class ArtistService {
         String nextProfileImageUrl = resolveOptionalValue(request.profileImageUrl(), artist.getProfileImageUrl());
         String nextCoverImageUrl = resolveOptionalValue(request.coverImageUrl(), artist.getCoverImageUrl());
         String nextIntro = resolveOptionalValue(request.intro(), artist.getIntro());
-
-        // 수정 시에도 핵심 프로필 이미지는 유지해야 하므로 null로 비워지지 않게 막는다.
-        if (nextProfileImageUrl == null) {
-            throw new ArtistException(ArtistErrorCode.MEDIA_PROFILE_REQUIRED);
-        }
 
         artist.updateProfile(nextName, nextSlug, nextProfileImageUrl, nextCoverImageUrl, nextIntro);
         return buildArtistResponse(artistId);

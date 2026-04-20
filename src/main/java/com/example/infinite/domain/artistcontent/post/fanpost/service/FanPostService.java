@@ -1,5 +1,6 @@
 package com.example.infinite.domain.artistcontent.post.fanpost.service;
 
+import com.example.infinite.domain.artistcontent.comment.service.CommentService;
 import com.example.infinite.domain.artistcontent.media.entity.Media;
 import com.example.infinite.domain.artistcontent.media.repository.MediaRepository;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
@@ -9,6 +10,7 @@ import com.example.infinite.domain.artistcontent.hashtag.service.HashtagService;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostCreateRequest;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostUpdateRequest;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostCreateResponse;
+import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostDetailResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostMediaResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostReadRow;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostResponse;
@@ -45,6 +47,7 @@ public class FanPostService {
     private final ArtistReader artistReader;
     private final FanPostReader fanPostReader;
     private final HashtagService hashtagService;
+    private final CommentService commentService;
 
     @Transactional
     public FanPostCreateResponse create(MemberDetailsImpl memberDetails, Long artistId, FanPostCreateRequest request) {
@@ -81,18 +84,15 @@ public class FanPostService {
         return toCursorSliceResponse(visibleRows, hasNext);
     }
 
-    public FanPostResponse getFanPost(Long artistId, Long fanPostId) {
+    public FanPostDetailResponse getFanPost(Long artistId, Long fanPostId, Long commentCursor) {
         // 상세 조회도 artist 소속을 함께 확인해 다른 커뮤니티 글을 잘못 읽지 않게 한다.
         artistReader.findArtistByIdOrThrow(artistId);
 
-        FanPostReadRow row = fanPostRepository.findDetailRowByArtistIdAndFanPostId(artistId, fanPostId)
-                .orElseThrow(() -> new ArtistContentException(ArtistContentErrorCode.POST_NOT_FOUND));
-        // 상세는 단건이지만 media 조합 방식은 목록과 동일하게 유지해 응답 구조를 맞춘다.
-        List<FanPostMediaResponse> media = loadMediaMap(List.of(fanPostId)).getOrDefault(fanPostId, List.of());
-        List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, List.of(fanPostId))
-                .getOrDefault(fanPostId, List.of());
-
-        return FanPostResponse.from(row, media, hashtags);
+        FanPostResponse fanPostResponse = buildFanPostResponse(artistId, fanPostId);
+        return FanPostDetailResponse.from(
+                fanPostResponse,
+                commentService.getFanPostComments(fanPostId, commentCursor)
+        );
     }
 
     @Transactional
@@ -110,7 +110,7 @@ public class FanPostService {
         // 수정은 "기존 매핑 제거 -> 수정된 본문 기준 재생성" 규칙을 그대로 따른다.
         hashtagService.syncHashtags(PostType.FAN_POST, fanPost.getId(), fanPost.getContent());
 
-        return getFanPost(artistId, fanPostId);
+        return buildFanPostResponse(artistId, fanPostId);
     }
 
     @Transactional
@@ -154,10 +154,34 @@ public class FanPostService {
                 .toList();
     }
 
+    private FanPostResponse buildFanPostResponse(Long artistId, Long fanPostId) {
+        FanPostReadRow row = fanPostRepository.findDetailRowByArtistIdAndFanPostId(artistId, fanPostId)
+                .orElseThrow(() -> new ArtistContentException(ArtistContentErrorCode.POST_NOT_FOUND));
+        // 상세는 단건이지만 media/hashtag 조합 방식은 목록과 동일하게 유지해 응답 구조를 맞춘다.
+        // TODO(subscription 담당자):
+        // 작성자 닉네임 옆 badge는 여기서 writerId 기준으로 조립할 예정.
+        // 필요한 contract:
+        // - input: artistId + writerIds(Collection<Long>)
+        // - output: Map<Long, WriterSubscriptionBadge>
+        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
+        // 상세 1건도 목록/댓글과 같은 contract를 재사용하고, 누락된 writerId는 false/false 로 간주 가능해야 한다.
+        List<FanPostMediaResponse> media = loadMediaMap(List.of(fanPostId)).getOrDefault(fanPostId, List.of());
+        List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, List.of(fanPostId))
+                .getOrDefault(fanPostId, List.of());
+        return FanPostResponse.from(row, media, hashtags);
+    }
+
     private CursorSliceResponse<FanPostResponse> toCursorSliceResponse(List<FanPostReadRow> visibleRows, boolean hasNext) {
         List<Long> postIds = extractPostIds(visibleRows);
         // 응답 조립은 "본문 row / media / hashtag"를 각각 배치 조회한 뒤 메모리에서 합친다.
         // 이렇게 해야 게시글별 media/hashtag 개별 조회로 인한 N+1을 피할 수 있다.
+        // TODO(subscription 담당자):
+        // 작성자 badge도 여기서 writerIds 배치 조회 후 함께 조립한다.
+        // 필요한 contract:
+        // - input: artistId + writerIds(Collection<Long>)
+        // - output: Map<Long, WriterSubscriptionBadge>
+        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
+        // FanPost 목록/상세와 Comment 목록이 동일한 contract를 재사용할 수 있어야 한다.
         Map<Long, List<FanPostMediaResponse>> mediaMap = loadMediaMap(postIds);
         Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, postIds);
 
