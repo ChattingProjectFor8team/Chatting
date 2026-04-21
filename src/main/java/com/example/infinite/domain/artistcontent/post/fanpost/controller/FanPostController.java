@@ -3,6 +3,7 @@ package com.example.infinite.domain.artistcontent.post.fanpost.controller;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostCreateRequest;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostUpdateRequest;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostCreateResponse;
+import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostDetailResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.service.FanPostService;
 import com.example.infinite.global.auth.MemberDetailsImpl;
@@ -52,12 +53,13 @@ public class FanPostController {
     }
 
     @GetMapping("/v1/artists/{artistId}/fan-posts/{fanPostId}")
-    public ResponseEntity<ApiResponse<FanPostResponse>> getFanPost(
+    public ResponseEntity<ApiResponse<FanPostDetailResponse>> getFanPost(
             @PathVariable Long artistId,
-            @PathVariable Long fanPostId
+            @PathVariable Long fanPostId,
+            @RequestParam(name = "commentCursor", required = false) Long commentCursor
     ) {
         // 상세도 artist 하위 경로를 유지해 잘못된 소속 커뮤니티 접근을 URL 단계에서 드러낸다.
-        return ResponseEntity.ok(ApiResponse.success(fanPostService.getFanPost(artistId, fanPostId)));
+        return ResponseEntity.ok(ApiResponse.success(fanPostService.getFanPost(artistId, fanPostId, commentCursor)));
     }
 
     @PatchMapping("/v1/artists/{artistId}/fan-posts/{fanPostId}")

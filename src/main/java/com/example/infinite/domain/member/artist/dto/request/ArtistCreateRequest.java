@@ -25,7 +25,6 @@ public record ArtistCreateRequest(
         String stageName,
 
         @Schema(description = "대표 프로필 이미지 URL", example = "https://cdn.infinite.com/artists/seventeen/profile.jpg")
-        @NotBlank
         @Size(max = 500)
         String profileImageUrl,
 

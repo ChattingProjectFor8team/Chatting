@@ -12,12 +12,17 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Entity
-@Table(name = "comments")
+@Table(
+        name = "comments",
+        indexes = {
+                @Index(name = "idx_comments_target", columnList = "target_type, target_id, id"),
+                @Index(name = "idx_comments_parent", columnList = "parent_id, id")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE comments SET deleted_at = current_timestamp WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
 public class Comment extends BaseEntity {
-
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,5 +52,26 @@ public class Comment extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    private Comment(PostType targetType, Long targetId, Comment parent, int depth, Member writer, String content) {
+        this.targetType = targetType;
+        this.targetId = targetId;
+        this.parent = parent;
+        this.depth = depth;
+        this.writer = writer;
+        this.content = content;
+    }
+
+    public static Comment create(PostType targetType, Long targetId, Member writer, String content, Comment parent) {
+        // 원댓글은 depth 1, 대댓글은 depth 2로만 생성해 3-depth 이상이 들어오지 않게 서비스와 규칙을 맞춘다.
+        return new Comment(targetType, targetId, parent, parent == null ? 1 : 2, writer, content);
+    }
+
+    public boolean isRootComment() {
+        return parent == null;
+    }
+
+    public boolean isOwnedBy(Long memberId) {
+        return writer.getId().equals(memberId);
+    }
 
 }
