@@ -65,4 +65,12 @@ public class DmSubscription extends BaseEntity {
         return this.status == SubscriptionStatus.ACTIVE
                 && LocalDateTime.now().isBefore(this.expiredAt);
     }
+
+    /**
+     * 만료일을 지정 일수만큼 연장한다.
+     * 래플 당첨 보상(MEMBERSHIP_EXTENSION) 등에서 사용.
+     */
+    public void extendExpiry(int days) {
+        this.expiredAt = this.expiredAt.plusDays(days);
+    }
 }
