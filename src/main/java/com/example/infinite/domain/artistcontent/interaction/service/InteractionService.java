@@ -6,6 +6,8 @@ import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.interaction.repository.InteractionRepository;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPost;
+import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
 import com.example.infinite.domain.artistcontent.post.fanletter.entity.FanLetter;
 import com.example.infinite.domain.artistcontent.post.fanletter.support.FanLetterReader;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;
@@ -25,6 +27,7 @@ public class InteractionService {
 
     private final InteractionRepository interactionRepository;
     private final FanPostReader fanPostReader;
+    private final ArtistPostReader artistPostReader;
     private final FanLetterReader fanLetterReader;
     private final MemberReader memberReader;
 
@@ -42,6 +45,21 @@ public class InteractionService {
                 )
                 .map(existingReaction -> cancelLike(existingReaction, fanPost))
                 .orElseGet(() -> addLike(member.getId(), fanPost));
+    }
+
+    @Transactional
+    public InteractionResponse toggleArtistPostLike(MemberDetailsImpl memberDetails, Long artistId, Long artistPostId) {
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        ArtistPost artistPost = artistPostReader.findByIdAndArtistIdOrThrow(artistPostId, artistId);
+
+        return interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
+                        PostType.ARTIST_POST,
+                        artistPostId,
+                        member.getId(),
+                        ReactionType.LIKE
+                )
+                .map(existingReaction -> cancelLike(existingReaction, artistPost))
+                .orElseGet(() -> addLike(member.getId(), artistPost));
     }
 
     @Transactional
@@ -78,6 +96,23 @@ public class InteractionService {
         interactionRepository.delete(existingReaction);
         fanPost.changeLikeCountBy(-1);
         return InteractionResponse.of(fanPost.getId(), false, fanPost.getLikeCount());
+    }
+
+    private InteractionResponse addLike(Long memberId, ArtistPost artistPost) {
+        interactionRepository.save(Reaction.create(
+                PostType.ARTIST_POST,
+                artistPost.getId(),
+                memberId,
+                ReactionType.LIKE
+        ));
+        artistPost.changeLikeCountBy(1);
+        return InteractionResponse.of(artistPost.getId(), true, artistPost.getLikeCount());
+    }
+
+    private InteractionResponse cancelLike(Reaction existingReaction, ArtistPost artistPost) {
+        interactionRepository.delete(existingReaction);
+        artistPost.changeLikeCountBy(-1);
+        return InteractionResponse.of(artistPost.getId(), false, artistPost.getLikeCount());
     }
 
     private InteractionResponse addLike(Long memberId, FanLetter fanLetter) {

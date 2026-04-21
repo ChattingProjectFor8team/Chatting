@@ -29,9 +29,9 @@
 
 지금 기준으로 상태를 한 줄로 요약하면 아래다.
 
-- 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, Hashtag 추천, FanPost 미디어 업로드 구조
-- 부분 구현: ArtistPost 엔티티/리더/미디어 훅/댓글 경로 준비, FanLetter 엔티티, Follow 엔티티
-- 미구현: ArtistPost 실API, ArtistPost 좋아요, FanLetter 실API, HOT 피드, Follow API, 메인 홈 대시보드 2종, 동시성 보강 및 검증 테스트
+- 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, ArtistPost CRUD, ArtistPost 좋아요, ArtistPost 댓글/대댓글 조회, FanLetter CRUD, FanLetter 좋아요, Hashtag 추천, FanPost/ArtistPost/FanLetter 미디어 업로드 구조
+- 부분 구현: Follow 엔티티
+- 미구현: HOT 피드, Follow API, 메인 홈 대시보드 2종, 동시성 보강 및 검증 테스트
 
 ## 2. 가장 중요한 고정 정책
 
@@ -82,9 +82,11 @@
 - 댓글 없음
 - 이미지 중심
 - 본문 텍스트는 핵심 아님
-- 작성 권한은 구독 상태 조회가 붙어야 최종 확정된다
+- 이미지 1장만 허용
+- 작성 권한은 현재 구독 도메인 조회로 이미 검증한다
 - 일반 좋아요는 가능
-- 아티스트 special-like는 별도 persisted field로 저장하지 않고 `Reaction` 조회 결과를 DTO에서 조립하는 방향이다
+- 아티스트 special-like는 별도 persisted field로 저장하지 않고 `Reaction` 조회 결과를 DTO에서 조립한다
+- special-like는 "수신 멤버 본인" 기준이 아니라 "그 아티스트 소속 멤버 중 한 명이라도 좋아요했는가" 기준이다
 
 ### 2-6. Follow / 구독 배지
 
@@ -361,48 +363,58 @@ FanPost 댓글 현재 정책:
 
 현재 실제 코드 상태:
 
-- `ArtistPost` 엔티티 있음
-- `ArtistPostReader` 있음
-- `ArtistPostRepository` / `Custom` / `Impl` 파일은 있으나 실쿼리 구현은 사실상 비어 있음
-- `ArtistPostController` 비어 있음
-- `ArtistPostService` 비어 있음
-- `ArtistPostRequest` / `ArtistPostResponse` 비어 있음
-- 댓글 컨트롤러에는 아래 artist-post 댓글 경로가 이미 존재함
+- 실제 구현 완료 API:
+- `POST /api/post/v1/artists/{artistId}/artist-posts`
+- `GET /api/post/v1/artists/{artistId}/artist-posts`
+- `GET /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}`
+- `PATCH /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}`
+- `DELETE /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}`
+- `POST /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/likes/toggle`
 - `POST /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments`
 - `DELETE /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}`
 - `GET /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}/replies`
 
 즉 현재 해석은 아래가 맞다.
 
-- 댓글 공통 구조는 ArtistPost 재사용 준비가 되어 있음
-- 하지만 정작 ArtistPost 본체 API가 없어서 프론트 실연동 대상은 아직 아님
-- 화면은 FanPost 기반으로 목업 가능
+- ArtistPost는 FanPost와 거의 같은 응답 구조로 실연동 가능하다
+- 작성자는 `ArtistMember.stageName`이 아니라 `Member.nickname`으로 내려온다
+- 작성자 옆 체크 표시용 `artistBadge` boolean이 내려온다
+- 구독 배지 필드는 없다
+- 작성/수정은 `multipart/form-data`
+- 권한은 아티스트 계정이면서 해당 artist 소속 artist member인 경우만 허용된다
 
 프론트가 지금 해두면 좋은 것:
 
-- ArtistPost 리스트 화면 목업
-- ArtistPost 상세 화면 목업
-- ArtistPost 작성 폼 목업
+- ArtistPost 리스트 실연동
+- ArtistPost 상세 실연동
+- ArtistPost 작성/수정 실연동
 - ArtistPost 카드 컴포넌트
 - 아티스트 인증 뱃지 UI
-- 작성 멤버 stage name / 그룹명 병기 UI
+- 좋아요 토글 실연동
 
 ## 4-2. FanLetter
 
 현재 실제 코드 상태:
 
-- `FanLetter` 엔티티 있음
-- `FanLetterRepository` / `Custom` / `Impl` 파일은 있으나 실구현 없음
-- `FanLetterController` 비어 있음
-- `FanLetterService` 비어 있음
-- `FanLetterRequest` / `FanLetterResponse` 비어 있음
-- 보안 설정에는 `/api/post/v1/fan-letters/**` 인증 필요 경로가 이미 걸려 있음
+- 실API 구현 완료
+- `FanLetterController`, `FanLetterService`, `FanLetterRepository` 모두 연결됨
+- 경로는 `/api/post/v1/artists/{artistId}/fan-letters/**`
+- FanLetter 작성/수정은 `multipart/form-data`
+- 수신 대상 선택 가능
+  - `recipientType=ARTIST`
+  - `recipientType=ARTIST_MEMBER`
+  - `recipientArtistMemberId`
+- 이미지 1장만 허용
+- 댓글 없음
+- 좋아요 토글 있음
+- special-like 응답 있음
+- 작성 권한은 fan membership 기준으로 서버에서 실제 검증함
 
 즉 현재 해석은 아래가 맞다.
 
-- 도메인 테이블 방향은 잡혀 있음
-- 실제 프론트 연동 가능한 API는 아직 없음
-- 화면은 mock 우선이 맞다
+- FanLetter는 이제 mock 우선이 아니라 실연동 가능 영역이다
+- 다만 목록 응답과 상세 응답의 필드 구성이 다르다
+- special-like는 "아티스트 멤버 중 한 명이라도 좋아요했는가" 기준이다
 
 프론트가 지금 해두면 좋은 것:
 
@@ -411,6 +423,7 @@ FanPost 댓글 현재 정책:
 - FanLetter 작성 모달
 - 댓글 UI 제거
 - special-like 배지 자리 확보
+- `To.세븐틴` / `To.민규` 선택 모달
 
 ## 4-3. Follow
 
@@ -438,7 +451,8 @@ FanPost 댓글 현재 정책:
 
 - 배지 UI는 먼저 만들어도 된다
 - FanPost / 댓글 영역은 실제 값 기준으로 처리해도 된다
-- FanLetter 쪽은 별도 구현 시점에 다시 확인하면 된다
+- FanLetter 상세는 작성자 배지/프로필을 실제 값 기준으로 처리해도 된다
+- FanLetter 목록은 작성자 배지/프로필이 아니라 이미지/수신자/special-like만 렌더링하면 된다
 
 ## 4-5. 메인 홈 대시보드 2종
 
@@ -464,35 +478,33 @@ Dashboard B:
 
 ## 5-1. ArtistPost
 
-백엔드 예정 작업:
+현재 백엔드 구현 상태:
 
-- create/update/delete
-- list/detail
-- FanPost와 같은 cursor slice
-- 댓글 공통 구조 재사용
-- 같은 미디어 attachment flow 재사용
-- 권한 체크
-- artist 소속 멤버 검증
+- create/update/delete 완료
+- list/detail 완료
+- FanPost와 같은 cursor slice 완료
+- 댓글 공통 구조 재사용 완료
+- 같은 미디어 attachment flow 재사용 완료
+- 좋아요 toggle 완료
+- 작성 권한 검증 완료
+- artist 소속 멤버 검증 완료
 
 프론트 준비 포인트:
 
-- FanPost와 동일한 큰 레이아웃으로 재사용
-- 단, 작성자 영역은 별도 설계 필요
-- 그룹 아티스트명
-- 실제 작성 멤버명 또는 stage name
-- 아티스트 인증 표시
+- FanPost와 동일한 큰 레이아웃으로 재사용 가능
+- 단, 작성자 영역은 `닉네임 + artistBadge` 기준으로 설계해야 한다
+- stage name을 주작성자 표기로 쓰면 안 된다
 - 댓글 depth 2 정책은 그대로 재사용 가능
-- 작성/수정 폼도 FanPost와 거의 같은 UX로 가되, 권한 가드가 더 강하게 들어간다
+- 작성/수정 폼도 FanPost와 거의 같은 UX로 가되 multipart 요청이어야 한다
 
 권장 mock 필드:
 
 - `artistPostId`
 - `artistId`
 - `writerId`
-- `writerName`
-- `writerStageName`
+- `writerNickname`
 - `writerProfileImageUrl`
-- `artistVerified`
+- `artistBadge`
 - `content`
 - `likeCount`
 - `commentCount`
@@ -502,11 +514,11 @@ Dashboard B:
 
 ## 5-2. ArtistPost 좋아요
 
-백엔드 예정 작업:
+현재 백엔드 구현 상태:
 
-- toggle 방식 유력
-- 대용량 트래픽 고려
-- 내 담당 범위에서 동시성 과제 후보 1순위
+- toggle 방식 완료
+- API 실연동 가능
+- 다만 대용량 트래픽 대응용 캐싱/락은 아직 미적용
 
 프론트 준비 포인트:
 
@@ -516,21 +528,44 @@ Dashboard B:
 
 ## 5-3. FanLetter
 
-백엔드 예정 작업:
+실제 구현 완료 범위:
 
 - create/update/delete/list/detail
-- 일반 좋아요
+- 일반 좋아요 토글
 - 아티스트 special-like 응답
-- 작성 권한은 subscription 질의 연동 필요
+- fan membership 기반 작성 권한 검증
 
 프론트 준비 포인트:
 
 - 텍스트형 커뮤니티 포스트처럼 만들면 안 된다
 - 이미지 중심 카드형 레이아웃
 - 댓글 영역 제거
-- 작성 버튼은 구독 여부에 따라 노출/disabled 처리될 가능성이 높다
+- 작성 버튼은 구독 여부에 따라 노출/disabled 처리하면 된다
 - special-like 뱃지나 스탬프 자리 확보
 - 좋아요는 가능하지만 댓글 카운트 UI는 필요 없다
+- 목록과 상세 응답 shape를 분리해서 보는 편이 안전하다
+
+목록 응답 핵심 필드:
+
+- `fanLetterId`
+- `recipientType`
+- `recipientArtistMemberId`
+- `recipientDisplayName`
+- `recipientProfileImageUrl`
+- `image`
+- `artistLiked`
+- `artistLikeDisplayName`
+- `artistLikeProfileImageUrl`
+- `createdAt`
+
+상세 응답 추가 필드:
+
+- `writerId`
+- `writerNickname`
+- `writerProfileImageUrl`
+- `fanMembershipSubscribed`
+- `dmSubscribed`
+- `likeCount`
 
 권장 mock 필드:
 
@@ -697,7 +732,7 @@ Dashboard B:
 - FanPost 수정/삭제
 - FanPost 좋아요
 - FanPost 댓글 작성/삭제
-- FanLetter 전체 예정
+- FanLetter 작성/수정/삭제/좋아요
 
 아티스트 권한 필요:
 
@@ -707,8 +742,9 @@ Dashboard B:
 
 중요:
 
-- 보안 설정에 ArtistPost GET 공개 경로가 미리 열려 있지만 실제 ArtistPost controller가 없으므로 지금 당장 쓸 수 있는 공개 API라고 보면 안 된다
-- FanLetter도 보안 경로는 걸려 있지만 controller가 없으므로 아직 실API 아님
+- ArtistPost는 이제 실제 controller/service가 있으므로 공개 GET 실API로 봐도 된다
+- 다만 작성/수정/삭제는 아티스트 소속 멤버 권한이 필요하다
+- FanLetter도 실제 controller/service가 있으므로 실API로 본다
 
 ## 8. 프론트 화면 우선순위 추천
 
@@ -719,24 +755,31 @@ Dashboard B:
 3. FanPost 리스트
 4. FanPost 상세
 5. FanPost 작성/수정
-6. Hashtag 자동완성
+6. ArtistPost 리스트
+7. ArtistPost 상세
+8. ArtistPost 작성/수정
+9. Hashtag 자동완성
+10. FanLetter 리스트
+11. FanLetter 상세
+12. FanLetter 작성/수정
 
 mock 우선:
 
-1. ArtistPost 리스트/상세/작성
-2. FanLetter 리스트/상세/작성
-3. 메인 홈 대시보드 2종
-4. Follow 버튼 / 팔로우 섹션
+1. 메인 홈 대시보드 2종
+2. Follow 버튼 / 팔로우 섹션
 
 ## 9. 프론트가 특히 조심해야 할 것
 
 - FanPost 작성/수정은 JSON API처럼 만들면 안 되고 `multipart/form-data`여야 한다
 - FanPost 수정에서 `files`를 보내면 부분 추가가 아니라 전체 교체다
+- FanLetter 작성/수정도 `multipart/form-data`다
+- FanLetter도 이미지 교체는 부분 추가가 아니라 전체 교체다
 - 댓글은 depth 3 구조를 만들 필요 없다
 - replies는 상세 응답에 전부 들어오는 구조가 아니다
-- subscription badge 필드는 아직 실데이터로 믿으면 안 된다
-- ArtistPost 댓글 경로는 보이지만 ArtistPost 본체가 아직 없으니 실사용 불가다
+- FanPost/댓글/FanLetter 상세의 subscription badge 필드는 지금 실제 값 기준으로 처리해도 된다
+- ArtistPost는 FanPost와 비슷하지만 작성자 표기는 `writerNickname + artistBadge` 기준이다
 - FanLetter는 텍스트 피드처럼 만들면 정책과 어긋난다
+- FanLetter 목록은 작성자 프로필/배지가 기본 노출 대상이 아니다
 - HOT은 단순 인기순이 아니라 최근 24시간 제한이 붙는다
 - 로컬 환경에서는 media storage가 기본 비활성화라 업로드 테스트가 실패할 수 있다
 
@@ -744,18 +787,16 @@ mock 우선:
 
 아래 문장을 그대로 써도 된다.
 
-> `Connectfin-standalone.html`은 비주얼 레퍼런스로만 참고하고, 실제 기능 범위와 데이터 구조는 `FRONTEND_TEAM_VIBE_HANDOFF.md`를 기준으로 작업해줘. 실연동 가능한 것은 메인 홈 검색, 아티스트 상세 헤더, FanPost 리스트/상세/작성/수정/좋아요/댓글이고, ArtistPost/FanLetter/대시보드/Follow는 아직 백엔드 미구현이라 mock 우선으로 설계해줘. FanPost는 반드시 multipart 작성/수정, cursor infinite scroll, 댓글 depth 2, 대댓글 별도 조회 구조를 반영해줘.
+> `Connectfin-standalone.html`은 비주얼 레퍼런스로만 참고하고, 실제 기능 범위와 데이터 구조는 `FRONTEND_TEAM_VIBE_HANDOFF.md`를 기준으로 작업해줘. 실연동 가능한 것은 메인 홈 검색, 아티스트 상세 헤더, FanPost 리스트/상세/작성/수정/좋아요/댓글, ArtistPost 리스트/상세/작성/수정/좋아요/댓글, FanLetter 리스트/상세/작성/수정/좋아요다. 대시보드/Follow는 아직 mock 우선으로 설계해줘. FanPost/ArtistPost/FanLetter는 반드시 multipart 작성/수정, cursor infinite scroll, 댓글 depth 2 정책, FanLetter 댓글 없음 구조를 반영해줘.
 
 ## 11. 최종 요약
 
-지금 프론트가 가장 안정적으로 붙일 수 있는 실구현 영역은 `검색 + 아티스트 상세 + FanPost 전체 + Hashtag 추천`이다.
+지금 프론트가 가장 안정적으로 붙일 수 있는 실구현 영역은 `검색 + 아티스트 상세 + FanPost 전체 + ArtistPost 전체 + FanLetter 전체 + Hashtag 추천`이다.
 
 앞으로 내가 구현할 핵심은 아래다.
 
-- ArtistPost
 - ArtistPost 좋아요 대용량 트래픽 대응
-- FanLetter
 - FanPost + FanLetter HOT 24시간 필터
 - 포스트 좋아요/댓글 카운터 동시성 보강
 
-즉 프론트는 지금 당장은 `FanPost 실연동`, 그다음은 `ArtistPost/FanLetter/HOT/dashboard/follow 목업` 순서로 가는 것이 가장 안전하다.
+즉 프론트는 지금 당장은 `FanPost + ArtistPost + FanLetter 실연동`, 그다음은 `HOT/dashboard/follow 목업` 순서로 가는 것이 가장 안전하다.

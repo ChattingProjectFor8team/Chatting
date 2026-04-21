@@ -30,4 +30,15 @@ public class InteractionController {
                 interactionService.toggleFanPostLike(memberDetails, artistId, fanPostId)
         ));
     }
+
+    @PostMapping("/v1/artists/{artistId}/artist-posts/{artistPostId}/likes/toggle")
+    public ResponseEntity<ApiResponse<InteractionResponse>> toggleArtistPostLike(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @PathVariable Long artistId,
+            @PathVariable Long artistPostId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interactionService.toggleArtistPostLike(memberDetails, artistId, artistPostId)
+        ));
+    }
 }
