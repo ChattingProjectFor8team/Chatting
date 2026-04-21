@@ -3,6 +3,7 @@ package com.example.infinite.domain.realtimelive.controller;
 import com.example.infinite.domain.realtimelive.dto.LiveChatMessageDto;
 import com.example.infinite.domain.realtimelive.service.LiveChatBuffer;
 import com.example.infinite.domain.realtimelive.service.LiveChatThrottleService;
+import com.example.infinite.domain.realtimelive.service.RealtimeLiveService;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,7 @@ import java.security.Principal;
 /**
  * STOMP /pub/live/{liveId}/chat 메시지 핸들러.
  *
- * 메시지 인입 → 뮤트 체크 → 쓰로틀링 체크 → 200자 체크 → 버퍼 적재
+ * 메시지 인입 → LIVE 상태 검증 → 뮤트 체크 → 쓰로틀링 체크 → 200자 체크 → 버퍼 적재
  * 위반 시 조용히 무시 (에러 응답 없음).
  */
 @Slf4j
@@ -27,6 +28,7 @@ public class LiveChatMessageHandler {
 
     private final LiveChatThrottleService throttleService;
     private final LiveChatBuffer liveChatBuffer;
+    private final RealtimeLiveService realtimeLiveService;
 
     @MessageMapping("/live/{liveId}/chat")
     public void handleChatMessage(
@@ -37,6 +39,10 @@ public class LiveChatMessageHandler {
         Long userId = extractUserId(principal);
         if (userId == null) {
             log.warn("인증 정보 없는 채팅 메시지 무시: liveId={}", liveId);
+            return;
+        }
+
+        if (!realtimeLiveService.isLiveActive(liveId)) {
             return;
         }
 
