@@ -10,8 +10,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 @Slf4j
 @Service
@@ -68,5 +70,38 @@ public class LiveChatBroadcastService {
                         liveId, messages.size(), e.getMessage());
             }
         });
+    }
+
+    /**
+     * 라이브 종료 시 해당 liveId 버퍼를 즉시 flush하고 제거한다.
+     */
+    public void drainAndRemove(Long liveId) {
+        ConcurrentLinkedQueue<LiveChatMessageDto> queue = liveChatBuffer.getQueue(liveId);
+        if (queue != null) {
+            List<LiveChatMessageDto> remaining = new ArrayList<>();
+            LiveChatMessageDto msg;
+            while ((msg = queue.poll()) != null) {
+                remaining.add(msg);
+            }
+
+            if (!remaining.isEmpty()) {
+                messagingTemplate.convertAndSend("/sub/live/" + liveId, remaining);
+
+                try {
+                    List<LiveChatMessage> entities = remaining.stream()
+                            .map(m -> LiveChatMessage.builder()
+                                    .liveStreamId(m.liveId())
+                                    .senderUserId(m.senderId())
+                                    .message(m.message())
+                                    .build())
+                            .toList();
+                    liveChatMessageRepository.saveAll(entities);
+                } catch (Exception e) {
+                    log.error("종료 시 채팅 DB 저장 실패: liveId={}, count={}", liveId, remaining.size());
+                }
+            }
+        }
+
+        liveChatBuffer.remove(liveId);
     }
 }

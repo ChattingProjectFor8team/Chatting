@@ -3,11 +3,13 @@ package com.example.infinite.global.error;
 import com.example.infinite.domain.artistcontent.comment.error.CommentException;
 import com.example.infinite.domain.artistcontent.hashtag.error.HashtagException;
 import com.example.infinite.domain.artistcontent.interaction.error.InteractionException;
+import com.example.infinite.domain.dm.error.DmException;
 import com.example.infinite.domain.member.artist.error.ArtistException;
 import com.example.infinite.domain.member.member.error.MemberErrorCode;
 import com.example.infinite.domain.member.member.error.MemberException;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.domain.raffle.error.RaffleException;
+import com.example.infinite.domain.realtimelive.error.LiveException;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -170,11 +172,27 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 4xx/5xx: 라이브 도메인 커스텀 예외 처리
+     * 4xx/5xx: 라이브 도메인 커스텀 예외 처리 (global ErrorCode 기반 레거시)
      */
     @ExceptionHandler(RealtimeLiveException.class)
     public ResponseEntity<ApiResponse<Void>> handleRealtimeLiveException(RealtimeLiveException e, HttpServletRequest request) {
         return handleCustomException("RealtimeLiveException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: 라이브 도메인 커스텀 예외 처리 (도메인별 ErrorCode)
+     */
+    @ExceptionHandler(LiveException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLiveException(LiveException e, HttpServletRequest request) {
+        return handleCustomException("LiveException", e.getErrorCode(), e, request);
+    }
+
+    /**
+     * 4xx/5xx: DM 도메인 커스텀 예외 처리 (도메인별 ErrorCode)
+     */
+    @ExceptionHandler(DmException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDmException(DmException e, HttpServletRequest request) {
+        return handleCustomException("DmException", e.getErrorCode(), e, request);
     }
 
     /**
