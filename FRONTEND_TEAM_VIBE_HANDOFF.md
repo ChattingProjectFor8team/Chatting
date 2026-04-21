@@ -30,7 +30,7 @@
 지금 기준으로 상태를 한 줄로 요약하면 아래다.
 
 - 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, Hashtag 추천, FanPost 미디어 업로드 구조
-- 부분 구현: ArtistPost 엔티티/리더/미디어 훅/댓글 경로 준비, FanLetter 엔티티, Follow 엔티티, 구독 배지 응답 필드 자리
+- 부분 구현: ArtistPost 엔티티/리더/미디어 훅/댓글 경로 준비, FanLetter 엔티티, Follow 엔티티
 - 미구현: ArtistPost 실API, ArtistPost 좋아요, FanLetter 실API, HOT 피드, Follow API, 메인 홈 대시보드 2종, 동시성 보강 및 검증 테스트
 
 ## 2. 가장 중요한 고정 정책
@@ -271,6 +271,7 @@ FanPost 댓글 현재 정책:
 - 삭제된 원댓글에 자식이 남아 있으면 `"삭제된 댓글입니다."` placeholder 유지
 - 자식 없는 원댓글은 soft delete 후 숨김
 - placeholder 부모의 마지막 대댓글도 사라지면 부모도 최종 삭제
+- 작성자 옆 구독 배지 boolean은 현재 실제 subscription 조회 결과가 내려온다
 
 프론트가 지금 바로 실연동 가능한 화면:
 
@@ -293,6 +294,8 @@ FanPost 댓글 현재 정책:
 - `writerId`
 - `writerNickname`
 - `writerProfileImageUrl`
+- `fanMembershipSubscribed`
+- `dmSubscribed`
 - `content`
 - `mentionedMember`
 - `replyCount`
@@ -428,15 +431,14 @@ FanPost 댓글 현재 정책:
 현재 실제 코드 상태:
 
 - FanPost 응답에 `fanMembershipSubscribed`, `dmSubscribed` 필드가 이미 있다
-- 하지만 현재 QueryDSL projection에서 둘 다 `false` 상수로 내려간다
-- 댓글 응답에는 아직 배지 필드가 아예 없다
-- 서비스 내부 TODO로 subscription 담당자 쿼리 연동 포인트가 명시돼 있다
+- 댓글 응답에도 `fanMembershipSubscribed`, `dmSubscribed` 필드가 추가되었다
+- 실제 값은 subscription 도메인 batch 조회 결과를 서비스에서 조립해 내려준다
 
 프론트 해석:
 
 - 배지 UI는 먼저 만들어도 된다
-- 실제 값은 아직 믿으면 안 된다
-- fallback 상태로 처리해야 한다
+- FanPost / 댓글 영역은 실제 값 기준으로 처리해도 된다
+- FanLetter 쪽은 별도 구현 시점에 다시 확인하면 된다
 
 ## 4-5. 메인 홈 대시보드 2종
 
@@ -460,33 +462,7 @@ Dashboard B:
 
 아래는 내가 다음으로 진행할 예정인 일이고, 프론트가 무엇을 준비해야 하는지도 같이 적는다.
 
-## 5-1. 미디어 검토
-
-백엔드 예정 작업:
-
-- 지금 추가된 미디어 구조를 다시 검토
-- S3/object storage 설정 전제 점검
-- FanPost 업로드/수정/교체/삭제 흐름 이상 여부 체크
-
-프론트 준비 포인트:
-
-- 업로드 UI는 FanPost 기준으로 먼저 사용
-- 실패 케이스를 분리해두는 것이 좋다
-- 형식 오류
-- 크기 초과
-- 혼합 업로드 금지
-- 저장소 미설정
-
-현재 바로 참고할 주요 에러 코드:
-
-- `M002` 지원하지 않는 파일 형식
-- `M003` 최대 용량 초과
-- `M006` 이미지 최대 10장 초과
-- `M007` 동영상 1개 초과
-- `M008` 이미지+동영상 혼합 금지
-- `M009` 미디어 저장소 설정 미준비
-
-## 5-2. ArtistPost
+## 5-1. ArtistPost
 
 백엔드 예정 작업:
 
@@ -524,7 +500,7 @@ Dashboard B:
 - `hashtags[]`
 - `createdAt`
 
-## 5-3. ArtistPost 좋아요
+## 5-2. ArtistPost 좋아요
 
 백엔드 예정 작업:
 
@@ -538,7 +514,7 @@ Dashboard B:
 - optimistic update를 너무 강하게 고정하지 말고 서버 count 재동기화가 가능한 구조가 좋다
 - 좋아요 애니메이션은 가능하지만 count는 최종적으로 서버 응답 기준으로 덮어쓰는 편이 안전하다
 
-## 5-4. FanLetter
+## 5-3. FanLetter
 
 백엔드 예정 작업:
 
@@ -569,7 +545,7 @@ Dashboard B:
 - `artistProfileImageUrl`
 - `createdAt`
 
-## 5-5. HOT 게시글 필터
+## 5-4. HOT 게시글 필터
 
 백엔드 예정 작업:
 
@@ -589,7 +565,7 @@ Dashboard B:
 - `최신` / `HOT 24h` 분리
 - FanPost 카드와 FanLetter 카드를 같은 피드에 섞을 수 있게 컴포넌트 분기
 
-## 5-6. 댓글/좋아요 카운터 동시성
+## 5-5. 댓글/좋아요 카운터 동시성
 
 백엔드 예정 작업:
 
@@ -776,7 +752,6 @@ mock 우선:
 
 앞으로 내가 구현할 핵심은 아래다.
 
-- 미디어 구조 재검토
 - ArtistPost
 - ArtistPost 좋아요 대용량 트래픽 대응
 - FanLetter
