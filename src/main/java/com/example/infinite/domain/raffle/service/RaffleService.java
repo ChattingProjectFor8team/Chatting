@@ -44,6 +44,7 @@ public class RaffleService {
     private final ReservoirSampler reservoirSampler;
     private final RaffleSchedulerService schedulerService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final RaffleNotificationService raffleNotificationService;
 
     private static final String META_KEY_FORMAT = "raffle:%d:meta";
     private static final Duration META_TTL_AFTER_COMPLETE = Duration.ofMinutes(5);
@@ -157,6 +158,8 @@ public class RaffleService {
             raffleSlotWinnerRepository.save(winner);
             currentSlot.complete();
             log.info("슬롯 당첨자 확정: raffleId={}, slot={}, winner={}", raffleId, slotIndex, winnerId);
+
+            raffleNotificationService.handleWinner(raffle, winner);
         } else {
             currentSlot.markEmpty(currentSlot.getTargetWinnerCount());
             log.info("슬롯 빈 종료: raffleId={}, slot={}, carryOver={}", raffleId, slotIndex, currentSlot.getTargetWinnerCount());
