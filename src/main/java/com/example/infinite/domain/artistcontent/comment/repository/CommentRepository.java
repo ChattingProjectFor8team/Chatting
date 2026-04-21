@@ -12,4 +12,6 @@ public interface CommentRepository extends JpaRepository<Comment, Long>, Comment
     Optional<Comment> findByIdAndTargetTypeAndTargetId(Long commentId, PostType targetType, Long targetId);
 
     List<Comment> findByParentIdOrderByIdAsc(Long parentId);
+
+    boolean existsByParentId(Long parentId);
 }

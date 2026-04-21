@@ -1,54 +1,37 @@
 package com.example.infinite.domain.artistcontent.post.fanletter.dto.response;
 
 import com.example.infinite.domain.artistcontent.post.fanletter.enums.FanLetterRecipientType;
-import com.example.infinite.domain.subscriptionmembership.dto.response.WriterSubscriptionBadge;
 
 import java.time.LocalDateTime;
 
-public record FanLetterResponse(
+// 팬레터 목록 카드 전용 응답이다.
+// 목록에서는 작성자 프로필/배지를 숨기고, 이미지/수신자/special-like 정보만 내려준다.
+public record FanLetterListResponse(
         Long fanLetterId,
-        Long artistId,
-        Long writerId,
-        String writerNickname,
-        String writerProfileImageUrl,
-        boolean fanMembershipSubscribed,
-        boolean dmSubscribed,
-        // 프론트에서 "To.아티스트" / "To.아티스트멤버" UI 를 구분하는 기준값이다.
         FanLetterRecipientType recipientType,
-        // recipientType=ARTIST_MEMBER 일 때만 내려간다.
         Long recipientArtistMemberId,
         String recipientDisplayName,
         String recipientProfileImageUrl,
         FanLetterImageResponse image,
-        long likeCount,
-        // 우하단 아티스트 하트 오버레이 노출 여부와 표기 정보를 담는다.
         boolean artistLiked,
         String artistLikeDisplayName,
         String artistLikeProfileImageUrl,
         LocalDateTime createdAt
 ) {
-    public static FanLetterResponse from(
-            FanLetterReadRow row,
+    public static FanLetterListResponse from(
+            FanLetterListRow row,
             FanLetterImageResponse image,
-            WriterSubscriptionBadge writerBadge,
             boolean artistLiked,
             String artistLikeDisplayName,
             String artistLikeProfileImageUrl
     ) {
-        return new FanLetterResponse(
+        return new FanLetterListResponse(
                 row.fanLetterId(),
-                row.artistId(),
-                row.writerId(),
-                row.writerNickname(),
-                row.writerProfileImageUrl(),
-                writerBadge.fanMembershipSubscribed(),
-                writerBadge.dmSubscribed(),
                 row.recipientType(),
                 row.recipientArtistMemberId(),
                 row.recipientDisplayName(),
                 row.recipientProfileImageUrl(),
                 image,
-                row.likeCount() == null ? 0L : row.likeCount(),
                 artistLiked,
                 artistLikeDisplayName,
                 artistLikeProfileImageUrl,

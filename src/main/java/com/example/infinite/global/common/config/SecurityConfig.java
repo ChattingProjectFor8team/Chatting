@@ -104,6 +104,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/post/v1/artists/*/fan-posts/*").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/fan-posts/*").authenticated()
+                        .requestMatchers("/api/post/v1/artists/*/fan-letters/**").authenticated()
                         .requestMatchers("/api/post/v1/fan-posts").authenticated()
 
                         // 좋아요, 댓글
@@ -113,9 +114,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts/*/comments").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/artist-posts/*/comments/*").authenticated()
                         .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
-
-                        // 팬레터 (구독 검증은 서비스 레이어에서 수행)
-                        .requestMatchers("/api/post/v1/fan-letters/**").authenticated()
 
                         // DM (구독 검증은 서비스 레이어에서 수행)
                         .requestMatchers("/api/v1/dm/**").authenticated()
