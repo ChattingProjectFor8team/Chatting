@@ -61,4 +61,11 @@ public class LiveChatBuffer {
     public void remove(Long liveId) {
         buffers.remove(liveId);
     }
+
+    /**
+     * 특정 liveId의 큐를 직접 반환한다. 없으면 null.
+     */
+    public ConcurrentLinkedQueue<LiveChatMessageDto> getQueue(Long liveId) {
+        return buffers.get(liveId);
+    }
 }

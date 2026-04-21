@@ -37,6 +37,12 @@ public class AuthService {
             );
         }
 
+        if (memberRepository.existsByNickname(request.nickname())) {
+            throw new com.example.infinite.domain.member.member.error.MemberException(
+                    com.example.infinite.domain.member.member.error.MemberErrorCode.MEMBER_DUPLICATE_NICKNAME
+            );
+        }
+
         Member member = Member.createNewMember(
                 request.email(),
                 passwordEncoder.encode(request.password()),

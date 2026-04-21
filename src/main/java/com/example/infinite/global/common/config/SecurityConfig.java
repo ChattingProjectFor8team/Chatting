@@ -51,8 +51,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/post/v1/fan-posts/**",
                                 "/api/post/v1/artists/*/fan-posts/**",
+                                "/api/post/v1/artists/*/fan-posts/*/comments/*/replies",
                                 "/api/post/v1/hashtags/**",
                                 "/api/post/v1/artist-posts/**",
+                                "/api/post/v1/artists/*/artist-posts/*/comments/*/replies",
                                 "/api/media/v1/**",
                                 "/api/member/v1/artists/{artistId}",
                                 "/api/member/v2/artists/{artistId}"
@@ -77,10 +79,21 @@ public class SecurityConfig {
                         // ── 3. ARTIST + SUPER_ADMIN (관리자) ──
                         .requestMatchers("/api/v1/admin/artists/*/raffles/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/artists/*/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers("/api/v1/admin/artists/*/dm/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        // 아티스트 자체 수정/삭제는 서비스에서도 "해당 아티스트 멤버 또는 SUPER_ADMIN"을 다시 검증한다.
+                        .requestMatchers(HttpMethod.PATCH, "/api/member/v1/artists/*").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/member/v1/artists/*").hasAnyRole("ARTIST", "SUPER_ADMIN")
+
+                        // ── 3-1. ARTIST 전용 ──
+                        // 아티스트 생성/멤버 관리는 현재 서비스 정책상 ARTIST 권한 사용자만 진입 가능하다.
+                        .requestMatchers(HttpMethod.POST, "/api/member/v1/artists").hasRole("ARTIST")
+                        .requestMatchers(HttpMethod.POST, "/api/member/v1/artists/*/members").hasRole("ARTIST")
+                        .requestMatchers(HttpMethod.PATCH, "/api/member/v1/artists/*/members/*").hasRole("ARTIST")
+                        .requestMatchers(HttpMethod.DELETE, "/api/member/v1/artists/*/members/*").hasRole("ARTIST")
 
                         // ── 4. 인증된 사용자 (로그인 필수) ──
                         // 래플 응모 및 내 응모 내역
@@ -95,10 +108,17 @@ public class SecurityConfig {
 
                         // 좋아요, 댓글
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/likes/toggle").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/comments").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/fan-posts/*/comments/*").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts/*/comments").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/artist-posts/*/comments/*").authenticated()
                         .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
 
                         // 팬레터 (구독 검증은 서비스 레이어에서 수행)
                         .requestMatchers("/api/post/v1/fan-letters/**").authenticated()
+
+                        // DM (구독 검증은 서비스 레이어에서 수행)
+                        .requestMatchers("/api/v1/dm/**").authenticated()
 
                         // 웹훅 — PortOne 서버가 JWT 없이 직접 호출하므로 인증 제외
                         // 위변조 방지는 Controller의 HMAC-SHA256 서명 검증으로 수행

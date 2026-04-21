@@ -1,9 +1,13 @@
 package com.example.infinite.domain.member.artist.controller;
 
 import com.example.infinite.domain.member.artist.dto.request.ArtistCreateRequest;
+import com.example.infinite.domain.member.artist.dto.request.ArtistCreateMultipartRequest;
 import com.example.infinite.domain.member.artist.dto.request.ArtistMemberCreateRequest;
+import com.example.infinite.domain.member.artist.dto.request.ArtistMemberCreateMultipartRequest;
 import com.example.infinite.domain.member.artist.dto.request.ArtistMemberUpdateRequest;
+import com.example.infinite.domain.member.artist.dto.request.ArtistMemberUpdateMultipartRequest;
 import com.example.infinite.domain.member.artist.dto.request.ArtistUpdateRequest;
+import com.example.infinite.domain.member.artist.dto.request.ArtistUpdateMultipartRequest;
 import com.example.infinite.domain.member.artist.dto.response.ArtistMemberResponse;
 import com.example.infinite.domain.member.artist.dto.response.ArtistPopularSearchResponse;
 import com.example.infinite.domain.member.artist.dto.response.ArtistResponse;
@@ -22,9 +26,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -73,7 +79,7 @@ public class ArtistController {
     }
 
     @Operation(summary = "아티스트 생성", description = "아티스트 권한을 가진 미소속 회원이 본인 아티스트를 생성합니다.")
-    @PostMapping("/v1/artists")
+    @PostMapping(value = "/v1/artists", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<ArtistResponse>> createArtist(
             @AuthenticationPrincipal MemberDetailsImpl memberDetails,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -101,6 +107,30 @@ public class ArtistController {
                 .body(ApiResponse.success(artistService.createArtist(memberDetails, request)));
     }
 
+    @PostMapping(value = "/v1/artists", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ArtistResponse>> createArtistMultipart(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @Valid @ModelAttribute ArtistCreateMultipartRequest request
+    ) {
+        // multipart 전용 DTO 로 받은 값을 기존 ArtistCreateRequest 로 다시 묶어
+        // JSON / multipart 경로가 같은 서비스 로직을 타게 만든다.
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(artistService.createArtist(
+                        memberDetails,
+                        new ArtistCreateRequest(
+                                request.getName(),
+                                request.getSlug(),
+                                request.getStageName(),
+                                request.getProfileImageUrl(),
+                                request.getCoverImageUrl(),
+                                request.getIntro()
+                        ),
+                        request.getProfileImageFile(),
+                        request.getCoverImageFile()
+                )));
+    }
+
     @Operation(summary = "아티스트 상세 조회 v1", description = "캐시 없이 아티스트와 전체 아티스트 멤버 목록을 조회합니다.")
     @GetMapping("v1/artists/{artistId}")
     public ResponseEntity<ApiResponse<ArtistResponse>> getArtist(
@@ -122,7 +152,7 @@ public class ArtistController {
     }
 
     @Operation(summary = "아티스트 수정", description = "해당 아티스트 소속 멤버 또는 SUPER_ADMIN이 아티스트 정보를 수정합니다.")
-    @PatchMapping("v1/artists/{artistId}")
+    @PatchMapping(value = "v1/artists/{artistId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<ArtistResponse>> updateArtist(
             @AuthenticationPrincipal MemberDetailsImpl memberDetails,
             @Parameter(description = "수정할 아티스트 ID", example = "1")
@@ -149,6 +179,29 @@ public class ArtistController {
         return ResponseEntity.ok(ApiResponse.success(artistService.updateArtist(memberDetails, artistId, request)));
     }
 
+    @PatchMapping(value = "v1/artists/{artistId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ArtistResponse>> updateArtistMultipart(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @PathVariable Long artistId,
+            @Valid @ModelAttribute ArtistUpdateMultipartRequest request
+    ) {
+        // 수정도 동일하게 문자열 필드와 파일 필드를 분리 바인딩한 뒤,
+        // 서비스에서는 기존 ArtistUpdateRequest 와 파일 파라미터를 함께 받는다.
+        return ResponseEntity.ok(ApiResponse.success(artistService.updateArtist(
+                memberDetails,
+                artistId,
+                new ArtistUpdateRequest(
+                        request.getName(),
+                        request.getSlug(),
+                        request.getProfileImageUrl(),
+                        request.getCoverImageUrl(),
+                        request.getIntro()
+                ),
+                request.getProfileImageFile(),
+                request.getCoverImageFile()
+        )));
+    }
+
     @Operation(summary = "아티스트 삭제", description = "아티스트와 연결된 아티스트 멤버를 함께 soft delete 처리합니다.")
     @DeleteMapping("v1/artists/{artistId}")
     public ResponseEntity<ApiResponse<Void>> deleteArtist(
@@ -161,7 +214,7 @@ public class ArtistController {
     }
 
     @Operation(summary = "아티스트 멤버 생성", description = "같은 아티스트 소속 멤버가 새 아티스트 멤버를 추가합니다.")
-    @PostMapping("v1/artists/{artistId}/members")
+    @PostMapping(value = "v1/artists/{artistId}/members", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<ArtistMemberResponse>> createArtistMember(
             @AuthenticationPrincipal MemberDetailsImpl memberDetails,
             @Parameter(description = "멤버를 추가할 아티스트 ID", example = "1")
@@ -189,8 +242,31 @@ public class ArtistController {
                 .body(ApiResponse.success(artistMemberService.createArtistMember(memberDetails, artistId, request)));
     }
 
+    @PostMapping(value = "v1/artists/{artistId}/members", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ArtistMemberResponse>> createArtistMemberMultipart(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @PathVariable Long artistId,
+            @Valid @ModelAttribute ArtistMemberCreateMultipartRequest request
+    ) {
+        // 아티스트 멤버 생성도 JSON DTO 를 그대로 재사용해
+        // 검증/권한/응답 조립 로직이 두 갈래로 갈라지지 않게 유지한다.
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(artistMemberService.createArtistMember(
+                        memberDetails,
+                        artistId,
+                        new ArtistMemberCreateRequest(
+                                request.getMemberId(),
+                                request.getStageName(),
+                                request.getProfileImageUrl(),
+                                request.getSortOrder()
+                        ),
+                        request.getProfileImageFile()
+                )));
+    }
+
     @Operation(summary = "아티스트 멤버 수정", description = "같은 아티스트 소속 멤버가 아티스트 멤버 정보를 수정합니다.")
-    @PatchMapping("v1/artists/{artistId}/members/{artistMemberId}")
+    @PatchMapping(value = "v1/artists/{artistId}/members/{artistMemberId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<ArtistMemberResponse>> updateArtistMember(
             @AuthenticationPrincipal MemberDetailsImpl memberDetails,
             @Parameter(description = "수정할 아티스트 ID", example = "1")
@@ -217,6 +293,30 @@ public class ArtistController {
         // 아티스트 멤버 수정 시 artist detail v2 캐시를 함께 비운다.
         return ResponseEntity.ok(ApiResponse.success(
                 artistMemberService.updateArtistMember(memberDetails, artistId, artistMemberId, request)
+        ));
+    }
+
+    @PatchMapping(value = "v1/artists/{artistId}/members/{artistMemberId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ArtistMemberResponse>> updateArtistMemberMultipart(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @PathVariable Long artistId,
+            @PathVariable Long artistMemberId,
+            @Valid @ModelAttribute ArtistMemberUpdateMultipartRequest request
+    ) {
+        // multipart 수정 요청도 기존 ArtistMemberUpdateRequest 와 파일 파라미터 조합으로 변환한다.
+        return ResponseEntity.ok(ApiResponse.success(
+                artistMemberService.updateArtistMember(
+                        memberDetails,
+                        artistId,
+                        artistMemberId,
+                        new ArtistMemberUpdateRequest(
+                                request.getStageName(),
+                                request.getProfileImageUrl(),
+                                request.getStatus(),
+                                request.getSortOrder()
+                        ),
+                        request.getProfileImageFile()
+                )
         ));
     }
 

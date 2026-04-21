@@ -11,6 +11,7 @@ public record MyInfoResponse(
         String nickname,
         String phoneNumber,
         String profileImageUrl,
+        String coverImageUrl,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -21,6 +22,7 @@ public record MyInfoResponse(
                 member.getNickname(),
                 member.getPhoneNumber(),
                 member.getProfileImageUrl(),
+                member.getCoverImageUrl(),
                 member.getCreatedAt(),
                 member.getUpdatedAt()
         );
