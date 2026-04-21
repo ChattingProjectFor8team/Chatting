@@ -79,6 +79,7 @@ public class SecurityConfig {
                         // ── 3. ARTIST + SUPER_ADMIN (관리자) ──
                         .requestMatchers("/api/v1/admin/artists/*/raffles/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/artists/*/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers("/api/v1/admin/artists/*/dm/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
@@ -115,6 +116,9 @@ public class SecurityConfig {
 
                         // 팬레터 (구독 검증은 서비스 레이어에서 수행)
                         .requestMatchers("/api/post/v1/fan-letters/**").authenticated()
+
+                        // DM (구독 검증은 서비스 레이어에서 수행)
+                        .requestMatchers("/api/v1/dm/**").authenticated()
 
                         // 웹훅 — PortOne 서버가 JWT 없이 직접 호출하므로 인증 제외
                         // 위변조 방지는 Controller의 HMAC-SHA256 서명 검증으로 수행
