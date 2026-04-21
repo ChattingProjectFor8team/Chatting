@@ -83,6 +83,10 @@ dependencies {
 
     //env 설정
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+    // S3 object storage
+    implementation platform('software.amazon.awssdk:bom:2.25.67')
+    implementation 'software.amazon.awssdk:s3'
 }
 
 tasks.withType(JavaCompile).configureEach {

@@ -1,5 +1,6 @@
 package com.example.infinite.domain.member.artist.service;
 
+import com.example.infinite.domain.artistcontent.media.service.AssetImageService;
 import com.example.infinite.domain.member.artist.dto.request.ArtistCreateRequest;
 import com.example.infinite.domain.member.artist.dto.request.ArtistUpdateRequest;
 import com.example.infinite.domain.member.artist.dto.response.ArtistDetailRow;
@@ -25,6 +26,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Locale;
@@ -43,6 +45,7 @@ public class ArtistService {
     private final ArtistMemberRepository artistMemberRepository;
     private final MemberReader memberReader;
     private final ArtistReader artistReader;
+    private final AssetImageService assetImageService;
 
     public PageResponse<ArtistSearchResponse> searchArtistsV1(String keyword) {
         // v1은 과제 요구사항상 캐시를 적용하지 않는 원본 조회 API다.
@@ -62,15 +65,30 @@ public class ArtistService {
 
     @Transactional
     public ArtistResponse createArtist(MemberDetailsImpl memberDetails, ArtistCreateRequest request) {
+        // JSON 전용 생성 API 와의 호환을 유지하기 위해
+        // 파일 없는 버전은 내부 오버로드 메서드로 단순 위임한다.
+        return createArtist(memberDetails, request, null, null);
+    }
+
+    @Transactional
+    public ArtistResponse createArtist(
+            MemberDetailsImpl memberDetails,
+            ArtistCreateRequest request,
+            MultipartFile profileImageFile,
+            MultipartFile coverImageFile
+    ) {
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
         validateCreatePermission(member);
 
         // 생성 직전 입력을 정규화해 빈 문자열/중복 slug를 한 번에 방어한다.
-        String normalizedProfileImageUrl = MemberInputSupport.trimToNull(request.profileImageUrl());
         String normalizedSlug = normalizeRequiredSlug(request.slug());
         if (artistRepository.existsBySlug(normalizedSlug)) {
             throw new ArtistException(ArtistErrorCode.ARTIST_SLUG_DUPLICATED);
         }
+
+        String inputProfileImageUrl = MemberInputSupport.trimToNull(request.profileImageUrl());
+        String inputCoverImageUrl = MemberInputSupport.trimToNull(request.coverImageUrl());
+        String normalizedIntro = MemberInputSupport.trimToNull(request.intro());
 
         Artist artist = artistRepository.save(Artist.create(
                 MemberInputSupport.requireTrimmed(
@@ -78,20 +96,26 @@ public class ArtistService {
                         () -> new IllegalArgumentException("아티스트 이름은 필수입니다.")
                 ),
                 normalizedSlug,
-                normalizedProfileImageUrl,
-                MemberInputSupport.trimToNull(request.coverImageUrl()),
-                MemberInputSupport.trimToNull(request.intro())
+                inputProfileImageUrl,
+                inputCoverImageUrl,
+                normalizedIntro
         ));
 
+        // artist id 가 생긴 뒤에야 storage key 경로를 안정적으로 만들 수 있으므로
+        // 대표 이미지 업로드는 엔티티 저장 직후에 처리한다.
+        String finalProfileImageUrl = resolveCreatedArtistProfileImageUrl(artist, inputProfileImageUrl, profileImageFile);
+        String finalCoverImageUrl = resolveCreatedArtistCoverImageUrl(artist, inputCoverImageUrl, coverImageFile);
+        artist.updateProfile(artist.getName(), artist.getSlug(), finalProfileImageUrl, finalCoverImageUrl, normalizedIntro);
+
         // 아티스트 생성과 첫 ArtistMember 연결은 반드시 같은 트랜잭션에서 끝나야 한다.
-        ArtistMember artistMember = artistMemberRepository.save(ArtistMember.create(
+        artistMemberRepository.save(ArtistMember.create(
                 artist,
                 member,
                 MemberInputSupport.requireTrimmed(
                         request.stageName(),
                         () -> new IllegalArgumentException("활동명은 필수입니다.")
                 ),
-                normalizedProfileImageUrl,
+                finalProfileImageUrl,
                 CREATOR_SORT_ORDER
         ));
 
@@ -119,14 +143,31 @@ public class ArtistService {
             key = "#artistId"
     )
     public ArtistResponse updateArtist(MemberDetailsImpl memberDetails, Long artistId, ArtistUpdateRequest request) {
+        // 기존 JSON 수정 API 도 그대로 유지하고,
+        // multipart 버전은 같은 서비스 로직을 재사용한다.
+        return updateArtist(memberDetails, artistId, request, null, null);
+    }
+
+    @Transactional
+    @CacheEvict(
+            value = CacheNames.ARTIST_DETAIL_V2,
+            key = "#artistId"
+    )
+    public ArtistResponse updateArtist(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            ArtistUpdateRequest request,
+            MultipartFile profileImageFile,
+            MultipartFile coverImageFile
+    ) {
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
         Artist artist = artistReader.findArtistByIdOrThrow(artistId);
         validateManagePermission(member, artistId);
 
         String nextSlug = resolveNextSlug(artist, request.slug());
         String nextName = resolveOptionalValue(request.name(), artist.getName());
-        String nextProfileImageUrl = resolveOptionalValue(request.profileImageUrl(), artist.getProfileImageUrl());
-        String nextCoverImageUrl = resolveOptionalValue(request.coverImageUrl(), artist.getCoverImageUrl());
+        String nextProfileImageUrl = resolveUpdatedArtistProfileImageUrl(artist, request.profileImageUrl(), profileImageFile);
+        String nextCoverImageUrl = resolveUpdatedArtistCoverImageUrl(artist, request.coverImageUrl(), coverImageFile);
         String nextIntro = resolveOptionalValue(request.intro(), artist.getIntro());
 
         artist.updateProfile(nextName, nextSlug, nextProfileImageUrl, nextCoverImageUrl, nextIntro);
@@ -212,6 +253,41 @@ public class ArtistService {
     private String resolveOptionalValue(String requestedValue, String currentValue) {
         String normalizedValue = MemberInputSupport.trimToNull(requestedValue);
         return normalizedValue != null ? normalizedValue : currentValue;
+    }
+
+    private String resolveCreatedArtistProfileImageUrl(Artist artist, String currentValue, MultipartFile profileImageFile) {
+        if (profileImageFile == null || profileImageFile.isEmpty()) {
+            return currentValue;
+        }
+        // 생성 시에는 이전 파일이 없으므로 단순 업로드만 수행한다.
+        return assetImageService.uploadArtistProfileImage(artist.getId(), profileImageFile);
+    }
+
+    private String resolveCreatedArtistCoverImageUrl(Artist artist, String currentValue, MultipartFile coverImageFile) {
+        if (coverImageFile == null || coverImageFile.isEmpty()) {
+            return currentValue;
+        }
+        return assetImageService.uploadArtistCoverImage(artist.getId(), coverImageFile);
+    }
+
+    private String resolveUpdatedArtistProfileImageUrl(Artist artist, String requestedValue, MultipartFile profileImageFile) {
+        if (profileImageFile != null && !profileImageFile.isEmpty()) {
+            // 수정 시 새 파일이 오면 "새로 업로드 -> 기존 URL best-effort 삭제" 순서로 교체한다.
+            String uploadedImageUrl = assetImageService.uploadArtistProfileImage(artist.getId(), profileImageFile);
+            assetImageService.deleteByUrlQuietly(artist.getProfileImageUrl());
+            return uploadedImageUrl;
+        }
+        return resolveOptionalValue(requestedValue, artist.getProfileImageUrl());
+    }
+
+    private String resolveUpdatedArtistCoverImageUrl(Artist artist, String requestedValue, MultipartFile coverImageFile) {
+        if (coverImageFile != null && !coverImageFile.isEmpty()) {
+            // cover 도 profile 과 같은 교체 규칙을 사용한다.
+            String uploadedImageUrl = assetImageService.uploadArtistCoverImage(artist.getId(), coverImageFile);
+            assetImageService.deleteByUrlQuietly(artist.getCoverImageUrl());
+            return uploadedImageUrl;
+        }
+        return resolveOptionalValue(requestedValue, artist.getCoverImageUrl());
     }
 
     private ArtistResponse buildArtistResponse(Long artistId) {

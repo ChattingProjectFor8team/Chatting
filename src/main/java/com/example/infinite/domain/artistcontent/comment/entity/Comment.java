@@ -24,6 +24,8 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("deleted_at IS NULL")
 public class Comment extends BaseEntity {
 
+    private static final String DELETED_PLACEHOLDER_CONTENT = "삭제된 댓글입니다.";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -52,6 +54,9 @@ public class Comment extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "deleted_placeholder", nullable = false)
+    private boolean deletedPlaceholder;
+
     private Comment(PostType targetType, Long targetId, Comment parent, int depth, Member writer, String content) {
         this.targetType = targetType;
         this.targetId = targetId;
@@ -59,6 +64,7 @@ public class Comment extends BaseEntity {
         this.depth = depth;
         this.writer = writer;
         this.content = content;
+        this.deletedPlaceholder = false;
     }
 
     public static Comment create(PostType targetType, Long targetId, Member writer, String content, Comment parent) {
@@ -72,6 +78,11 @@ public class Comment extends BaseEntity {
 
     public boolean isOwnedBy(Long memberId) {
         return writer.getId().equals(memberId);
+    }
+
+    public void markDeletedPlaceholder() {
+        this.content = DELETED_PLACEHOLDER_CONTENT;
+        this.deletedPlaceholder = true;
     }
 
 }

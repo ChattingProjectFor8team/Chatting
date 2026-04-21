@@ -17,6 +17,8 @@ import com.example.infinite.domain.artistcontent.post.fanpost.support.FanPostRea
 import com.example.infinite.domain.member.member.entity.Member;
 import com.example.infinite.domain.member.member.support.MemberInputSupport;
 import com.example.infinite.domain.member.member.support.MemberReader;
+import com.example.infinite.domain.subscriptionmembership.dto.response.WriterSubscriptionBadge;
+import com.example.infinite.domain.subscriptionmembership.service.SubscriptionMembershipService;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ public class CommentService {
     private final ArtistPostReader artistPostReader;
     private final CommentMentionService commentMentionService;
     private final MemberReader memberReader;
+    private final SubscriptionMembershipService subscriptionMembershipService;
 
     @Transactional
     public CommentResponse createFanPostComment(
@@ -66,24 +69,24 @@ public class CommentService {
         return createComment(memberDetails, artistId, artistPostId, request, PostType.ARTIST_POST);
     }
 
-    public CursorSliceResponse<CommentResponse> getFanPostComments(Long fanPostId, Long cursor) {
+    public CursorSliceResponse<CommentResponse> getFanPostComments(Long artistId, Long fanPostId, Long cursor) {
         // 팬포스트 상세 댓글 조회는 공통 slice 로직을 FAN_POST 타입으로 실행한다.
-        return getComments(PostType.FAN_POST, fanPostId, cursor);
+        return getComments(PostType.FAN_POST, artistId, fanPostId, cursor);
     }
 
-    public CursorSliceResponse<CommentResponse> getArtistPostComments(Long artistPostId, Long cursor) {
+    public CursorSliceResponse<CommentResponse> getArtistPostComments(Long artistId, Long artistPostId, Long cursor) {
         // 아티스트 게시글도 댓글 조회 규칙은 동일하므로 targetType만 바꿔 재사용한다.
-        return getComments(PostType.ARTIST_POST, artistPostId, cursor);
+        return getComments(PostType.ARTIST_POST, artistId, artistPostId, cursor);
     }
 
     public List<CommentResponse> getFanPostReplies(Long artistId, Long fanPostId, Long parentCommentId) {
         validateCommentTarget(PostType.FAN_POST, artistId, fanPostId);
-        return getReplies(PostType.FAN_POST, fanPostId, parentCommentId);
+        return getReplies(PostType.FAN_POST, artistId, fanPostId, parentCommentId);
     }
 
     public List<CommentResponse> getArtistPostReplies(Long artistId, Long artistPostId, Long parentCommentId) {
         validateCommentTarget(PostType.ARTIST_POST, artistId, artistPostId);
-        return getReplies(PostType.ARTIST_POST, artistPostId, parentCommentId);
+        return getReplies(PostType.ARTIST_POST, artistId, artistPostId, parentCommentId);
     }
 
     @Transactional
@@ -133,18 +136,17 @@ public class CommentService {
         // 댓글 생성 시 대상 게시글 카운트를 같은 트랜잭션에서 함께 올린다.
         changeCommentCount(targetType, artistId, targetId, 1);
         CommentMentionResponse mentionedMember = commentMentionService.syncMention(comment, mentionNickname);
-        // TODO(subscription 담당자):
-        // 댓글 작성자 닉네임 옆 badge도 FanPost와 같은 contract로 여기서 조립할 예정.
-        // 필요한 contract:
-        // - input: artistId + writerIds(Collection<Long>)
-        // - output: Map<Long, WriterSubscriptionBadge>
-        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
-        // 이후 CommentResponse에 badge 필드를 추가하고 writerId 기준으로 주입한다.
+        WriterSubscriptionBadge writerBadge = loadSingleWriterBadge(artistId, member.getId());
 
-        return CommentResponse.from(comment, mentionedMember);
+        return CommentResponse.from(
+                comment,
+                writerBadge.fanMembershipSubscribed(),
+                writerBadge.dmSubscribed(),
+                mentionedMember
+        );
     }
 
-    private CursorSliceResponse<CommentResponse> getComments(PostType targetType, Long targetId, Long cursor) {
+    private CursorSliceResponse<CommentResponse> getComments(PostType targetType, Long artistId, Long targetId, Long cursor) {
         // 댓글 기본 조회는 부모 댓글 slice만 내리고, 대댓글은 별도 endpoint에서 온디맨드로 조회한다.
         List<Comment> rootComments = commentRepository.findRootSliceByTargetTypeAndTargetId(
                 targetType,
@@ -159,20 +161,25 @@ public class CommentService {
                 .map(Comment::getId)
                 .toList();
         Map<Long, Integer> replyCountsByParentId = commentRepository.findReplyCountsByParentIds(rootCommentIds);
-        // TODO(subscription 담당자):
-        // root comment writerId 전체를 모아 badge를 한 번에 조회한 뒤 응답 조립 단계에서 주입할 예정.
-        // 필요한 contract:
-        // - input: artistId + writerIds(Collection<Long>)
-        // - output: Map<Long, WriterSubscriptionBadge>
-        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
-        // 누락된 writerId는 false/false 로 간주 가능해야 하고 FanPost 쪽과 동일 contract를 써야 한다.
+        Map<Long, WriterSubscriptionBadge> badgeByWriterId = loadWriterBadges(
+                artistId,
+                visibleRootComments.stream().map(comment -> comment.getWriter().getId()).toList()
+        );
 
         List<CommentResponse> content = visibleRootComments.stream()
-                .map(rootComment -> CommentResponse.from(
-                        rootComment,
-                        replyCountsByParentId.getOrDefault(rootComment.getId(), 0),
-                        null
-                ))
+                .map(rootComment -> {
+                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
+                            rootComment.getWriter().getId(),
+                            WriterSubscriptionBadge.empty(rootComment.getWriter().getId())
+                    );
+                    return CommentResponse.from(
+                            rootComment,
+                            writerBadge.fanMembershipSubscribed(),
+                            writerBadge.dmSubscribed(),
+                            replyCountsByParentId.getOrDefault(rootComment.getId(), 0),
+                            null
+                    );
+                })
                 .toList();
 
         Long nextCursor = hasNext && !visibleRootComments.isEmpty()
@@ -183,27 +190,31 @@ public class CommentService {
     }
 
     // 대댓글조회
-    private List<CommentResponse> getReplies(PostType targetType, Long targetId, Long parentCommentId) {
+    private List<CommentResponse> getReplies(PostType targetType, Long artistId, Long targetId, Long parentCommentId) {
         Comment parentComment = commentReader.findByIdAndTargetTypeAndTargetIdOrThrow(parentCommentId, targetType, targetId);
         if (!parentComment.isRootComment()) {
             throw new CommentException(CommentErrorCode.INVALID_PARENT_COMMENT);
         }
 
         List<Comment> replies = commentRepository.findRepliesByParentId(parentCommentId, COMMENT_REPLY_LIMIT);
-        Map<Long, CommentMentionResponse> mentionsByCommentId = loadMentionsByCommentId(replies);
-
-        // TODO(subscription 담당자):
-        // 대댓글 조회도 같은 writer badge contract를 재사용해 writerId 기준으로 주입할 예정.
-        // 필요한 contract:
-        // - input: artistId + writerIds(Collection<Long>)
-        // - output: Map<Long, WriterSubscriptionBadge>
-        // - WriterSubscriptionBadge { Long writerId; boolean fanMembershipSubscribed; boolean dmSubscribed; }
+        Map<Long, CommentMentionResponse> mentionByCommentId = loadMentionByCommentId(replies);
+        Map<Long, WriterSubscriptionBadge> badgeByWriterId = loadWriterBadges(
+                artistId,
+                replies.stream().map(reply -> reply.getWriter().getId()).toList()
+        );
         return replies.stream()
-                .map(reply -> CommentResponse.from(
-                        reply,
-                        0,
-                        mentionsByCommentId.get(reply.getId())
-                ))
+                .map(reply -> {
+                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
+                            reply.getWriter().getId(),
+                            WriterSubscriptionBadge.empty(reply.getWriter().getId())
+                    );
+                    return CommentResponse.from(
+                            reply,
+                            writerBadge.fanMembershipSubscribed(),
+                            writerBadge.dmSubscribed(),
+                            mentionByCommentId.get(reply.getId())
+                    );
+                })
                 .toList();
     }
 
@@ -223,18 +234,36 @@ public class CommentService {
             throw new CommentException(CommentErrorCode.COMMENT_PERMISSION_DENIED);
         }
 
-        int deletedCommentCount = 1;
+        if (comment.isDeletedPlaceholder()) {
+            return;
+        }
+
+        commentMentionService.deleteMention(comment.getId());
+
         if (comment.isRootComment()) {
-            // 2뎁스 정책이므로 루트 삭제 시 그 아래 대댓글도 함께 지워야 commentCount와 스레드 구조가 맞는다.
             List<Comment> replies = commentRepository.findByParentIdOrderByIdAsc(comment.getId());
-            for (Comment reply : replies) {
-                reply.delete();
+            if (replies.isEmpty()) {
+                // 자식이 없는 부모 댓글은 그대로 soft delete 해 목록에서 숨긴다.
+                comment.delete();
+            } else {
+                // 자식이 있으면 부모 댓글은 placeholder 로 남겨 스레드 문맥을 유지한다.
+                comment.markDeletedPlaceholder();
             }
-            deletedCommentCount += replies.size();
+            changeCommentCount(targetType, artistId, targetId, -1);
+            return;
         }
 
         comment.delete();
-        changeCommentCount(targetType, artistId, targetId, -deletedCommentCount);
+        changeCommentCount(targetType, artistId, targetId, -1);
+
+        Comment parentComment = comment.getParent();
+        if (parentComment != null && parentComment.isDeletedPlaceholder()) {
+            List<Comment> remainingReplies = commentRepository.findByParentIdOrderByIdAsc(parentComment.getId());
+            if (remainingReplies.isEmpty()) {
+                // placeholder 부모에 달린 마지막 자식도 사라지면 부모를 실제 soft delete 로 마무리한다.
+                parentComment.delete();
+            }
+        }
     }
 
     private Comment resolveParentComment(PostType targetType, Long parentId, Long targetId) {
@@ -309,10 +338,22 @@ public class CommentService {
         }
     }
 
-    private Map<Long, CommentMentionResponse> loadMentionsByCommentId(List<Comment> comments) {
+    private Map<Long, CommentMentionResponse> loadMentionByCommentId(List<Comment> comments) {
         List<Long> commentIds = comments.stream()
                 .map(Comment::getId)
                 .toList();
-        return commentMentionService.findMentionResponsesByCommentIds(commentIds);
+        return commentMentionService.findMentionResponseByCommentIds(commentIds);
+    }
+
+    private Map<Long, WriterSubscriptionBadge> loadWriterBadges(Long artistId, List<Long> writerIds) {
+        if (writerIds.isEmpty()) {
+            return Map.of();
+        }
+        return subscriptionMembershipService.getWriterBadges(artistId, writerIds);
+    }
+
+    private WriterSubscriptionBadge loadSingleWriterBadge(Long artistId, Long writerId) {
+        return subscriptionMembershipService.getWriterBadges(artistId, List.of(writerId))
+                .getOrDefault(writerId, WriterSubscriptionBadge.empty(writerId));
     }
 }

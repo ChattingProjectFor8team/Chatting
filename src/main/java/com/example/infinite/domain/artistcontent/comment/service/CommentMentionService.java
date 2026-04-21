@@ -43,18 +43,23 @@ public class CommentMentionService {
         return CommentMentionResponse.from(mention);
     }
 
-    public Map<Long, CommentMentionResponse> findMentionResponsesByCommentIds(Collection<Long> commentIds) {
+    public Map<Long, CommentMentionResponse> findMentionResponseByCommentIds(Collection<Long> commentIds) {
         if (commentIds == null || commentIds.isEmpty()) {
             return Map.of();
         }
 
-        // 댓글 id 묶음으로 멘션을 배치 조회해 목록/상세 응답 조립 시 추가 쿼리를 막는다.
-        List<CommentMention> mentions = commentMentionRepository.findByComment_IdInOrderByComment_IdAscIdAsc(commentIds);
-        Map<Long, CommentMentionResponse> mentionsByCommentId = new LinkedHashMap<>();
+        // 여러 댓글 id를 한 번에 읽되, 각 댓글은 최대 1건의 멘션만 가진다는 현재 정책을 전제로 조립한다.
+        List<CommentMention> mentionRows = commentMentionRepository.findByComment_IdInOrderByComment_IdAscIdAsc(commentIds);
+        Map<Long, CommentMentionResponse> mentionByCommentId = new LinkedHashMap<>();
 
-        for (CommentMention mention : mentions) {
-            mentionsByCommentId.put(mention.getComment().getId(), CommentMentionResponse.from(mention));
+        for (CommentMention mentionRow : mentionRows) {
+            mentionByCommentId.put(mentionRow.getComment().getId(), CommentMentionResponse.from(mentionRow));
         }
-        return mentionsByCommentId;
+        return mentionByCommentId;
+    }
+
+    @Transactional
+    public void deleteMention(Long commentId) {
+        commentMentionRepository.deleteAllByComment_Id(commentId);
     }
 }
