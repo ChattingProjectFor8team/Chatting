@@ -78,11 +78,24 @@ public class JellyService {
         }
     }
 
-    // 젤리 환불 - 비관적 락 적용 (내부: 환불 서비스에서 호출)
+    // 젤리 환불 (잔액 반환) — DM 구독권처럼 젤리로 결제한 항목 환불 시 호출
+    // 결제 시 차감된 젤리를 다시 지급한다.
     @Transactional
     public void refund(Long userId, int amount, ReferenceType referenceType, Long relatedId) {
         UserJellyBalance wallet = findWalletForUpdate(userId);
-        wallet.charge(amount); // 환불은 잔액 재충전
+        wallet.charge(amount); // 환불 = 잔액 재충전
+
+        saveTransaction(userId, TransactionType.REFUND, referenceType, relatedId,
+                amount, wallet.getCurrentBalance());
+    }
+
+    // 현금 결제 환불 시 젤리 회수 — 수동결제·자동충전처럼 현금으로 결제한 항목 환불 시 호출
+    // PortOne이 현금을 돌려주므로 지급됐던 젤리는 다시 차감한다.
+    // use()와 달리 자동충전을 트리거하지 않는다 — 환불로 인한 차감이므로 재충전 불필요
+    @Transactional
+    public void reclaimForCashRefund(Long userId, int amount, ReferenceType referenceType, Long relatedId) {
+        UserJellyBalance wallet = findWalletForUpdate(userId);
+        wallet.use(amount); // 지급됐던 젤리 회수
 
         saveTransaction(userId, TransactionType.REFUND, referenceType, relatedId,
                 amount, wallet.getCurrentBalance());
