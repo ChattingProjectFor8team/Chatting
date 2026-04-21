@@ -16,7 +16,11 @@ public enum ArtistContentErrorCode implements ErrorCodeType {
     MEDIA_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "M002", "지원하지 않는 파일 형식입니다."),
     MEDIA_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "M003", "업로드 가능한 최대 용량을 초과했습니다."),
     MEDIA_RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "M004", "요청한 미디어 파일을 찾을 수 없습니다."),
-    MEDIA_THUMBNAIL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "M005", "썸네일 생성 중 오류가 발생했습니다.");
+    MEDIA_THUMBNAIL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "M005", "썸네일 생성 중 오류가 발생했습니다."),
+    MEDIA_MAX_IMAGE_COUNT_EXCEEDED(HttpStatus.BAD_REQUEST, "M006", "이미지는 최대 10장까지 업로드할 수 있습니다."),
+    MEDIA_MAX_VIDEO_COUNT_EXCEEDED(HttpStatus.BAD_REQUEST, "M007", "동영상은 한 개만 업로드할 수 있습니다."),
+    MEDIA_MIXED_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "M008", "이미지와 동영상을 함께 업로드할 수 없습니다."),
+    MEDIA_STORAGE_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "M009", "미디어 저장소 설정이 준비되지 않았습니다.");
 
     private final HttpStatus status;
     private final String code;

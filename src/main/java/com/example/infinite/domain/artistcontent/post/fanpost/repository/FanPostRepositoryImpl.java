@@ -22,7 +22,6 @@ public class FanPostRepositoryImpl implements FanPostRepositoryCustom {
         QFanPost fanPost = QFanPost.fanPost;
         QMember member = QMember.member;
 
-        // TODO: 구독 도메인 조회가 붙으면 fanMembership/dmSubscription 배지를 배치 조회 후 서비스에서 조립한다.
         return queryFactory
                 .select(Projections.constructor(
                         FanPostReadRow.class,

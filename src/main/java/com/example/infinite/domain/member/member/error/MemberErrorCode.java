@@ -18,7 +18,8 @@ public enum MemberErrorCode implements ErrorCodeType {
     MEMBER_DUPLICATE_PHONE_NUMBER(HttpStatus.BAD_REQUEST, "A007", "이미 사용 중인 전화번호입니다."),
     MEMBER_PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "A008", "현재 비밀번호가 일치하지 않습니다."),
     MEMBER_INVALID_ROLE_CHANGE(HttpStatus.BAD_REQUEST, "A009", "허용되지 않은 역할 변경입니다."),
-    MEMBER_SAME_EMAIL_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "A010", "같은 이메일로는 변경할 수 없습니다.");
+    MEMBER_SAME_EMAIL_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "A010", "같은 이메일로는 변경할 수 없습니다."),
+    MEMBER_DUPLICATE_NICKNAME(HttpStatus.BAD_REQUEST, "A011", "이미 사용 중인 닉네임입니다.");
 
     private final HttpStatus status;
     private final String code;

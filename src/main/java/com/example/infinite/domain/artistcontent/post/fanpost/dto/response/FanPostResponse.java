@@ -27,7 +27,6 @@ public record FanPostResponse(
                 row.writerId(),
                 row.writerNickname(),
                 row.writerProfileImageUrl(),
-                // 현재는 query에서 false 상수를 받고, 나중에 subscription 도메인 조회가 붙으면 실제 값으로 교체한다.
                 Boolean.TRUE.equals(row.fanMembershipSubscribed()),
                 Boolean.TRUE.equals(row.dmSubscribed()),
                 row.content(),

@@ -1,5 +1,6 @@
 package com.example.infinite.domain.member.member.service;
 
+import com.example.infinite.domain.artistcontent.media.service.AssetImageService;
 import com.example.infinite.domain.member.member.dto.request.ChangeEmailRequest;
 import com.example.infinite.domain.member.member.dto.request.ChangePasswordRequest;
 import com.example.infinite.domain.member.member.dto.request.UpdateMemberRequest;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,7 @@ public class MemberService {
     private final MemberReader memberReader;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AssetImageService assetImageService;
 
     @Transactional(readOnly = true)
     public MyInfoResponse getMyInfo(MemberDetailsImpl memberDetails) {
@@ -39,19 +42,34 @@ public class MemberService {
     }
 
     public MyInfoResponse updateMyInfo(MemberDetailsImpl memberDetails, UpdateMemberRequest request) {
+        // 기존 JSON API 와의 호환을 위해 파일 없는 경로는 그대로 유지하고,
+        // 내부적으로만 "파일 포함 버전" 오버로드로 위임한다.
+        return updateMyInfo(memberDetails, request, null, null);
+    }
+
+    public MyInfoResponse updateMyInfo(
+            MemberDetailsImpl memberDetails,
+            UpdateMemberRequest request,
+            MultipartFile profileImageFile,
+            MultipartFile coverImageFile
+    ) {
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
 
-        // null/blank 입력은 기존 값 유지로 해석해 부분 수정처럼 동작시킨다.
+        // 문자열 URL 과 실제 업로드 파일을 동시에 받을 수 있으므로
+        // "파일이 오면 새 업로드 URL 우선, 아니면 문자열 URL, 그것도 없으면 기존 값 유지" 규칙으로 해석한다.
         String nextNickname = MemberInputSupport.trimToNull(request.nickname());
         String nextPhoneNumber = MemberInputSupport.trimToNull(request.phoneNumber());
-        String nextProfileImageUrl = MemberInputSupport.trimToNull(request.profileImageUrl());
+        String nextProfileImageUrl = resolveNextProfileImageUrl(member, request.profileImageUrl(), profileImageFile);
+        String nextCoverImageUrl = resolveNextCoverImageUrl(member, request.coverImageUrl(), coverImageFile);
 
         // 본인 번호를 제외한 다른 회원의 전화번호와 충돌하면 수정하지 못하게 막는다.
+        validateNicknameDuplication(member.getId(), nextNickname);
         validatePhoneNumberDuplication(member.getId(), nextPhoneNumber);
         member.updateProfile(
                 nextNickname != null ? nextNickname : member.getNickname(),
                 nextPhoneNumber != null ? nextPhoneNumber : member.getPhoneNumber(),
-                nextProfileImageUrl != null ? nextProfileImageUrl : member.getProfileImageUrl()
+                nextProfileImageUrl,
+                nextCoverImageUrl
         );
 
         return MyInfoResponse.from(member);
@@ -120,10 +138,42 @@ public class MemberService {
         }
     }
 
+    private void validateNicknameDuplication(Long memberId, String nickname) {
+        if (nickname != null && memberRepository.existsByNicknameAndIdNot(nickname, memberId)) {
+            throw new MemberException(MemberErrorCode.MEMBER_DUPLICATE_NICKNAME);
+        }
+    }
+
     // 프로필 수정에서는 본인 번호는 허용하고, 다른 회원과의 충돌만 막는다.
     private void validatePhoneNumberDuplication(Long memberId, String phoneNumber) {
         if (phoneNumber != null && memberRepository.existsByPhoneNumberAndIdNot(phoneNumber, memberId)) {
             throw new MemberException(MemberErrorCode.MEMBER_DUPLICATE_PHONE_NUMBER);
         }
+    }
+
+    private String resolveNextProfileImageUrl(Member member, String requestedProfileImageUrl, MultipartFile profileImageFile) {
+        if (profileImageFile != null && !profileImageFile.isEmpty()) {
+            // 실제 파일이 오면 새 파일을 storage 에 올리고,
+            // 이전 대표 이미지는 best-effort 로 정리한다.
+            String uploadedImageUrl = assetImageService.uploadMemberProfileImage(member.getId(), profileImageFile);
+            assetImageService.deleteByUrlQuietly(member.getProfileImageUrl());
+            return uploadedImageUrl;
+        }
+
+        // 파일이 없을 때만 기존의 "URL 문자열 직접 저장" 경로를 허용한다.
+        String normalizedRequestedUrl = MemberInputSupport.trimToNull(requestedProfileImageUrl);
+        return normalizedRequestedUrl != null ? normalizedRequestedUrl : member.getProfileImageUrl();
+    }
+
+    private String resolveNextCoverImageUrl(Member member, String requestedCoverImageUrl, MultipartFile coverImageFile) {
+        if (coverImageFile != null && !coverImageFile.isEmpty()) {
+            // cover 역시 profile 과 동일한 규칙으로 처리한다.
+            String uploadedImageUrl = assetImageService.uploadMemberCoverImage(member.getId(), coverImageFile);
+            assetImageService.deleteByUrlQuietly(member.getCoverImageUrl());
+            return uploadedImageUrl;
+        }
+
+        String normalizedRequestedUrl = MemberInputSupport.trimToNull(requestedCoverImageUrl);
+        return normalizedRequestedUrl != null ? normalizedRequestedUrl : member.getCoverImageUrl();
     }
 }

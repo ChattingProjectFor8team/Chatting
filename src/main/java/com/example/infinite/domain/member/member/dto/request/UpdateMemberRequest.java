@@ -14,6 +14,8 @@ public record UpdateMemberRequest(
         @Size(max = 13)
         String phoneNumber,
 
-        String profileImageUrl
+        String profileImageUrl,
+
+        String coverImageUrl
 ) {
 }

@@ -84,11 +84,17 @@ dependencies {
     //env 설정
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
+<<<<<<< feat#39/CI/CD
     // 3.1.x 버전은 안정성이 검증된 GA 버전
     implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.1.1')
 
     // S3 스타터
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
+=======
+    // S3 object storage
+    implementation platform('software.amazon.awssdk:bom:2.25.67')
+    implementation 'software.amazon.awssdk:s3'
+>>>>>>> develop
 }
 
 tasks.withType(JavaCompile).configureEach {
