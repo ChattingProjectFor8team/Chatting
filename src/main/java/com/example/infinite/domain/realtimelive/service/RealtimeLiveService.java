@@ -28,6 +28,7 @@ public class RealtimeLiveService {
     private final RealtimeLiveRepository realtimeLiveRepository;
     private final LiveChatMessageRepository liveChatMessageRepository;
     private final LiveChatBroadcastService liveChatBroadcastService;
+    private final LiveChatThrottleService liveChatThrottleService;
     private final StringRedisTemplate stringRedisTemplate;
 
     @Transactional
@@ -89,6 +90,18 @@ public class RealtimeLiveService {
         }
 
         message.softDelete();
+    }
+
+    public void muteUser(Long artistId, Long liveId, Long userId) {
+        RealtimeLive live = findLiveOrThrow(liveId);
+        validateOwnership(live, artistId);
+        liveChatThrottleService.mute(liveId, userId);
+    }
+
+    public void unmuteUser(Long artistId, Long liveId, Long userId) {
+        RealtimeLive live = findLiveOrThrow(liveId);
+        validateOwnership(live, artistId);
+        liveChatThrottleService.unmute(liveId, userId);
     }
 
     public List<LiveResponse> getLiveList(Long artistId, LiveStatus status) {

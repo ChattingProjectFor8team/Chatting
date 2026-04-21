@@ -53,4 +53,22 @@ public class LiveAdminController {
         realtimeLiveService.deleteChatMessage(artistId, liveId, messageId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @PostMapping("/{liveId}/chat/mute/{userId}")
+    public ResponseEntity<ApiResponse<Void>> muteUser(
+            @PathVariable Long artistId,
+            @PathVariable Long liveId,
+            @PathVariable Long userId) {
+        realtimeLiveService.muteUser(artistId, liveId, userId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @DeleteMapping("/{liveId}/chat/mute/{userId}")
+    public ResponseEntity<ApiResponse<Void>> unmuteUser(
+            @PathVariable Long artistId,
+            @PathVariable Long liveId,
+            @PathVariable Long userId) {
+        realtimeLiveService.unmuteUser(artistId, liveId, userId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }
