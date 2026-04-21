@@ -60,4 +60,9 @@ public class PaymentOrder extends BaseEntity {
     public void fail() {
         this.status = PaymentStatus.FAILED;
     }
+
+    // 환불 완료 — PortOne 취소 + 젤리 회수 후 호출
+    public void refund() {
+        this.status = PaymentStatus.REFUNDED;
+    }
 }
