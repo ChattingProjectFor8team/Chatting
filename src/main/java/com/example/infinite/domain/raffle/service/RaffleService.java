@@ -196,6 +196,8 @@ public class RaffleService {
         }
 
         log.info("래플 완료: id={}", raffle.getId());
+
+        raffleNotificationService.notifyLosers(raffle);
     }
 
     // ─── Redis 메타 초기화 ───
