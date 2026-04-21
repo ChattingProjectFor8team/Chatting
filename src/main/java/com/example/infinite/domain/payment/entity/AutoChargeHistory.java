@@ -37,13 +37,20 @@ public class AutoChargeHistory extends BaseEntity {
     @Column
     private String failReason; // 실패 사유 (성공 시 null)
 
+    // PortOne 결제 식별자 — 환불 시 PortOne 취소 API 호출에 사용
+    // 이 필드가 null인 이력(기존 데이터)은 환불 불가
+    @Column
+    private String portOnePaymentId;
+
     @Builder
     public AutoChargeHistory(Long userId, BillingKey billingKey,
-                             Integer jellyAmount, boolean success, String failReason) {
+                             Integer jellyAmount, boolean success,
+                             String failReason, String portOnePaymentId) {
         this.userId = userId;
         this.billingKey = billingKey;
         this.jellyAmount = jellyAmount;
         this.success = success;
         this.failReason = failReason;
+        this.portOnePaymentId = portOnePaymentId;
     }
 }

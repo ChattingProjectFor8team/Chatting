@@ -174,12 +174,12 @@ public class AutoChargeService {
         int chargeAmount = setting.getJellyAmount() * jellyProperties.pricePerUnit();
 
         try {
-            // 1) PortOne 빌링키 결제
-            portOneClient.charge(billingKey.getBillingKey(), chargeAmount, userId);
+            // 1) PortOne 빌링키 결제 — paymentId를 반환받아 이력에 저장 (환불 시 취소 API 호출에 필요)
+            String portOnePaymentId = portOneClient.charge(billingKey.getBillingKey(), chargeAmount, userId);
             // 2) 젤리 지급 (CHARGE 거래 이력도 함께 저장됨)
             jellyService.charge(userId, setting.getJellyAmount(), ReferenceType.AUTO_CHARGE, setting.getId());
             // 3) 성공 이력 저장 — 현재 트랜잭션(REQUIRES_NEW)에 참여
-            chargeHistoryService.saveSuccess(userId, setting);
+            chargeHistoryService.saveSuccess(userId, setting, portOnePaymentId);
             log.info("자동충전 성공: userId={}, jellies={}", userId, setting.getJellyAmount());
         } catch (Exception e) {
             // 실패 이력은 ChargeHistoryService.saveFailure() 의 REQUIRES_NEW 트랜잭션으로 독립 저장
