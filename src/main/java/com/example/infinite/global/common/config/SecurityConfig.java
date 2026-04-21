@@ -54,6 +54,7 @@ public class SecurityConfig {
                                 "/api/post/v1/artists/*/fan-posts/*/comments/*/replies",
                                 "/api/post/v1/hashtags/**",
                                 "/api/post/v1/artist-posts/**",
+                                "/api/post/v1/artists/*/artist-posts/**",
                                 "/api/post/v1/artists/*/artist-posts/*/comments/*/replies",
                                 "/api/media/v1/**",
                                 "/api/member/v1/artists/{artistId}",
@@ -81,6 +82,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/artists/*/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/artists/*/dm/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts").hasRole("ARTIST")
+                        .requestMatchers(HttpMethod.PATCH, "/api/post/v1/artists/*/artist-posts/*").hasRole("ARTIST")
+                        .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/artist-posts/*").hasRole("ARTIST")
                         .requestMatchers("/api/media/v1/media/import-youtube").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/media/v1/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
@@ -109,6 +113,7 @@ public class SecurityConfig {
 
                         // 좋아요, 댓글
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/likes/toggle").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts/*/likes/toggle").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/comments").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/fan-posts/*/comments/*").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts/*/comments").authenticated()
