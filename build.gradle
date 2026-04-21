@@ -83,6 +83,11 @@ dependencies {
 
     //env 설정
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+    // BOM으로 Spring Cloud AWS Starter 버전 통합 관리 + S3 포함
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:4.0.0-RC1')
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-parameter-store'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -91,4 +96,14 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+
+// Jar boot
+bootJar {
+    enabled = true
+}
+
+jar {
+    enabled = false
 }
