@@ -1,67 +1,25 @@
 spring:
   application:
     name: demo
-  # 로컬 전용 설정 파일이 있으면 기본 설정 위에 덮어쓴다.
   config:
-    import: optional:classpath:application-local.yml
-  data:
-    redis:
-      host: localhost
-      port: 6379
-  # AWS Region + bucket name
-  cloud:
-    aws:
-      s3:
-        bucket: ${S3_BUCKET_NAME:default-bucket-name}
-      region:
-        static: ap-northeast-2
-  datasource:
-  # AWS 콘솔 RDS 정보에 있는 '엔드포인트' 주소를 넣으세요.
-    url: jdbc:mysql://${RDS_HOST}:3306/$infinite?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
-    username: ${RDS_USERNAME}
-    password: ${RDS_PASSWORD}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.MySQL8Dialect
-
-
-
-
-  # 파일 업로드 크기 제한
+    import: "optional:classpath:application-local.yml" # 로컬 설정 있으면 가져오기
   servlet:
     multipart:
       max-file-size: 10MB
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
 
-# JWT
-jwt:
-  secret: ${JWT_SECRET_KEY:aW5maW5pdGVMb2NhbERldlNlY3JldEtleU1pbmltdW0zMkJ5dGVz}
-  expiration: 3600000
-
-# PortOne
-portone:
-  api-secret: ${PORTONE_API_SECRET:test_dummy_secret_for_local}
-  # 웹훅 서명 검증용 시크릿 — PortOne 콘솔에서 발급, 운영 환경에서는 반드시 환경변수로 주입
-  webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_dummy_webhook_secret_for_local}
-
-# Jelly
+# 비즈니스 로직 및 공통 상수
 jelly:
   price-per-unit: 300
   fan-membership-cost: 9
   dm-subscription-cost: 15
 
-
+# Actuator 등 공통 설정
 management:
   endpoints:
     web:
       exposure:
         include: health, prometheus, info
-  endpoint:
-    health:
-      show-details: when_authorized
-

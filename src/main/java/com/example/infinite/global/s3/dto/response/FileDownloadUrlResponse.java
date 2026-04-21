@@ -1,13 +1,10 @@
 package com.example.infinite.global.s3.dto.response;
 
-import lombok.Getter;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-@Getter
-public class FileDownloadUrlResponse {
-
-    private final String url;
-
-    public FileDownloadUrlResponse(String url) {
-        this.url = url;
-    }
+@Schema(description = "파일 다운로드 URL 응답")
+public record FileDownloadUrlResponse(
+        @Schema(description = "발급된 S3 다운로드 URL", example = "https://s3.amazonaws.com/...")
+        String url
+) {
 }
