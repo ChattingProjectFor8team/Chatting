@@ -38,9 +38,14 @@ public class AutoChargeHistory extends BaseEntity {
     private String failReason; // 실패 사유 (성공 시 null)
 
     // PortOne 결제 식별자 — 환불 시 PortOne 취소 API 호출에 사용
-    // 이 필드가 null인 이력(기존 데이터)은 환불 불가
+    // 이 필드가 null인 이력(이 기능 도입 전 데이터)은 환불 불가
     @Column
     private String portOnePaymentId;
+
+    // 환불 완료 여부 — 젤리 회수 + PortOne 취소가 모두 완료된 경우 true
+    // PaymentOrder의 REFUNDED 상태와 동일한 의미이나, AutoChargeHistory는 별도 status 컬럼이 없으므로 플래그로 관리
+    @Column(nullable = false)
+    private boolean refunded = false;
 
     @Builder
     public AutoChargeHistory(Long userId, BillingKey billingKey,
@@ -52,5 +57,11 @@ public class AutoChargeHistory extends BaseEntity {
         this.success = success;
         this.failReason = failReason;
         this.portOnePaymentId = portOnePaymentId;
+        this.refunded = false;
+    }
+
+    // 환불 완료 처리 — RefundService에서 PortOne 취소 + 젤리 회수 완료 후 호출
+    public void markRefunded() {
+        this.refunded = true;
     }
 }
