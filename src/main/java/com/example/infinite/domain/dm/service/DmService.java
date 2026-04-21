@@ -18,6 +18,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -141,5 +142,21 @@ public class DmService {
         if (!room.getUserId().equals(userId) && !room.getArtistId().equals(userId)) {
             throw new DmException(DmErrorCode.DM_NOT_ROOM_MEMBER);
         }
+    }
+
+    /**
+     * 해당 유저가 특정 아티스트와의 DM에서 지정 시각 이후 메시지를 보낸 적이 있는지 확인.
+     * 환불 서비스에서 호출: dmService.hasUserSentMessageAfter(userId, artistId, subscription.getStartedAt())
+     *
+     * @param userId   유저 ID
+     * @param artistId 아티스트 ID
+     * @param after    기준 시각 (구독 시작일)
+     * @return true면 메시지 발송 이력 있음 → 환불 불가
+     */
+    public boolean hasUserSentMessageAfter(Long userId, Long artistId, LocalDateTime after) {
+        return dmMessageRepository
+                .existsByDmRoom_UserIdAndDmRoom_ArtistIdAndSenderTypeAndSentAtAfter(
+                        userId, artistId, SenderType.USER, after
+                );
     }
 }
