@@ -131,6 +131,10 @@ public class SubscriptionMembershipService {
      */
     @Transactional(readOnly = true)
     public Map<Long, WriterSubscriptionBadge> getWriterBadges(Long artistId, Collection<Long> writerIds) {
+        if (writerIds == null || writerIds.isEmpty()) {
+            return Map.of();
+        }
+
         // DM 구독 중인 writerId Set
         Set<Long> dmSubscribedIds = dmSubscriptionRepository
                 .findByArtistIdAndUserIdInAndStatus(artistId, writerIds, SubscriptionStatus.ACTIVE)

@@ -12,6 +12,8 @@ public record CommentResponse(
         Long writerId,
         String writerNickname,
         String writerProfileImageUrl,
+        boolean fanMembershipSubscribed,
+        boolean dmSubscribed,
         String content,
         // 현재 정책상 대댓글 멘션은 최대 1명만 해석한다.
         CommentMentionResponse mentionedMember,
@@ -21,6 +23,8 @@ public record CommentResponse(
 ) {
     public static CommentResponse from(
             Comment comment,
+            boolean fanMembershipSubscribed,
+            boolean dmSubscribed,
             int replyCount,
             List<CommentResponse> replies,
             CommentMentionResponse mentionedMember
@@ -33,6 +37,8 @@ public record CommentResponse(
                 comment.getWriter().getId(),
                 comment.getWriter().getNickname(),
                 comment.getWriter().getProfileImageUrl(),
+                fanMembershipSubscribed,
+                dmSubscribed,
                 comment.getContent(),
                 mentionedMember,
                 replyCount,
@@ -41,12 +47,40 @@ public record CommentResponse(
         );
     }
 
+    public static CommentResponse from(
+            Comment comment,
+            int replyCount,
+            List<CommentResponse> replies,
+            CommentMentionResponse mentionedMember
+    ) {
+        return from(comment, false, false, replyCount, replies, mentionedMember);
+    }
+
     public static CommentResponse from(Comment comment, int replyCount, CommentMentionResponse mentionedMember) {
         return from(comment, replyCount, List.of(), mentionedMember);
     }
 
     public static CommentResponse from(Comment comment, CommentMentionResponse mentionedMember) {
         return from(comment, 0, List.of(), mentionedMember);
+    }
+
+    public static CommentResponse from(
+            Comment comment,
+            boolean fanMembershipSubscribed,
+            boolean dmSubscribed,
+            int replyCount,
+            CommentMentionResponse mentionedMember
+    ) {
+        return from(comment, fanMembershipSubscribed, dmSubscribed, replyCount, List.of(), mentionedMember);
+    }
+
+    public static CommentResponse from(
+            Comment comment,
+            boolean fanMembershipSubscribed,
+            boolean dmSubscribed,
+            CommentMentionResponse mentionedMember
+    ) {
+        return from(comment, fanMembershipSubscribed, dmSubscribed, 0, List.of(), mentionedMember);
     }
 
     public static CommentResponse from(Comment comment) {

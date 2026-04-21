@@ -11,4 +11,8 @@ public record WriterSubscriptionBadge(
         boolean fanMembershipSubscribed,
         // 해당 작성자가 이 아티스트의 DM 구독권을 보유 중인지 여부
         boolean dmSubscribed
-) {}
+) {
+    public static WriterSubscriptionBadge empty(Long writerId) {
+        return new WriterSubscriptionBadge(writerId, false, false);
+    }
+}

@@ -25,3 +25,22 @@ jelly:
   price-per-unit: 300
   fan-membership-cost: 9
   dm-subscription-cost: 15
+
+media:
+  storage:
+    # 기본은 비활성화로 두고, S3 설정이 준비된 환경에서만 활성화한다.
+    enabled: ${MEDIA_STORAGE_ENABLED:false}
+    bucket: ${MEDIA_STORAGE_BUCKET:}
+    region: ${MEDIA_STORAGE_REGION:ap-northeast-2}
+    endpoint: ${MEDIA_STORAGE_ENDPOINT:}
+    public-base-url: ${MEDIA_STORAGE_PUBLIC_BASE_URL:}
+    access-key: ${MEDIA_STORAGE_ACCESS_KEY:}
+    secret-key: ${MEDIA_STORAGE_SECRET_KEY:}
+    path-style-access: ${MEDIA_STORAGE_PATH_STYLE_ACCESS:false}
+    key-prefix: ${MEDIA_STORAGE_KEY_PREFIX:post-media}
+    max-image-count: 10
+    max-video-count: 1
+    max-image-size-bytes: 10485760
+    max-video-size-bytes: 104857600
+    allowed-image-extensions: jpg,jpeg,png,gif,webp
+    allowed-video-extensions: mp4,mov,webm

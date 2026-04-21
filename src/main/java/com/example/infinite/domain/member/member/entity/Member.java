@@ -45,6 +45,9 @@ public class Member extends BaseEntity {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
 
 
     // 1. private 생성자 — 모든 필수 필드를 강제
@@ -65,10 +68,11 @@ public class Member extends BaseEntity {
     }
 
     // 내 정보 수정에서 사용하는 프로필성 필드 변경 메서드다.
-    public void updateProfile(String nickname, String phoneNumber, String profileImageUrl) {
+    public void updateProfile(String nickname, String phoneNumber, String profileImageUrl, String coverImageUrl) {
         this.nickname = nickname;
         this.phoneNumber = phoneNumber;
         this.profileImageUrl = profileImageUrl;
+        this.coverImageUrl = coverImageUrl;
     }
 
     // 비밀번호는 서비스 계층에서 암호화한 값을 받아 교체한다.
