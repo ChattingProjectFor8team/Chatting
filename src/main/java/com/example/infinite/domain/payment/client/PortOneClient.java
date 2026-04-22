@@ -37,7 +37,8 @@ public class PortOneClient {
     }
 
     // PortOne 빌링키로 결제 (자동충전)
-    public void charge(String billingKey, int amount, Long userId) {
+    // paymentId를 반환해 호출부에서 저장할 수 있도록 한다 — 환불 시 취소 API 호출에 필요
+    public String charge(String billingKey, int amount, Long userId) {
         String paymentId = "auto-charge-" + UUID.randomUUID();
         Map<String, Object> body = Map.of(
                 "billingKey", billingKey,
@@ -54,8 +55,25 @@ public class PortOneClient {
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
+            return paymentId;
         } catch (Exception e) {
             log.error("PortOne 자동충전 결제 실패: userId={}, amount={}, error={}", userId, amount, e.getMessage());
+            throw e;
+        }
+    }
+
+    // PortOne 결제 취소 (환불) — 수동결제·자동충전 환불 시 호출
+    public void cancelPayment(String paymentId, String reason) {
+        try {
+            restClient.post()
+                    .uri("/payments/{paymentId}/cancel", paymentId)
+                    .header("Authorization", "PortOne " + apiSecret)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("reason", reason))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            log.error("PortOne 결제 취소 실패: paymentId={}, error={}", paymentId, e.getMessage());
             throw e;
         }
     }
