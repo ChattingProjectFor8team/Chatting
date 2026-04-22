@@ -26,6 +26,18 @@ jobs:
             --health-interval 10s
             --health-timeout 5s
             --health-retries 5
+        mysql:
+          image: mysql:8.0
+          ports:
+            - 3306:3306
+          env:
+            MYSQL_ROOT_PASSWORD: test
+            MYSQL_DATABASE: infinite_test
+          options: >-
+            --health-cmd "mysqladmin ping -h localhost"
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
     outputs:
       image_tag: ${{ steps.vars.outputs.short_sha }}
 
@@ -64,8 +76,9 @@ jobs:
 
       # Step 5-2: 테스트 실행
       - name: Run tests
-        run: ./gradlew test -Dspring.profiles.active=test
+        run: ./gradlew test --stacktrace --info
         env:
+          SPRING_PROFILES_ACTIVE: test
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
           # application.yml에서 사용하는 정확한 변수명으로 매핑하세요!
@@ -76,7 +89,10 @@ jobs:
           AWS_S3_BUCKET: dummy-bucket
           # 만약 S3_BUCKET_NAME으로 쓰고 싶다면 yml도 ${S3_BUCKET_NAME}이어야 합니다.
 
+          JWT_SECRET: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
           JWT_SECRET_KEY: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
+
+          JWT_EXPIRATION: 3600000
 
 
 #          # 테스트 코드가 localhost:6379로 붙을 수 있게 설정
@@ -101,6 +117,11 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+
+      # 도커 빌드 전에 QEMU 에뮬레이터 설치 스텝 추가
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       # Step 7: Docker 빌드 및 push (보완 버전)
       - name: Build and push Docker image
         run: |
@@ -109,7 +130,7 @@ jobs:
           REPO_URL=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}
 
           # 1. 빌드 (플랫폼은 대상 EC2 사양에 맞춰 수정하세요)
-          docker build --platform linux/amd64 \
+          docker build --platform linux/arm64 \
             -t $REPO_URL:$SHORT_SHA \
             -t $REPO_URL:latest .
           
@@ -122,7 +143,7 @@ jobs:
 
   deploy:
     needs: build
-    if: contains(fromJson('["refs/heads/main", "refs/heads/develop"]'), github.ref)
+    if: contains(fromJson('["refs/heads/main", "refs/heads/develop", "refs/heads/hotfix/env/var"]'), github.ref)
 #    if: github.ref == 'refs/heads/main'   # main push에서만 배포 (PR에서는 CI만 실행)
     runs-on: ubuntu-latest
 
@@ -134,7 +155,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # Step 2: Launch Template 새 버전 생성 (User Data의 IMAGE_TAG를 새 커밋 SHA로 교체)
+      # Step 2: Launch Template 새 버전 생성
       - name: Update Launch Template
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
@@ -145,6 +166,7 @@ jobs:
         run: |
           ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 
+          # base64 인코딩 (줄바꿈 방지)
           USER_DATA=$(cat <<'USERDATA' | sed "s|__IMAGE_TAG__|${IMAGE_TAG}|g; s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; s|__AWS_REGION__|${AWS_REGION}|g; s|__ECR_REPOSITORY__|${ECR_REPOSITORY}|g" | base64 -w 0
           #!/bin/bash
           set -e
@@ -163,18 +185,19 @@ jobs:
           USERDATA
           )
 
+          # [중요] 변수를 큰따옴표로 감싸서 공백 에러 방지
           NEW_VERSION=$(aws ec2 create-launch-template-version \
-            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
+            --launch-template-id "$LAUNCH_TEMPLATE_ID" \
             --source-version '$Latest' \
-            --launch-template-data "{\"UserData\":\"${USER_DATA}\"}" \
+            --launch-template-data "{\"UserData\":\"$USER_DATA\"}" \
             --query 'LaunchTemplateVersion.VersionNumber' \
             --output text)
 
           echo "✅ Launch Template v${NEW_VERSION} 생성 완료"
 
           aws ec2 modify-launch-template \
-            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
-            --default-version ${NEW_VERSION}
+            --launch-template-id "$LAUNCH_TEMPLATE_ID" \
+            --default-version "$NEW_VERSION"
 
           echo "✅ 기본 버전 → v${NEW_VERSION} 변경 완료"
 
