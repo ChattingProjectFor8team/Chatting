@@ -1,5 +1,6 @@
 spring:
   config:
+    import: "aws-parameterstore:/config/demo/"
     activate:
       on-profile: prod
   datasource:
@@ -13,3 +14,6 @@ spring:
     aws:
       s3:
         bucket: ${S3_BUCKET_NAME}
+jwt:
+  secret:
+    key: ${JWT_SECRET_KEY}
