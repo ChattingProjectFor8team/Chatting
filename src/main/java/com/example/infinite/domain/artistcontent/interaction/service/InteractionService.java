@@ -1,12 +1,18 @@
 package com.example.infinite.domain.artistcontent.interaction.service;
 
+import com.example.infinite.domain.artistcontent.comment.entity.Comment;
+import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
+import com.example.infinite.domain.artistcontent.interaction.dto.response.ArtistPostLikeQueuedResponse;
 import com.example.infinite.domain.artistcontent.interaction.dto.response.InteractionResponse;
 import com.example.infinite.domain.artistcontent.interaction.entity.Reaction;
 import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.interaction.repository.InteractionRepository;
-import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
+import com.example.infinite.domain.artistcontent.interaction.service.commentlike.CommentLikeRedissonService;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
-import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPost;
+import com.example.infinite.domain.artistcontent.interaction.service.fanletterlike.FanLetterLikeRedissonService;
+import com.example.infinite.domain.artistcontent.interaction.service.fanpostlike.FanPostLikeRedissonService;
+import com.example.infinite.domain.artistcontent.interaction.service.artistpostlike.ArtistPostLikeRedissonV2Service;
+import com.example.infinite.domain.artistcontent.interaction.service.artistpostlike.stream.ArtistPostLikeStreamV3Service;
 import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
 import com.example.infinite.domain.artistcontent.post.fanletter.entity.FanLetter;
 import com.example.infinite.domain.artistcontent.post.fanletter.support.FanLetterReader;
@@ -18,6 +24,7 @@ import com.example.infinite.domain.member.member.support.MemberReader;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -29,109 +36,86 @@ public class InteractionService {
     private final FanPostReader fanPostReader;
     private final ArtistPostReader artistPostReader;
     private final FanLetterReader fanLetterReader;
+    private final CommentReader commentReader;
     private final MemberReader memberReader;
+    private final FanPostLikeRedissonService fanPostLikeRedissonService;
+    private final FanLetterLikeRedissonService fanLetterLikeRedissonService;
+    private final ArtistPostLikeRedissonV2Service artistPostLikeRedissonV2Service;
+    private final ArtistPostLikeStreamV3Service artistPostLikeStreamV3Service;
+    private final CommentLikeRedissonService commentLikeRedissonService;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public InteractionResponse toggleFanPostLike(MemberDetailsImpl memberDetails, Long artistId, Long fanPostId) {
-        // 좋아요 토글은 로그인 principal을 Member로 확정한 뒤 대상 팬포스트를 조회한다.
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
-        FanPost fanPost = fanPostReader.findByIdAndArtistIdOrThrow(fanPostId, artistId);
-
-        return interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
-                        PostType.FAN_POST,
-                        fanPostId,
-                        member.getId(),
-                        ReactionType.LIKE
-                )
-                .map(existingReaction -> cancelLike(existingReaction, fanPost))
-                .orElseGet(() -> addLike(member.getId(), fanPost));
+        // 여기서 outer transaction을 열어두면 "락 해제 후 커밋" 순서가 되어
+        // 같은 member-target 요청이 미커밋 상태를 다시 읽는 레이스가 생길 수 있다.
+        // 그래서 진입점은 비트랜잭션으로 두고, 락 안쪽 core service가 실제 write 트랜잭션을 시작한다.
+        return fanPostLikeRedissonService.toggle(member.getId(), artistId, fanPostId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public InteractionResponse toggleArtistPostLike(MemberDetailsImpl memberDetails, Long artistId, Long artistPostId) {
-        // 아티스트 게시글 좋아요도 공통 reaction 테이블을 재사용하고 targetType만 ARTIST_POST로 구분한다.
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
-        ArtistPost artistPost = artistPostReader.findByIdAndArtistIdOrThrow(artistPostId, artistId);
-
-        return interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
-                        PostType.ARTIST_POST,
-                        artistPostId,
-                        member.getId(),
-                        ReactionType.LIKE
-                )
-                .map(existingReaction -> cancelLike(existingReaction, artistPost))
-                .orElseGet(() -> addLike(member.getId(), artistPost));
+        // ArtistPost 좋아요는 다른 좋아요와 달리 고트래픽 후보라서 별도 서비스로 분리했다.
+        // 실제 운영 경로는 Redisson 기반 V2를 사용하고, Lettuce V1은 비교/과제 설명용 구현으로만 남긴다.
+        //
+        // 이렇게 분리한 이유:
+        // 1) InteractionService 안에서 락, 토글, delta 집계까지 모두 처리하면 책임이 너무 커진다.
+        // 2) Redisson AOP 락은 별도 빈을 통해 호출해야 정상 적용된다(self-invocation 회피).
+        // 3) 나중에 V1/Lettuce와 V2/Redisson을 비교 설명하기도 쉬워진다.
+        return artistPostLikeRedissonV2Service.toggle(member.getId(), artistId, artistPostId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ArtistPostLikeQueuedResponse queueArtistPostLikeV3(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long artistPostId
+    ) {
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        // V3는 stream 기반 비동기 처리 진입점이다. 실사용 동기 경로(V2)와 계약이 다르므로 메서드를 분리한다.
+        return artistPostLikeStreamV3Service.queue(member.getId(), artistId, artistPostId);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public InteractionResponse toggleFanLetterLike(MemberDetailsImpl memberDetails, Long artistId, Long fanLetterId) {
-        // 팬레터도 fan post 와 같은 reaction 테이블을 재사용한다.
-        // 차이는 targetType=FAN_LETTER 로 저장하고, likeCount 반영 대상이 FanLetter 라는 점뿐이다.
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
-        FanLetter fanLetter = fanLetterReader.findByIdAndArtistIdOrThrow(fanLetterId, artistId);
-
-        return interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
-                        PostType.FAN_LETTER,
-                        fanLetterId,
-                        member.getId(),
-                        ReactionType.LIKE
-                )
-                .map(existingReaction -> cancelLike(existingReaction, fanLetter))
-                .orElseGet(() -> addLike(member.getId(), fanLetter));
+        return fanLetterLikeRedissonService.toggle(member.getId(), artistId, fanLetterId);
     }
 
-    private InteractionResponse addLike(Long memberId, FanPost fanPost) {
-        // 반응 저장과 비정규화 likeCount 증감을 한 트랜잭션 안에서 같이 처리한다.
-        interactionRepository.save(Reaction.create(
-                PostType.FAN_POST,
-                fanPost.getId(),
-                memberId,
-                ReactionType.LIKE
-        ));
-        fanPost.changeLikeCountBy(1);
-        return InteractionResponse.of(fanPost.getId(), true, fanPost.getLikeCount());
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public InteractionResponse toggleFanPostCommentLike(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long fanPostId,
+            Long commentId
+    ) {
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        // 댓글 좋아요도 이제 member + comment 단위 Redisson 락 안에서 처리한다.
+        // 그렇지 않으면 같은 댓글에 대한 연타나 동시 요청에서 Reaction/likeCount 정합성이 깨질 수 있다.
+        return commentLikeRedissonService.toggle(
+                member.getId(),
+                artistId,
+                fanPostId,
+                commentId,
+                PostType.FAN_POST
+        );
     }
 
-    private InteractionResponse cancelLike(Reaction existingReaction, FanPost fanPost) {
-        // 토글 해제는 기존 반응 삭제 후 likeCount를 내려 조회 응답과 일치시킨다.
-        interactionRepository.delete(existingReaction);
-        fanPost.changeLikeCountBy(-1);
-        return InteractionResponse.of(fanPost.getId(), false, fanPost.getLikeCount());
-    }
-
-    private InteractionResponse addLike(Long memberId, ArtistPost artistPost) {
-        interactionRepository.save(Reaction.create(
-                PostType.ARTIST_POST,
-                artistPost.getId(),
-                memberId,
-                ReactionType.LIKE
-        ));
-        artistPost.changeLikeCountBy(1);
-        return InteractionResponse.of(artistPost.getId(), true, artistPost.getLikeCount());
-    }
-
-    private InteractionResponse cancelLike(Reaction existingReaction, ArtistPost artistPost) {
-        interactionRepository.delete(existingReaction);
-        artistPost.changeLikeCountBy(-1);
-        return InteractionResponse.of(artistPost.getId(), false, artistPost.getLikeCount());
-    }
-
-    private InteractionResponse addLike(Long memberId, FanLetter fanLetter) {
-        // special-like 표시는 별도 플래그를 저장하지 않고,
-        // 나중에 "좋아요를 누른 사람이 아티스트 소속 멤버인가"를 조회 단계에서 해석한다.
-        interactionRepository.save(Reaction.create(
-                PostType.FAN_LETTER,
-                fanLetter.getId(),
-                memberId,
-                ReactionType.LIKE
-        ));
-        fanLetter.changeLikeCountBy(1);
-        return InteractionResponse.of(fanLetter.getId(), true, fanLetter.getLikeCount());
-    }
-
-    private InteractionResponse cancelLike(Reaction existingReaction, FanLetter fanLetter) {
-        interactionRepository.delete(existingReaction);
-        fanLetter.changeLikeCountBy(-1);
-        return InteractionResponse.of(fanLetter.getId(), false, fanLetter.getLikeCount());
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public InteractionResponse toggleArtistPostCommentLike(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long artistPostId,
+            Long commentId
+    ) {
+        Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
+        return commentLikeRedissonService.toggle(
+                member.getId(),
+                artistId,
+                artistPostId,
+                commentId,
+                PostType.ARTIST_POST
+        );
     }
 }

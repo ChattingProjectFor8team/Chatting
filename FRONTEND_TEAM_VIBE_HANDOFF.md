@@ -282,6 +282,8 @@ FanPost 댓글 현재 정책:
 - 자식 없는 원댓글은 soft delete 후 숨김
 - placeholder 부모의 마지막 대댓글도 사라지면 부모도 최종 삭제
 - 작성자 옆 구독 배지 boolean은 현재 실제 subscription 조회 결과가 내려온다
+- FanPost는 별도 상위 버전 route가 없으므로 현재 route가 곧 최신 구현이다
+- 내부적으로는 백엔드가 Redisson 락/atomic update 구조로 바뀌었지만 응답 계약은 그대로다
 
 프론트가 지금 바로 실연동 가능한 화면:
 
@@ -400,6 +402,10 @@ FanPost 댓글 현재 정책:
 - `POST /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments`
 - `DELETE /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}`
 - `GET /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}/replies`
+- 추가 비동기 버전 API도 생김:
+- `POST /api/post/v3/artists/{artistId}/artist-posts/{artistPostId}/likes/toggle`
+- `POST /api/post/v2/artists/{artistId}/artist-posts/{artistPostId}/comments`
+- `DELETE /api/post/v2/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}`
 
 즉 현재 해석은 아래가 맞다.
 
@@ -411,6 +417,16 @@ FanPost 댓글 현재 정책:
 - 권한은 아티스트 계정이면서 해당 artist 소속 artist member인 경우만 허용된다
 - ArtistPost 리스트의 `media[]`도 FanPost와 동일하게 앞 `6개` preview만 내려오고, 전체 개수는 `mediaCount`로 본다
 - ArtistPost 상세에서는 전체 `media[]`가 내려온다
+- 버전 선택 규칙은 고정:
+  - `v3`가 있으면 `v3`
+  - `v3`는 없고 `v2`까지만 있으면 `v2`
+- 따라서 ArtistPost 기준 최신 사용 버전은:
+  - 좋아요 = `v3`
+  - 댓글 생성/삭제 = `v2`
+- `v1` 동기 API는 형태만 남아 있고 실제 사용 경로가 아니다
+- 새 `v2/v3`는 비동기 command enqueue 용도라 `202 Accepted` + queued metadata를 반환한다
+- ArtistPost 댓글 생성/삭제는 반드시 `v2`를 기준으로 붙여야 한다
+- ArtistPost 댓글 `v1`은 레거시 호환용으로만 남아 있다
 
 프론트가 지금 해두면 좋은 것:
 

@@ -1,12 +1,15 @@
 package com.example.infinite.domain.artistcontent.comment.service;
 
 import com.example.infinite.domain.artistcontent.comment.dto.request.CommentCreateRequest;
+import com.example.infinite.domain.artistcontent.comment.dto.response.ArtistPostCommentQueuedResponse;
 import com.example.infinite.domain.artistcontent.comment.dto.response.CommentMentionResponse;
 import com.example.infinite.domain.artistcontent.comment.dto.response.CommentResponse;
 import com.example.infinite.domain.artistcontent.comment.entity.Comment;
 import com.example.infinite.domain.artistcontent.comment.error.CommentErrorCode;
 import com.example.infinite.domain.artistcontent.comment.error.CommentException;
 import com.example.infinite.domain.artistcontent.comment.repository.CommentRepository;
+import com.example.infinite.domain.artistcontent.comment.service.fanpost.FanPostCommentRedissonService;
+import com.example.infinite.domain.artistcontent.comment.service.artistpoststream.ArtistPostCommentStreamV2Service;
 import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
 import com.example.infinite.domain.artistcontent.comment.support.MentionParser;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
@@ -23,6 +26,7 @@ import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
@@ -47,15 +51,19 @@ public class CommentService {
     private final CommentMentionService commentMentionService;
     private final MemberReader memberReader;
     private final SubscriptionMembershipService subscriptionMembershipService;
+    private final FanPostCommentRedissonService fanPostCommentRedissonService;
+    private final ArtistPostCommentStreamV2Service artistPostCommentStreamV2Service;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public CommentResponse createFanPostComment(
             MemberDetailsImpl memberDetails,
             Long artistId,
             Long fanPostId,
             CommentCreateRequest request
     ) {
-        return createComment(memberDetails, artistId, fanPostId, request, PostType.FAN_POST);
+        // FanPost 댓글도 락 안에서 실제 write 트랜잭션이 열리게 해야
+        // "락은 풀렸지만 아직 커밋 전" 상태를 다른 요청이 다시 읽는 문제를 막을 수 있다.
+        return fanPostCommentRedissonService.create(memberDetails, artistId, fanPostId, request);
     }
 
     @Transactional
@@ -65,8 +73,22 @@ public class CommentService {
             Long artistPostId,
             CommentCreateRequest request
     ) {
-        // 아티스트 게시글 댓글도 같은 댓글 정책을 재사용하되 targetType만 다르게 태운다.
+        // legacy compatibility path.
+        // ArtistPost 댓글의 실사용 최신 경로는 queueArtistPostCommentV2이고,
+        // 이 동기 경로는 기존 형태를 깨지 않기 위해서만 남겨둔다.
         return createComment(memberDetails, artistId, artistPostId, request, PostType.ARTIST_POST);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ArtistPostCommentQueuedResponse queueArtistPostCommentV2(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long artistPostId,
+            CommentCreateRequest request
+    ) {
+        // ArtistPost 댓글의 실제 사용 경로.
+        // worker가 DB 반영을 맡는 비동기 계약이며, 최신 클라이언트는 이 경로만 사용한다.
+        return artistPostCommentStreamV2Service.queueCreate(memberDetails, artistId, artistPostId, request);
     }
 
     public CursorSliceResponse<CommentResponse> getFanPostComments(Long artistId, Long fanPostId, Long cursor) {
@@ -89,15 +111,14 @@ public class CommentService {
         return getReplies(PostType.ARTIST_POST, artistId, artistPostId, parentCommentId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deleteFanPostComment(
             MemberDetailsImpl memberDetails,
             Long artistId,
             Long fanPostId,
             Long commentId
     ) {
-        // 삭제 정책도 생성과 동일하게 공통 로직에 FAN_POST 타입만 주입한다.
-        deleteComment(memberDetails, artistId, fanPostId, commentId, PostType.FAN_POST);
+        fanPostCommentRedissonService.delete(memberDetails, artistId, fanPostId, commentId);
     }
 
     @Transactional
@@ -107,8 +128,21 @@ public class CommentService {
             Long artistPostId,
             Long commentId
     ) {
-        // 아티스트 게시글 댓글 삭제도 targetType 기반 공통 로직으로 처리한다.
+        // legacy compatibility path.
+        // ArtistPost 댓글 삭제의 실사용 최신 경로는 queueDeleteArtistPostCommentV2다.
         deleteComment(memberDetails, artistId, artistPostId, commentId, PostType.ARTIST_POST);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ArtistPostCommentQueuedResponse queueDeleteArtistPostCommentV2(
+            MemberDetailsImpl memberDetails,
+            Long artistId,
+            Long artistPostId,
+            Long commentId
+    ) {
+        // ArtistPost 댓글 삭제의 실제 사용 경로.
+        // v2에서는 stream command 적재까지만 동기 처리한다.
+        return artistPostCommentStreamV2Service.queueDelete(memberDetails, artistId, artistPostId, commentId);
     }
 
     private CommentResponse createComment(

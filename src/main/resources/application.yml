@@ -39,6 +39,20 @@ jelly:
   fan-membership-cost: 9
   dm-subscription-cost: 15
 
+artist-post:
+  like-count:
+    # flush는 Redis delta가 쌓인 글만 반영한다.
+    flush-delay-ms: 3000
+    # full reconcile은 하루 1회 Reaction 원본을 다시 세어 DB count를 최종 보정한다.
+    reconcile-cron: 0 0 4 * * *
+  like-v3:
+    consumer-delay-ms: 300
+  comment-count:
+    flush-delay-ms: 3000
+    reconcile-cron: 0 10 4 * * *
+  comment-v2:
+    consumer-delay-ms: 300
+
 media:
   storage:
     # 기본은 비활성화로 두고, S3 설정이 준비된 환경에서만 활성화한다.

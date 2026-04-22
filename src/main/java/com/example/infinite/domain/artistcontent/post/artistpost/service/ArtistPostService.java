@@ -193,7 +193,6 @@ public class ArtistPostService {
         if (artistPostIds.isEmpty()) {
             return Map.of();
         }
-
         // 목록 카드는 post당 앞쪽 6장만 미리보기로 내리고,
         // 전체 장수는 mediaCount 필드를 그대로 사용한다.
         return mediaRepository.findPreviewByTargetTypeAndTargetIdInOrderByTargetIdAscSortOrderAsc(

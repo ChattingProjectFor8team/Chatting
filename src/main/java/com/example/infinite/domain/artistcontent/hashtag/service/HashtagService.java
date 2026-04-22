@@ -83,20 +83,17 @@ public class HashtagService {
         if (targetIds == null || targetIds.isEmpty()) {
             return Map.of();
         }
-
         // targetId 묶음 IN 조회 한 번으로 여러 게시글의 해시태그 이름을 배치 로딩한다.
         List<ContentHashtag> contentHashtags = contentHashtagRepository.findByTargetTypeAndTargetIdInOrderByTargetIdAscIdAsc(
                 targetType,
                 targetIds
         );
-
         // 서비스 응답 조립에서 바로 쓸 수 있도록 targetId -> hashtagNames 구조로 메모리 그룹핑한다.
         Map<Long, List<ContentHashtag>> groupedByTargetId = new LinkedHashMap<>();
         for (ContentHashtag contentHashtag : contentHashtags) {
             groupedByTargetId.computeIfAbsent(contentHashtag.getTargetId(), key -> new java.util.ArrayList<>())
                     .add(contentHashtag);
         }
-
         Map<Long, List<String>> result = new LinkedHashMap<>();
         for (Long targetId : targetIds) {
             // 입력 순서를 유지해 feed/detail 응답 조립 순서와 어긋나지 않게 한다.

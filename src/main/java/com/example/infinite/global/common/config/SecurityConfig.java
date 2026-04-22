@@ -112,10 +112,15 @@ public class SecurityConfig {
                         // 좋아요, 댓글
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/likes/toggle").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts/*/likes/toggle").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/post/v3/artists/*/artist-posts/*/likes/toggle").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/comments/*/likes/toggle").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts/*/comments/*/likes/toggle").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/fan-posts/*/comments").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/fan-posts/*/comments/*").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts/*/comments").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/artist-posts/*/comments/*").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/post/v2/artists/*/artist-posts/*/comments").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/post/v2/artists/*/artist-posts/*/comments/*").authenticated()
                         .requestMatchers("/api/post/v1/comments/**", "/api/post/v1/*/likes/toggle").authenticated()
 
                         // DM (구독 검증은 서비스 레이어에서 수행)
