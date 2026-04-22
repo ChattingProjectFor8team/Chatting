@@ -241,8 +241,7 @@ public class CommentService {
         commentMentionService.deleteMention(comment.getId());
 
         if (comment.isRootComment()) {
-            List<Comment> replies = commentRepository.findByParentIdOrderByIdAsc(comment.getId());
-            if (replies.isEmpty()) {
+            if (!commentRepository.existsByParentId(comment.getId())) {
                 // 자식이 없는 부모 댓글은 그대로 soft delete 해 목록에서 숨긴다.
                 comment.delete();
             } else {
@@ -258,8 +257,7 @@ public class CommentService {
 
         Comment parentComment = comment.getParent();
         if (parentComment != null && parentComment.isDeletedPlaceholder()) {
-            List<Comment> remainingReplies = commentRepository.findByParentIdOrderByIdAsc(parentComment.getId());
-            if (remainingReplies.isEmpty()) {
+            if (!commentRepository.existsByParentId(parentComment.getId())) {
                 // placeholder 부모에 달린 마지막 자식도 사라지면 부모를 실제 soft delete 로 마무리한다.
                 parentComment.delete();
             }

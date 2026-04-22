@@ -5,6 +5,8 @@ import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface InteractionRepository extends JpaRepository<Reaction, Long>, InteractionRepositoryCustom {
@@ -28,6 +30,13 @@ public interface InteractionRepository extends JpaRepository<Reaction, Long>, In
     long countByTargetTypeAndTargetIdAndReactionType(
             PostType targetType,
             Long targetId,
+            ReactionType reactionType
+    );
+
+    // 팬레터 special-like 계산처럼 "여러 대상의 좋아요를 한 번에 읽어야 하는" 배치 조회에 사용한다.
+    List<Reaction> findByTargetTypeAndTargetIdInAndReactionType(
+            PostType targetType,
+            Collection<Long> targetIds,
             ReactionType reactionType
     );
 }

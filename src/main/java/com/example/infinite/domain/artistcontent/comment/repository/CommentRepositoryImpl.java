@@ -11,8 +11,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-
-import static com.querydsl.core.group.GroupBy.groupBy;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class CommentRepositoryImpl implements CommentRepositoryCustom {
@@ -69,12 +68,20 @@ public class CommentRepositoryImpl implements CommentRepositoryCustom {
         QComment comment = QComment.comment;
         QComment parent = new QComment("parent");
 
-        // 부모 댓글 여러 개의 대댓글 개수를 한 번에 계산해 목록 응답의 replyCount 조립에 재사용한다.
+        // Hibernate 7 환경에서는 QueryDSL groupBy(transform)가 내부 ScrollableResults 구현과 충돌할 수 있다.
+        // 여기서는 (parentId, count) 튜플만 조회한 뒤 Map으로 조립해 같은 배치 집계를 안정적으로 유지한다.
         return queryFactory
+                .select(parent.id, comment.id.count())
                 .from(comment)
                 .join(comment.parent, parent)
                 .where(parent.id.in(parentIds))
-                .transform(groupBy(parent.id).as(comment.id.count().intValue()));
+                .groupBy(parent.id)
+                .fetch()
+                .stream()
+                .collect(Collectors.toMap(
+                        tuple -> tuple.get(parent.id),
+                        tuple -> tuple.get(comment.id.count()).intValue()
+                ));
     }
 
     @Override

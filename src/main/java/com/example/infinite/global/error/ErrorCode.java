@@ -40,6 +40,7 @@ public enum ErrorCode implements ErrorCodeType {
     SUB_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "S001", "이미 활성화된 멤버십 또는 구독권을 보유하고 있습니다."),
     SUB_ARTIST_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "구독하려는 아티스트 정보를 찾을 수 없습니다."),
     SUB_EXPIRED(HttpStatus.FORBIDDEN, "S003", "구독 기간이 만료되어 권한이 회수되었습니다."),
+    FAN_LETTER_PERMISSION_REQUIRED(HttpStatus.FORBIDDEN, "S004", "팬레터 작성은 팬 멤버십 보유자만 가능합니다."),
 
     // 5. Refund (환불)
     REFUND_PERIOD_EXPIRED(HttpStatus.BAD_REQUEST, "R001", "환불 가능 기간이 초과되었습니다."),

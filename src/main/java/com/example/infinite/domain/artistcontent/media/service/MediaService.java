@@ -10,6 +10,7 @@ import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPo
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.fanletter.entity.FanLetter;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,10 +65,9 @@ public class MediaService {
 
     @Transactional
     public void replaceFanPostMedia(Long artistId, FanPost fanPost, List<MultipartFile> files) {
-        // 현재 수정 정책은 append/부분교체가 아니라 "전체 교체"다.
-        // 그래서 기존 첨부를 모두 지우고 새 파일 집합을 다시 업로드한다.
-        deletePostMedia(PostType.FAN_POST, fanPost.getId(), fanPost::changeMediaCountBy);
-        attachFanPostMedia(artistId, fanPost, files);
+        // 전체 교체 정책은 유지하되,
+        // 새 첨부 저장 성공 전에는 기존 DB 참조를 지우지 않아야 업로드 실패 시 깨지지 않는다.
+        replacePostMedia(artistId, PostType.FAN_POST, fanPost.getId(), files, fanPost::changeMediaCountBy);
     }
 
     @Transactional
@@ -88,15 +88,36 @@ public class MediaService {
 
     @Transactional
     public void replaceArtistPostMedia(Long artistId, ArtistPost artistPost, List<MultipartFile> files) {
-        // ArtistPost 도 FanPost 와 같은 교체 정책을 유지하면
-        // 읽기 모델과 프론트 조립 규칙이 단순해진다.
-        deletePostMedia(PostType.ARTIST_POST, artistPost.getId(), artistPost::changeMediaCountBy);
-        attachArtistPostMedia(artistId, artistPost, files);
+        // ArtistPost 도 같은 전체 교체 정책을 따르되,
+        // 교체 실패 시 기존 첨부 참조가 살아 있도록 새 첨부를 먼저 확보한다.
+        replacePostMedia(artistId, PostType.ARTIST_POST, artistPost.getId(), files, artistPost::changeMediaCountBy);
     }
 
     @Transactional
     public void deleteArtistPostMedia(ArtistPost artistPost) {
         deletePostMedia(PostType.ARTIST_POST, artistPost.getId(), artistPost::changeMediaCountBy);
+    }
+
+    @Transactional
+    public void attachFanLetterMedia(Long artistId, FanLetter fanLetter, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ArtistContentException(ArtistContentErrorCode.MEDIA_FAN_LETTER_IMAGE_ONLY);
+        }
+        // 팬레터는 사진 카드 1장을 본문처럼 쓰는 모델이라
+        // fan post 처럼 List<MultipartFile> 을 받지 않고 단일 파일만 받는다.
+        uploadFanLetterMedia(artistId, fanLetter.getId(), file);
+    }
+
+    @Transactional
+    public void replaceFanLetterMedia(Long artistId, FanLetter fanLetter, MultipartFile file) {
+        // 팬레터도 전체 교체지만, 새 이미지 확보 전에 기존 media row 를 지우면 실패 시 참조가 깨진다.
+        replaceFanLetterImage(artistId, fanLetter, file);
+    }
+
+    @Transactional
+    public void deleteFanLetterMedia(FanLetter fanLetter) {
+        deletePostMedia(PostType.FAN_LETTER, fanLetter.getId(), ignored -> {
+        });
     }
 
     private void uploadPostMedia(
@@ -163,6 +184,134 @@ public class MediaService {
         mediaRepository.deleteAllInBatch(existingMedia);
         mediaCountChanger.accept(-existingMedia.size());
         deleteObjectsQuietly(existingMedia);
+    }
+
+    private void replacePostMedia(
+            Long artistId,
+            PostType targetType,
+            Long targetId,
+            List<MultipartFile> files,
+            IntConsumer mediaCountChanger
+    ) {
+        List<Media> existingMedia = mediaRepository.findByTargetTypeAndTargetIdOrderBySortOrderAsc(targetType, targetId);
+        if (files == null || files.isEmpty()) {
+            deletePostMedia(targetType, targetId, mediaCountChanger);
+            return;
+        }
+
+        // 전체 교체에서는 기존 첨부를 모두 버리고 새 집합으로 다시 만들기 때문에
+        // 정책 검증도 "새 파일 집합만 놓고 최종 상태가 유효한가"를 본다.
+        List<PreparedUploadFile> preparedFiles = prepareUploadFiles(List.of(), files);
+        List<UploadedObject> uploadedObjects = new ArrayList<>();
+
+        try {
+            List<Media> newMedia = new ArrayList<>();
+            for (int index = 0; index < preparedFiles.size(); index++) {
+                PreparedUploadFile preparedFile = preparedFiles.get(index);
+                String storageKey = buildStorageKey(artistId, targetType, targetId, preparedFile.extension());
+                UploadedObject uploadedObject = objectStorageClient.upload(preparedFile.file(), storageKey);
+                uploadedObjects.add(uploadedObject);
+
+                newMedia.add(Media.create(
+                        targetType,
+                        targetId,
+                        preparedFile.mediaType(),
+                        uploadedObject.key(),
+                        uploadedObject.url(),
+                        null,
+                        resolveOriginalFileName(preparedFile.file()),
+                        uploadedObject.contentType(),
+                        uploadedObject.size(),
+                        index
+                ));
+            }
+
+            mediaRepository.saveAll(newMedia);
+            mediaRepository.deleteAllInBatch(existingMedia);
+            mediaCountChanger.accept(newMedia.size() - existingMedia.size());
+            deleteObjectsQuietly(existingMedia);
+        } catch (RuntimeException e) {
+            cleanupUploadedObjects(uploadedObjects);
+            throw e;
+        }
+    }
+
+    private void uploadFanLetterMedia(Long artistId, Long fanLetterId, MultipartFile file) {
+        List<Media> existingMedia = mediaRepository.findByTargetTypeAndTargetIdOrderBySortOrderAsc(PostType.FAN_LETTER, fanLetterId);
+        if (!existingMedia.isEmpty()) {
+            throw new ArtistContentException(ArtistContentErrorCode.MEDIA_FAN_LETTER_IMAGE_ONLY);
+        }
+
+        // 정책상 팬레터는 비디오를 허용하지 않는다.
+        // prepareUploadFile 로 기본 검증을 통과한 뒤에도 IMAGE 타입인지 한 번 더 좁혀서 확인한다.
+        PreparedUploadFile preparedFile = prepareUploadFile(file);
+        if (preparedFile.mediaType() != MediaType.IMAGE) {
+            throw new ArtistContentException(ArtistContentErrorCode.MEDIA_FAN_LETTER_IMAGE_ONLY);
+        }
+
+        UploadedObject uploadedObject = objectStorageClient.upload(
+                preparedFile.file(),
+                buildStorageKey(artistId, PostType.FAN_LETTER, fanLetterId, preparedFile.extension())
+        );
+
+        try {
+            mediaRepository.save(Media.create(
+                    PostType.FAN_LETTER,
+                    fanLetterId,
+                    MediaType.IMAGE,
+                    uploadedObject.key(),
+                    uploadedObject.url(),
+                    null,
+                    resolveOriginalFileName(preparedFile.file()),
+                    uploadedObject.contentType(),
+                    uploadedObject.size(),
+                    0
+            ));
+        } catch (RuntimeException e) {
+            cleanupUploadedObjects(List.of(uploadedObject));
+            throw e;
+        }
+    }
+
+    private void replaceFanLetterImage(Long artistId, FanLetter fanLetter, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ArtistContentException(ArtistContentErrorCode.MEDIA_FAN_LETTER_IMAGE_ONLY);
+        }
+
+        List<Media> existingMedia = mediaRepository.findByTargetTypeAndTargetIdOrderBySortOrderAsc(
+                PostType.FAN_LETTER,
+                fanLetter.getId()
+        );
+
+        PreparedUploadFile preparedFile = prepareUploadFile(file);
+        if (preparedFile.mediaType() != MediaType.IMAGE) {
+            throw new ArtistContentException(ArtistContentErrorCode.MEDIA_FAN_LETTER_IMAGE_ONLY);
+        }
+
+        UploadedObject uploadedObject = objectStorageClient.upload(
+                preparedFile.file(),
+                buildStorageKey(artistId, PostType.FAN_LETTER, fanLetter.getId(), preparedFile.extension())
+        );
+
+        try {
+            mediaRepository.save(Media.create(
+                    PostType.FAN_LETTER,
+                    fanLetter.getId(),
+                    MediaType.IMAGE,
+                    uploadedObject.key(),
+                    uploadedObject.url(),
+                    null,
+                    resolveOriginalFileName(preparedFile.file()),
+                    uploadedObject.contentType(),
+                    uploadedObject.size(),
+                    0
+            ));
+            mediaRepository.deleteAllInBatch(existingMedia);
+            deleteObjectsQuietly(existingMedia);
+        } catch (RuntimeException e) {
+            cleanupUploadedObjects(List.of(uploadedObject));
+            throw e;
+        }
     }
 
     private List<PreparedUploadFile> prepareUploadFiles(List<Media> existingMedia, List<MultipartFile> files) {

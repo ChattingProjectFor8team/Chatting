@@ -49,6 +49,26 @@ public class ArtistPost extends BaseEntity {
     @Column(nullable = false)
     private int mediaCount;
 
+    private ArtistPost(Artist artist, Member writer, String content) {
+        this.artist = artist;
+        this.writer = writer;
+        // 현재 정책상 아티스트 게시글도 커뮤니티 공개글만 작성한다.
+        this.visibility = PostVisibility.PUBLIC;
+        this.content = content;
+        this.mediaCount = 0;
+    }
+
+    public static ArtistPost create(Artist artist, Member writer, String content) {
+        // 작성자는 ArtistMember 검증을 통과한 Member이지만, 로그인 principal 기준으로 Member를 writer에 저장한다.
+        return new ArtistPost(artist, writer, content);
+    }
+
+    public void update(String content) {
+        // ArtistPost도 공개 여부 변경 없이 본문만 수정한다.
+        this.visibility = PostVisibility.PUBLIC;
+        this.content = content;
+    }
+
     /**
      * [Day 12 Step 3] 좋아요 추가 시 +1, 취소 시 -1.
      * 취소 후 음수 방지(비정규화/실패 시나리오에서 최소 0 유지).
