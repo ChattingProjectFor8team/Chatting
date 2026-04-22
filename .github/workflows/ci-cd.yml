@@ -117,6 +117,11 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+
+      # 도커 빌드 전에 QEMU 에뮬레이터 설치 스텝 추가
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       # Step 7: Docker 빌드 및 push (보완 버전)
       - name: Build and push Docker image
         run: |
