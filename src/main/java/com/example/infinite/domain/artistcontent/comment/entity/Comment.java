@@ -14,6 +14,9 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(
         name = "comments",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_comments_command_request_id", columnNames = "command_request_id")
+        },
         indexes = {
                 @Index(name = "idx_comments_target", columnList = "target_type, target_id, id"),
                 @Index(name = "idx_comments_parent", columnList = "parent_id, id")
@@ -54,22 +57,41 @@ public class Comment extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(nullable = false)
+    private long likeCount;
+
+    @Column(name = "command_request_id", length = 64)
+    private String commandRequestId;
+
     @Column(name = "deleted_placeholder", nullable = false)
     private boolean deletedPlaceholder;
 
-    private Comment(PostType targetType, Long targetId, Comment parent, int depth, Member writer, String content) {
+    private Comment(PostType targetType, Long targetId, Comment parent, int depth, Member writer, String content, String commandRequestId) {
         this.targetType = targetType;
         this.targetId = targetId;
         this.parent = parent;
         this.depth = depth;
         this.writer = writer;
         this.content = content;
+        this.likeCount = 0L;
+        this.commandRequestId = commandRequestId;
         this.deletedPlaceholder = false;
     }
 
     public static Comment create(PostType targetType, Long targetId, Member writer, String content, Comment parent) {
+        return create(targetType, targetId, writer, content, parent, null);
+    }
+
+    public static Comment create(
+            PostType targetType,
+            Long targetId,
+            Member writer,
+            String content,
+            Comment parent,
+            String commandRequestId
+    ) {
         // 원댓글은 depth 1, 대댓글은 depth 2로만 생성해 3-depth 이상이 들어오지 않게 서비스와 규칙을 맞춘다.
-        return new Comment(targetType, targetId, parent, parent == null ? 1 : 2, writer, content);
+        return new Comment(targetType, targetId, parent, parent == null ? 1 : 2, writer, content, commandRequestId);
     }
 
     public boolean isRootComment() {
@@ -83,6 +105,10 @@ public class Comment extends BaseEntity {
     public void markDeletedPlaceholder() {
         this.content = DELETED_PLACEHOLDER_CONTENT;
         this.deletedPlaceholder = true;
+    }
+
+    public void changeLikeCountBy(int delta) {
+        this.likeCount = Math.max(0L, this.likeCount + delta);
     }
 
 }

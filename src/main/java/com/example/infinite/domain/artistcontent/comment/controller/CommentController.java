@@ -1,6 +1,7 @@
 package com.example.infinite.domain.artistcontent.comment.controller;
 
 import com.example.infinite.domain.artistcontent.comment.dto.request.CommentCreateRequest;
+import com.example.infinite.domain.artistcontent.comment.dto.response.ArtistPostCommentQueuedResponse;
 import com.example.infinite.domain.artistcontent.comment.dto.response.CommentResponse;
 import com.example.infinite.domain.artistcontent.comment.service.CommentService;
 import com.example.infinite.global.auth.MemberDetailsImpl;
@@ -48,11 +49,29 @@ public class CommentController {
             @PathVariable Long artistPostId,
             @Valid @RequestBody CommentCreateRequest request
     ) {
-        // 아티스트 게시글도 댓글 정책은 같고, URL만 게시글 종류에 맞춰 분리한다.
+        // legacy compatibility route.
+        // ArtistPost 댓글의 실제 최신 사용 경로는 v2이며, v1은 형태 보존용으로만 남겨둔다.
+        // 새 연동/수정은 이 경로 기준으로 진행하지 않는다.
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
                         commentService.createArtistPostComment(memberDetails, artistId, artistPostId, request)
+                ));
+    }
+
+    @PostMapping("/v2/artists/{artistId}/artist-posts/{artistPostId}/comments")
+    public ResponseEntity<ApiResponse<ArtistPostCommentQueuedResponse>> createArtistPostCommentV2(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @PathVariable Long artistId,
+            @PathVariable Long artistPostId,
+            @Valid @RequestBody CommentCreateRequest request
+    ) {
+        // v2는 댓글 원본 저장을 worker가 처리하므로, API는 "접수됨"만 응답한다.
+        // ArtistPost 댓글의 실제 사용 경로는 이 v2다.
+        return ResponseEntity
+                .status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.success(
+                        commentService.queueArtistPostCommentV2(memberDetails, artistId, artistPostId, request)
                 ));
     }
 
@@ -96,8 +115,25 @@ public class CommentController {
             @PathVariable Long artistPostId,
             @PathVariable Long commentId
     ) {
-        // 삭제 역시 artist-post 경로를 별도로 두되 서비스 공통 로직으로 위임한다.
+        // legacy compatibility route.
+        // ArtistPost 댓글 삭제의 실제 최신 사용 경로는 v2이며, v1 delete도 형태만 유지한다.
         commentService.deleteArtistPostComment(memberDetails, artistId, artistPostId, commentId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @DeleteMapping("/v2/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}")
+    public ResponseEntity<ApiResponse<ArtistPostCommentQueuedResponse>> deleteArtistPostCommentV2(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @PathVariable Long artistId,
+            @PathVariable Long artistPostId,
+            @PathVariable Long commentId
+    ) {
+        // ArtistPost 댓글 삭제의 실제 사용 경로는 이 v2다.
+        // 실제 delete/placeholder 전환은 consumer가 thread lock 안에서 수행한다.
+        return ResponseEntity
+                .status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.success(
+                        commentService.queueDeleteArtistPostCommentV2(memberDetails, artistId, artistPostId, commentId)
+                ));
     }
 }

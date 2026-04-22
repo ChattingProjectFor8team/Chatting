@@ -15,6 +15,7 @@ public record CommentResponse(
         boolean fanMembershipSubscribed,
         boolean dmSubscribed,
         String content,
+        long likeCount,
         // 현재 정책상 대댓글 멘션은 최대 1명만 해석한다.
         CommentMentionResponse mentionedMember,
         int replyCount,
@@ -40,6 +41,7 @@ public record CommentResponse(
                 fanMembershipSubscribed,
                 dmSubscribed,
                 comment.getContent(),
+                comment.getLikeCount(),
                 mentionedMember,
                 replyCount,
                 replies,
