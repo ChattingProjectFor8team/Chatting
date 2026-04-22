@@ -49,6 +49,7 @@ public class InteractionService {
 
     @Transactional
     public InteractionResponse toggleArtistPostLike(MemberDetailsImpl memberDetails, Long artistId, Long artistPostId) {
+        // 아티스트 게시글 좋아요도 공통 reaction 테이블을 재사용하고 targetType만 ARTIST_POST로 구분한다.
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
         ArtistPost artistPost = artistPostReader.findByIdAndArtistIdOrThrow(artistPostId, artistId);
 

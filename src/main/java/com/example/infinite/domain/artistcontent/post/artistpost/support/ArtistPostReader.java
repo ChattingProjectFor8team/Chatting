@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+// ArtistPostReader는 "artist 소속까지 확인된 게시글 1건 조회"를 공통화한 read helper다.
 public class ArtistPostReader {
 
     private final ArtistPostRepository artistPostRepository;

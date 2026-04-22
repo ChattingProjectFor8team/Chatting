@@ -17,6 +17,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -62,6 +63,21 @@ public class GlobalExceptionHandler {
         String errorMessage = e.getBindingResult().getFieldError().getDefaultMessage();
         return ResponseEntity
                 .badRequest() // 400 Bad Request
+                .body(ApiResponse.fail(buildErrorResponse(ErrorCode.INVALID_INPUT_VALUE, errorMessage, request.getRequestURI())));
+    }
+
+    /**
+     * multipart/form-data + @ModelAttribute 바인딩 검증 실패 시 발생하는 예외를 처리한다.
+     * 예: FanPost / ArtistPost / FanLetter 생성/수정에서 필드 누락 또는 타입 변환 실패
+     */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBindException(BindException e, HttpServletRequest request) {
+        log.warn("BindException : {}", e.getMessage());
+        String errorMessage = e.getBindingResult().getFieldError() != null
+                ? e.getBindingResult().getFieldError().getDefaultMessage()
+                : "요청 값이 유효하지 않음";
+        return ResponseEntity
+                .badRequest()
                 .body(ApiResponse.fail(buildErrorResponse(ErrorCode.INVALID_INPUT_VALUE, errorMessage, request.getRequestURI())));
     }
 

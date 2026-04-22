@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
+// ArtistPost 조회는 FanPost와 동일하게 "본문 row만 먼저 읽고, media/hashtag는 서비스에서 배치 조립" 구조를 따른다.
 public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
 
     protected final JPAQueryFactory queryFactory;
@@ -55,6 +56,7 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
         QArtistPost artistPost = QArtistPost.artistPost;
         QMember member = QMember.member;
 
+        // 상세도 목록과 같은 projection을 재사용해 응답 shape 차이를 서비스 조립 쪽으로만 한정한다.
         return Optional.ofNullable(queryFactory
                 .select(Projections.constructor(
                         ArtistPostReadRow.class,

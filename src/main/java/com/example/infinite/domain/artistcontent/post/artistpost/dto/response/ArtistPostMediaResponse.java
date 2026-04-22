@@ -11,6 +11,8 @@ public record ArtistPostMediaResponse(
         Integer sortOrder
 ) {
     public static ArtistPostMediaResponse from(Media media) {
+        // ArtistPost도 Media 공통 엔티티를 그대로 재사용하므로
+        // 응답에서는 게시글 렌더링에 필요한 최소 필드만 잘라 내려준다.
         return new ArtistPostMediaResponse(
                 media.getId(),
                 media.getMediaType(),

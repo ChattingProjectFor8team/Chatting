@@ -14,7 +14,14 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "fan_memberships")
+@Table(
+        name = "fan_memberships",
+        indexes = {
+                @Index(name = "idx_fan_memberships_artist_status_user", columnList = "artist_id, status, user_id"),
+                @Index(name = "idx_fan_memberships_user_id_id", columnList = "user_id, id"),
+                @Index(name = "idx_fan_memberships_status_expired_at", columnList = "status, expired_at")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE fan_memberships SET deleted_at = current_timestamp WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")

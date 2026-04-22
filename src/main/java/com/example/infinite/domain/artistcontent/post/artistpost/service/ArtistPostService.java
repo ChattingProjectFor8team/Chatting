@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 public class ArtistPostService {
 
     private static final int ARTIST_POST_SLICE_SIZE = 10;
+    private static final int ARTIST_POST_LIST_MEDIA_PREVIEW_LIMIT = 6;
 
     private final ArtistPostRepository artistPostRepository;
     private final MediaRepository mediaRepository;
@@ -61,8 +62,8 @@ public class ArtistPostService {
             Long artistId,
             ArtistPostCreateRequest request
     ) {
-        Member writer = findAuthorizedArtistWriter(memberDetails, artistId);
         Artist artist = artistReader.findArtistByIdOrThrow(artistId);
+        Member writer = findAuthorizedArtistWriter(memberDetails, artistId);
         validateCreateRequest(request);
 
         ArtistPost artistPost = artistPostRepository.save(ArtistPost.create(
@@ -88,12 +89,14 @@ public class ArtistPostService {
         boolean hasNext = rows.size() > ARTIST_POST_SLICE_SIZE;
         List<ArtistPostReadRow> visibleRows = hasNext ? rows.subList(0, ARTIST_POST_SLICE_SIZE) : rows;
 
+        // 본문 row만 먼저 읽고 media/hashtag를 배치로 붙여 N+1을 피한다.
         return toCursorSliceResponse(visibleRows, hasNext);
     }
 
     public ArtistPostDetailResponse getArtistPost(Long artistId, Long artistPostId, Long commentCursor) {
         artistReader.findArtistByIdOrThrow(artistId);
 
+        // 상세는 게시글 1건 조립 결과 위에 댓글 슬라이스를 덧붙이는 구조다.
         ArtistPostResponse artistPostResponse = buildArtistPostResponse(artistId, artistPostId);
         return ArtistPostDetailResponse.from(
                 artistPostResponse,
@@ -111,7 +114,9 @@ public class ArtistPostService {
         Member writer = findAuthorizedArtistWriter(memberDetails, artistId);
         ArtistPost artistPost = findOwnedArtistPost(writer.getId(), artistId, artistPostId);
 
-        artistPost.update(resolveUpdatedContent(request.getContent(), artistPost.getContent()));
+        String resolvedContent = resolveUpdatedContent(request.getContent(), artistPost.getContent());
+        validateUpdateRequest(resolvedContent, artistPost, request);
+        artistPost.update(resolvedContent);
         hashtagService.syncHashtags(PostType.ARTIST_POST, artistPost.getId(), artistPost.getContent());
         if (request.getFiles() != null) {
             mediaService.replaceArtistPostMedia(artistId, artistPost, request.getFiles());
@@ -136,7 +141,7 @@ public class ArtistPostService {
         }
 
         List<Long> postIds = extractPostIds(visibleRows);
-        Map<Long, List<ArtistPostMediaResponse>> mediaMap = loadMediaMap(postIds);
+        Map<Long, List<ArtistPostMediaResponse>> mediaMap = loadPreviewMediaMap(postIds);
         Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.ARTIST_POST, postIds);
 
         List<ArtistPostResponse> responses = visibleRows.stream()
@@ -157,6 +162,7 @@ public class ArtistPostService {
     private ArtistPostResponse buildArtistPostResponse(Long artistId, Long artistPostId) {
         ArtistPostReadRow row = artistPostRepository.findDetailRowByArtistIdAndArtistPostId(artistId, artistPostId)
                 .orElseThrow(() -> new ArtistContentException(ArtistContentErrorCode.POST_NOT_FOUND));
+        // 상세 1건도 목록과 같은 media/hashtag 조립 규칙을 재사용해 응답 일관성을 유지한다.
         List<ArtistPostMediaResponse> media = loadMediaMap(List.of(artistPostId)).getOrDefault(artistPostId, List.of());
         List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.ARTIST_POST, List.of(artistPostId))
                 .getOrDefault(artistPostId, List.of());
@@ -183,8 +189,28 @@ public class ArtistPostService {
                 ));
     }
 
+    private Map<Long, List<ArtistPostMediaResponse>> loadPreviewMediaMap(Collection<Long> artistPostIds) {
+        if (artistPostIds.isEmpty()) {
+            return Map.of();
+        }
+
+        // 목록 카드는 post당 앞쪽 6장만 미리보기로 내리고,
+        // 전체 장수는 mediaCount 필드를 그대로 사용한다.
+        return mediaRepository.findPreviewByTargetTypeAndTargetIdInOrderByTargetIdAscSortOrderAsc(
+                        PostType.ARTIST_POST,
+                        artistPostIds,
+                        ARTIST_POST_LIST_MEDIA_PREVIEW_LIMIT
+                )
+                .stream()
+                .collect(Collectors.groupingBy(
+                        Media::getTargetId,
+                        Collectors.mapping(ArtistPostMediaResponse::from, Collectors.toList())
+                ));
+    }
+
     private ArtistPost findOwnedArtistPost(Long memberId, Long artistId, Long artistPostId) {
         ArtistPost artistPost = artistPostReader.findByIdAndArtistIdOrThrow(artistPostId, artistId);
+        // 공식 계정 글이라도 수정/삭제는 실제 작성자 본인만 허용한다.
         if (!artistPost.getWriter().getId().equals(memberId)) {
             throw new ArtistContentException(ArtistContentErrorCode.POST_PERMISSION_DENIED);
         }
@@ -217,7 +243,20 @@ public class ArtistPostService {
         boolean hasFiles = request.getFiles() != null && !request.getFiles().isEmpty();
 
         if (!hasContent && !hasFiles) {
-            throw new IllegalArgumentException("아티스트포스트는 본문 또는 첨부파일 중 하나가 필요합니다.");
+            throw new ArtistContentException(ArtistContentErrorCode.POST_CONTENT_OR_MEDIA_REQUIRED);
+        }
+    }
+
+    private void validateUpdateRequest(String resolvedContent, ArtistPost artistPost, ArtistPostUpdateRequest request) {
+        boolean hasContent = resolvedContent != null && !resolvedContent.isBlank();
+        boolean hasMediaAfterUpdate = request.getFiles() == null
+                ? artistPost.getMediaCount() > 0
+                : !request.getFiles().isEmpty();
+
+        // 수정도 생성과 같은 불변조건을 지켜야 한다.
+        // 기존 media를 모두 비우는 요청이라면 최종 본문이 비어 있지 않아야 한다.
+        if (!hasContent && !hasMediaAfterUpdate) {
+            throw new ArtistContentException(ArtistContentErrorCode.POST_CONTENT_OR_MEDIA_REQUIRED);
         }
     }
 }
