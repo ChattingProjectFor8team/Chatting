@@ -146,7 +146,7 @@ jobs:
           systemctl start docker
           aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
           docker pull ${ECR_URI}:${IMAGE_TAG}
-          docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo -e SPRING_PROFILES_ACTIVE=prod -e JWT_SECRET_KEY="__JWT_SECRET_KEY__" ${ECR_URI}:${IMAGE_TAG}
+          docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo -e SPRING_PROFILES_ACTIVE=prod ${ECR_URI}:${IMAGE_TAG}
           USERDATA
           )
 
