@@ -9,6 +9,19 @@ spring:
       host: localhost
       port: 6379
 
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}
+        secret-key: ${AWS_SECRET_ACCESS_KEY}
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
+      s3:
+        enabled: true
+        bucket: ${AWS_S3_BUCKET}
+        domain: ${CLOUDFRONT_DOMAIN:http://localhost:8080}
+
+
 # JWT
 jwt:
   secret: ${JWT_SECRET_KEY:aW5maW5pdGVMb2NhbERldlNlY3JldEtleU1pbmltdW0zMkJ5dGVz}
@@ -44,3 +57,30 @@ media:
     max-video-size-bytes: 104857600
     allowed-image-extensions: jpg,jpeg,png,gif,webp
     allowed-video-extensions: mp4,mov,webm
+
+
+#for prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus, health, info  # 프로메테우스 엔드포인트 개방
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+
+# DockerCompose for prometheus, grafana
+services:
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"

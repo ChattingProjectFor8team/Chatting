@@ -13,6 +13,7 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
+@SuppressWarnings("deprecation")
 public class RedisLiveChatConfig {
 
     private static final String REDIS_LIVE_CHAT_CHANNEL = "live:chat:broadcast";
@@ -34,6 +35,8 @@ public class RedisLiveChatConfig {
         template.setConnectionFactory(connectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper));
+//        template.setKeySerializer(new StringRedisSerializer());
+//        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper));
         return template;
     }
 
