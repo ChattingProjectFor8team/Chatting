@@ -16,7 +16,7 @@ import com.example.infinite.domain.artistcontent.post.artistpost.repository.Arti
 import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.hashtag.service.HashtagService;
 import com.example.infinite.domain.member.artist.entity.Artist;
 import com.example.infinite.domain.member.artist.repository.ArtistMemberRepository;

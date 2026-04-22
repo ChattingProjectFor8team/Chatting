@@ -6,7 +6,7 @@ import com.example.infinite.domain.artistcontent.media.repository.MediaRepositor
 import com.example.infinite.domain.artistcontent.media.service.MediaService;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.hashtag.service.HashtagService;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostCreateRequest;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPostUpdateRequest;

@@ -1,6 +1,6 @@
 package com.example.infinite.domain.artistcontent.interaction.entity;
 
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.global.common.entity.BaseEntity;
 import jakarta.persistence.*;

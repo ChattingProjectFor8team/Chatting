@@ -2,7 +2,7 @@ package com.example.infinite.domain.artistcontent.comment.repository;
 
 import com.example.infinite.domain.artistcontent.comment.entity.Comment;
 import com.example.infinite.domain.artistcontent.comment.entity.QComment;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.member.member.entity.QMember;
 import com.example.infinite.global.common.util.querydsl.CursorSliceUtils;
 import com.querydsl.jpa.impl.JPAQueryFactory;

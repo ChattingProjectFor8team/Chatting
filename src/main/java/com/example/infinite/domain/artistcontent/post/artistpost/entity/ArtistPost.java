@@ -1,6 +1,6 @@
 package com.example.infinite.domain.artistcontent.post.artistpost.entity;
 
-import com.example.infinite.domain.artistcontent.post.eunms.PostVisibility;
+import com.example.infinite.domain.artistcontent.post.enums.PostVisibility;
 import com.example.infinite.domain.member.artist.entity.Artist;
 import com.example.infinite.domain.member.member.entity.Member;
 import com.example.infinite.global.common.entity.BaseEntity;
