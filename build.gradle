@@ -93,6 +93,8 @@ dependencies {
 
     // 2. 버전 충돌을 방지하기 위해 플랫폼(BOM) 설정을 추가하여 하위 라이브러리 버전을 강제 통일합니다.
     implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.2.1')
+
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-parameter-store:3.1.1'
 }
 
 tasks.withType(JavaCompile).configureEach {
