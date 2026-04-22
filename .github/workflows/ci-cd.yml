@@ -76,7 +76,7 @@ jobs:
 
       # Step 5-2: 테스트 실행
       - name: Run tests
-        run: ./gradlew test --stacktrace
+        run: ./gradlew test --stacktrace --info
         env:
           SPRING_PROFILES_ACTIVE: test
           SPRING_DATA_REDIS_HOST: localhost
@@ -90,6 +90,7 @@ jobs:
           # 만약 S3_BUCKET_NAME으로 쓰고 싶다면 yml도 ${S3_BUCKET_NAME}이어야 합니다.
 
           JWT_SECRET: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
+          JWT_SECRET_KEY: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
 
 
 #          # 테스트 코드가 localhost:6379로 붙을 수 있게 설정
