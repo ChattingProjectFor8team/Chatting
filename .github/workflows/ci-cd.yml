@@ -66,16 +66,29 @@ jobs:
       - name: Run tests
         run: ./gradlew test -Dspring.profiles.active=test
         env:
-          # 테스트 코드가 localhost:6379로 붙을 수 있게 설정
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
-          # PlaceholderResolutionException 방지를 위한 필수 변수들 (임시값)
-          AWS_REGION: ${{ vars.AWS_REGION }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }} # 변수 처리!
-          # 필요한 다른 환경변수가 있다면 여기에 추가하세요
-          CLOUDFRONT_DOMAIN: ${{ vars.CLOUDFRONT_DOMAIN || 'mock.cloudfront.net' }}
+          # application.yml에서 사용하는 정확한 변수명으로 매핑하세요!
+          AWS_REGION: ap-northeast-2
+          AWS_ACCESS_KEY_ID: dummy
+          AWS_SECRET_ACCESS_KEY: dummy
+          # 👈 이 부분! 만약 yml에 ${AWS_S3_BUCKET}라고 되어있다면 아래처럼 맞춰야 합니다.
+          AWS_S3_BUCKET: dummy-bucket
+          # 만약 S3_BUCKET_NAME으로 쓰고 싶다면 yml도 ${S3_BUCKET_NAME}이어야 합니다.
+
+          JWT_SECRET_KEY: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
+
+
+#          # 테스트 코드가 localhost:6379로 붙을 수 있게 설정
+#          SPRING_DATA_REDIS_HOST: localhost
+#          SPRING_DATA_REDIS_PORT: 6379
+#          # PlaceholderResolutionException 방지를 위한 필수 변수들 (임시값)
+#          AWS_REGION: ${{ vars.AWS_REGION }}
+#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }} # 변수 처리!
+#          # 필요한 다른 환경변수가 있다면 여기에 추가하세요
+#          CLOUDFRONT_DOMAIN: ${{ vars.CLOUDFRONT_DOMAIN || 'mock.cloudfront.net' }}
 
       # Step 5: AWS 자격증명 - OIDC
       - name: Configure AWS credentials
