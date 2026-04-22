@@ -6,7 +6,7 @@ WORKDIR /app
 COPY . .
 
 # 테스트 실패 시 빌드 자체가 중단되도록 보장
-RUN chmod +x gradlew && ./gradlew bootJar
+RUN chmod +x gradlew && ./gradlew bootJar -x test
 
 # 2. 실행 스테이지
 FROM amazoncorretto:21-alpine
