@@ -76,8 +76,9 @@ jobs:
 
       # Step 5-2: 테스트 실행
       - name: Run tests
-        run: ./gradlew test -Dspring.profiles.active=test
+        run: ./gradlew test --stacktrace
         env:
+          SPRING_PROFILES_ACTIVE: test
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
           # application.yml에서 사용하는 정확한 변수명으로 매핑하세요!
