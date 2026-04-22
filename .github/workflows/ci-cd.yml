@@ -64,7 +64,7 @@ jobs:
 
       # Step 5-2: 테스트 실행
       - name: Run tests
-        run: ./gradlew test -Dspring.profiles.active=test
+        run: ./gradlew test -Dspring.profiles.active=test --info
         env:
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
@@ -109,7 +109,7 @@ jobs:
           REPO_URL=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}
 
           # 1. 빌드 (플랫폼은 대상 EC2 사양에 맞춰 수정하세요)
-          docker build --platform linux/arm64 \
+          docker build --platform linux/armgit64 \
             -t $REPO_URL:$SHORT_SHA \
             -t $REPO_URL:latest .
           
