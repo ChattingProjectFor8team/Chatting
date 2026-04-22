@@ -1,5 +1,7 @@
 package com.example.infinite.global.s3.service;
 
+import com.example.infinite.global.s3.s3error.S3ErrorCode;
+import com.example.infinite.global.s3.s3error.S3Exception;
 import io.awspring.cloud.s3.S3Template;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,8 +30,8 @@ public class S3Service {
             s3Template.upload(bucket, key, file.getInputStream());
             return key;
         } catch (IOException e) {
-            // 적절한 커스텀 예외로 바꾸고, GlobalExceptionHandler로 핸들링 필요
-            throw new RuntimeException("파일 업로드 실패", e);
+
+            throw new S3Exception(S3ErrorCode.FILE_UPLOAD_ERROR);
         }
     }
 

@@ -13,21 +13,22 @@ import java.net.URL;
 
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/files")
 public class FileController {
 
     private final S3Service s3Service;
 
     @PostMapping("/upload")
-    public ResponseEntity<ApiResponse<String>> uploadFile(@RequestParam("file") MultipartFile file) {
-        String fileUrl = s3Service.upload(file);
+    public ResponseEntity<ApiResponse<FileUploadResponse>> uploadFile(@RequestPart("file") MultipartFile file) {
+        String fileUrl = s3Service.upload(file); // S3에 업로드 후 URL 반환
 
-        return ResponseEntity.ok(ApiResponse.success(fileUrl));
+        // 미리 만들어두신 레코드(FileUploadResponse)를 활용해 응답!
+        return ResponseEntity.ok(ApiResponse.success(new FileUploadResponse(fileUrl)));
     }
 
-    @GetMapping("/download-url/{fileName}")
-    public ResponseEntity<ApiResponse<String>> getDownloadUrl(@PathVariable String fileName) {
-        String downloadUrl = String.valueOf(s3Service.getDownloadUrl(fileName));
-
-        return ResponseEntity.ok(ApiResponse.success(downloadUrl));
+    @GetMapping("/download-url")
+    public ResponseEntity<ApiResponse<FileDownloadUrlResponse>> getDownloadUrl(@RequestParam("fileName") String fileName) {
+        URL downloadUrl = s3Service.getDownloadUrl(fileName);
+        return ResponseEntity.ok(ApiResponse.success(new FileDownloadUrlResponse(downloadUrl.toString())));
     }
 }
