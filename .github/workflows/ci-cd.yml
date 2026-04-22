@@ -132,7 +132,7 @@ jobs:
         run: |
           ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 
-          USER_DATA=$(cat <<'USERDATA' | sed "s|__IMAGE_TAG__|${IMAGE_TAG}|g; s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; s|__AWS_REGION__|${AWS_REGION}|g; s|__ECR_REPOSITORY__|${ECR_REPOSITORY}|g; s|__JWT_SECRET_KEY__|${JWT_SECRET_KEY}|g" | base64 -w 0
+          USER_DATA=$(cat <<'USERDATA' | sed "s|__IMAGE_TAG__|${IMAGE_TAG}|g; s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; s|__AWS_REGION__|${AWS_REGION}|g; s|__ECR_REPOSITORY__|${ECR_REPOSITORY}|g" | base64 -w 0
           #!/bin/bash
           set -e
           AWS_REGION="__AWS_REGION__"
