@@ -29,9 +29,10 @@
 
 지금 기준으로 상태를 한 줄로 요약하면 아래다.
 
-- 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, ArtistPost CRUD, ArtistPost 좋아요, ArtistPost 댓글/대댓글 조회, FanLetter CRUD, FanLetter 좋아요, Hashtag 추천, FanPost/ArtistPost/FanLetter 미디어 업로드 구조
+- 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, ArtistPost CRUD, ArtistPost 좋아요, ArtistPost 댓글/대댓글 조회, FanLetter CRUD, FanLetter 좋아요, Hashtag 추천, FanPost/ArtistPost/FanLetter 미디어 업로드 구조, 실시간 스트리밍 메타데이터/채팅 기본 구조
 - 부분 구현: Follow 엔티티
-- 미구현: HOT 피드, Follow API, 메인 홈 대시보드 2종, 동시성 보강 및 검증 테스트
+- 필수 구현 예정: 아티스트페이지 코드 검토, 포스트페이지 동시성·캐싱, 메인 홈 대시보드/아티스트 홈 대시보드
+- 구현 예정이지만 미구현으로 끝날 수도 있음: YouTube 미디어 탭, 종료된 스트리밍 영상 보관 조회, Follow API, 알림
 
 ## 2. 가장 중요한 고정 정책
 
@@ -209,6 +210,13 @@ FanPost 리스트 카드 필드:
 - `hashtags[]`
 - `createdAt`
 
+FanPost 리스트 `media[]` 정책:
+
+- 리스트에서는 정렬순 앞 `6개`만 내려온다
+- `mediaCount`는 전체 첨부 개수다
+- 프론트는 `mediaCount - media.length`로 `+N` 오버레이를 계산하면 된다
+- 상세에서는 전체 `media[]`가 내려온다
+
 `media[]` 필드:
 
 - `mediaId`
@@ -357,6 +365,25 @@ FanPost 댓글 현재 정책:
 - 즉 백엔드 코드상 업로드 구조는 있지만, 환경 설정이 안 되면 실제 업로드는 `MEDIA_STORAGE_NOT_CONFIGURED`로 실패할 수 있다
 - 프론트는 업로드 UI를 먼저 만들 수 있지만, 로컬 실테스트 가능 여부는 스토리지 설정 여부에 달려 있다
 
+추가로 알아둘 상태:
+
+- 보안 설정에는 `/api/media/v1/media/import-youtube` 경로가 잡혀 있다
+- 하지만 현재 코드 기준으로는 실제 YouTube 미디어 탭용 controller/service 구현은 확인되지 않았다
+- 즉 "유튜브 영상 썸네일 + 제목 + 외부 링크" 기능은 앞으로 추가될 가능성이 높은 후속 작업이다
+
+## 3-8. Streaming / Live
+
+현재 코드 기준으로 확인된 상태:
+
+- 실시간 스트리밍 메타데이터 생성/시작/종료 구조가 있다
+- 스트리밍 채팅 조회/삭제/뮤트 등 대용량 댓글성 처리 구조가 있다
+- 실제 방송 송출은 외부 플랫폼(현재 대화 기준으로는 YouTube) 의존 전제가 강하다
+
+중요한 주의:
+
+- "종료된 스트리밍 영상을 저장해서 다시 조회하는 VOD 형태"는 현재 코드에서 확인되지 않았다
+- 즉 라이브/채팅 인프라는 어느 정도 있지만, 종료 영상 아카이브 조회는 후속 구현 영역으로 보는 것이 안전하다
+
 ## 4. 부분 구현 상태
 
 ## 4-1. ArtistPost
@@ -382,6 +409,8 @@ FanPost 댓글 현재 정책:
 - 구독 배지 필드는 없다
 - 작성/수정은 `multipart/form-data`
 - 권한은 아티스트 계정이면서 해당 artist 소속 artist member인 경우만 허용된다
+- ArtistPost 리스트의 `media[]`도 FanPost와 동일하게 앞 `6개` preview만 내려오고, 전체 개수는 `mediaCount`로 본다
+- ArtistPost 상세에서는 전체 `media[]`가 내려온다
 
 프론트가 지금 해두면 좋은 것:
 
@@ -474,147 +503,88 @@ Dashboard B:
 
 ## 5. 앞으로 내가 구현할 것
 
-아래는 내가 다음으로 진행할 예정인 일이고, 프론트가 무엇을 준비해야 하는지도 같이 적는다.
+아래는 현재 고정된 우선순위다.
 
-## 5-1. ArtistPost
+- `5-1 ~ 5-3`은 필수 구현 예정으로 보는 것이 맞다
+- `5-4 ~ 5-6`은 후순위라 이번 작업 범위에서 미구현으로 끝날 수 있다
 
-현재 백엔드 구현 상태:
-
-- create/update/delete 완료
-- list/detail 완료
-- FanPost와 같은 cursor slice 완료
-- 댓글 공통 구조 재사용 완료
-- 같은 미디어 attachment flow 재사용 완료
-- 좋아요 toggle 완료
-- 작성 권한 검증 완료
-- artist 소속 멤버 검증 완료
-
-프론트 준비 포인트:
-
-- FanPost와 동일한 큰 레이아웃으로 재사용 가능
-- 단, 작성자 영역은 `닉네임 + artistBadge` 기준으로 설계해야 한다
-- stage name을 주작성자 표기로 쓰면 안 된다
-- 댓글 depth 2 정책은 그대로 재사용 가능
-- 작성/수정 폼도 FanPost와 거의 같은 UX로 가되 multipart 요청이어야 한다
-
-권장 mock 필드:
-
-- `artistPostId`
-- `artistId`
-- `writerId`
-- `writerNickname`
-- `writerProfileImageUrl`
-- `artistBadge`
-- `content`
-- `likeCount`
-- `commentCount`
-- `media[]`
-- `hashtags[]`
-- `createdAt`
-
-## 5-2. ArtistPost 좋아요
-
-현재 백엔드 구현 상태:
-
-- toggle 방식 완료
-- API 실연동 가능
-- 다만 대용량 트래픽 대응용 캐싱/락은 아직 미적용
-
-프론트 준비 포인트:
-
-- API를 add/remove 분리형으로 가정하지 말고 toggle 버튼 1개 기준으로 설계
-- optimistic update를 너무 강하게 고정하지 말고 서버 count 재동기화가 가능한 구조가 좋다
-- 좋아요 애니메이션은 가능하지만 count는 최종적으로 서버 응답 기준으로 덮어쓰는 편이 안전하다
-
-## 5-3. FanLetter
-
-실제 구현 완료 범위:
-
-- create/update/delete/list/detail
-- 일반 좋아요 토글
-- 아티스트 special-like 응답
-- fan membership 기반 작성 권한 검증
-
-프론트 준비 포인트:
-
-- 텍스트형 커뮤니티 포스트처럼 만들면 안 된다
-- 이미지 중심 카드형 레이아웃
-- 댓글 영역 제거
-- 작성 버튼은 구독 여부에 따라 노출/disabled 처리하면 된다
-- special-like 뱃지나 스탬프 자리 확보
-- 좋아요는 가능하지만 댓글 카운트 UI는 필요 없다
-- 목록과 상세 응답 shape를 분리해서 보는 편이 안전하다
-
-목록 응답 핵심 필드:
-
-- `fanLetterId`
-- `recipientType`
-- `recipientArtistMemberId`
-- `recipientDisplayName`
-- `recipientProfileImageUrl`
-- `image`
-- `artistLiked`
-- `artistLikeDisplayName`
-- `artistLikeProfileImageUrl`
-- `createdAt`
-
-상세 응답 추가 필드:
-
-- `writerId`
-- `writerNickname`
-- `writerProfileImageUrl`
-- `fanMembershipSubscribed`
-- `dmSubscribed`
-- `likeCount`
-
-권장 mock 필드:
-
-- `fanLetterId`
-- `artistId`
-- `writerId`
-- `writerNickname`
-- `writerProfileImageUrl`
-- `imageUrl`
-- `likeCount`
-- `artistLiked`
-- `artistProfileImageUrl`
-- `createdAt`
-
-## 5-4. HOT 게시글 필터
+## 5-1. 필수 1순위: 아티스트페이지 코드 검토
 
 백엔드 예정 작업:
 
-- 대상은 `FanPost + FanLetter`
-- 최근 24시간 제한
-- 정렬 기준은 `likeCount + commentCount`
+- 방금 붙은 ArtistPost/artist-page 관련 코드 재검토
+- 응답 shape, 권한, 댓글/좋아요/미디어 연결, 프론트에서 쓰는 화면 흐름 재확인
 
 프론트 준비 포인트:
 
-- HOT 필터는 별도 정렬 탭 또는 토글로 분리하는 편이 안전하다
-- 24시간 제한 문구가 UI에 보여야 한다
-- FanLetter는 댓글이 없으므로 HOT 점수 해석이 FanPost와 완전히 같지 않다
-- 따라서 혼합 피드라면 카드 타입을 공통 래퍼 + 내부 variant 구조로 잡는 것이 좋다
+- ArtistPost/artist-page 화면을 먼저 안정적으로 붙이는 게 우선이다
+- 이 단계에서는 큰 신규 API보다 세부 응답 shape 정리와 edge case 보정 가능성을 열어두는 편이 좋다
 
-권장 화면 방향:
-
-- `최신` / `HOT 24h` 분리
-- FanPost 카드와 FanLetter 카드를 같은 피드에 섞을 수 있게 컴포넌트 분기
-
-## 5-5. 댓글/좋아요 카운터 동시성
+## 5-2. 필수 2순위: 포스트페이지 동시성 / 캐싱
 
 백엔드 예정 작업:
 
-- FanPost
-- ArtistPost
-- FanLetter
-- 특히 `likeCount`, `commentCount`
-- 이후 동시성 테스트도 추가
+- FanPost + FanLetter 동시성/캐싱
+- ArtistPost 대용량 동시성/캐싱
+- 캐싱/락/무효화 전략 정리
+- 관련 검증 테스트 추가
 
 프론트 준비 포인트:
 
-- 카운터를 절대 프론트 단독 source of truth로 두지 말 것
-- 여러 탭/여러 사용자 동시 반영을 고려해 재조회 또는 응답 덮어쓰기 구조가 필요
-- optimistic UI는 가능하지만 롤백 처리 경로가 있어야 한다
+- count를 프론트 단독 truth로 두지 않는 구조가 좋다
+- optimistic UI는 가능하지만 서버 응답 덮어쓰기와 실패 롤백 경로가 필요하다
+- HOT/최신 탭 전환이 생겨도 데이터 소스가 분리될 수 있게 컴포넌트를 짜두는 편이 좋다
+
+## 5-3. 필수 3순위: 메인 홈 대시보드 / 아티스트 홈 대시보드
+
+백엔드 예정 작업:
+
+- 메인 홈 화면의 대시보드성 조회
+- 아티스트 페이지 홈 화면의 최신글 대시보드성 조회
+
+프론트 준비 포인트:
+
+- 아티스트/아티스트멤버 대시보드와 아티스트 홈 최신글 영역을 별도 섹션으로 열어두는 편이 좋다
+- 이 구간은 mock에서 실연동으로 넘어갈 가능성이 있다
+
+## 5-4. 후순위 기능: YouTube 미디어 탭
+
+백엔드 예정 방향:
+
+- 해당 아티스트의 YouTube 영상 목록을 가져오고
+- 썸네일 + 제목을 내려주고
+- 클릭 시 YouTube로 이동시키는 조회성 기능
+
+현재 주의:
+
+- 아직 실제 구현은 확인되지 않았다
+- 프론트는 미디어 탭을 만든다면 "영상 카드 + 외부 링크" 형태를 먼저 생각하는 편이 안전하다
+
+## 5-5. 후순위 기능: 종료된 스트리밍 영상 조회
+
+백엔드 예정 방향:
+
+- 스트리밍 종료 후 영상을 저장하고
+- 스트리밍 영역에서 다시 조회 가능한 구조
+
+현재 주의:
+
+- 실시간 라이브/채팅 구조는 이미 어느 정도 있다
+- 하지만 종료 영상 저장/조회(VOD)는 아직 확인되지 않았다
+- 프론트는 라이브와 VOD를 같은 카드로 묶을지 분리할지 열어두는 편이 좋다
+
+## 5-6. 후순위 기능: Follow / 알림
+
+백엔드 예정 가능 작업:
+
+- member-to-member Follow API
+- notification feature
+
+현재 해석:
+
+- 둘 다 아직 확정 구현은 아니다
+- 특히 알림은 "할 수도 있고 안 할 수도 있는" 후순위 기능이다
+- 이 구간은 실제 구현 없이 문서/아이디어 단계로 끝날 가능성도 충분하다
 
 ## 6. 프론트가 바로 써먹는 API 계약
 
@@ -771,13 +741,16 @@ mock 우선:
 ## 9. 프론트가 특히 조심해야 할 것
 
 - FanPost 작성/수정은 JSON API처럼 만들면 안 되고 `multipart/form-data`여야 한다
+- ArtistPost 작성/수정도 `multipart/form-data`여야 한다
 - FanPost 수정에서 `files`를 보내면 부분 추가가 아니라 전체 교체다
+- ArtistPost 수정에서 `files`를 보내면 부분 추가가 아니라 전체 교체다
 - FanLetter 작성/수정도 `multipart/form-data`다
 - FanLetter도 이미지 교체는 부분 추가가 아니라 전체 교체다
 - 댓글은 depth 3 구조를 만들 필요 없다
 - replies는 상세 응답에 전부 들어오는 구조가 아니다
 - FanPost/댓글/FanLetter 상세의 subscription badge 필드는 지금 실제 값 기준으로 처리해도 된다
 - ArtistPost는 FanPost와 비슷하지만 작성자 표기는 `writerNickname + artistBadge` 기준이다
+- FanPost / ArtistPost / FanLetter multipart 검증 실패는 이제 공통 400 에러 포맷으로 내려온다
 - FanLetter는 텍스트 피드처럼 만들면 정책과 어긋난다
 - FanLetter 목록은 작성자 프로필/배지가 기본 노출 대상이 아니다
 - HOT은 단순 인기순이 아니라 최근 24시간 제한이 붙는다
@@ -795,8 +768,16 @@ mock 우선:
 
 앞으로 내가 구현할 핵심은 아래다.
 
-- ArtistPost 좋아요 대용량 트래픽 대응
-- FanPost + FanLetter HOT 24시간 필터
-- 포스트 좋아요/댓글 카운터 동시성 보강
+필수 구현 예정:
 
-즉 프론트는 지금 당장은 `FanPost + ArtistPost + FanLetter 실연동`, 그다음은 `HOT/dashboard/follow 목업` 순서로 가는 것이 가장 안전하다.
+- 아티스트페이지 코드 검토
+- 포스트페이지 동시성/캐싱
+- 메인 홈 대시보드 / 아티스트 홈 대시보드
+
+후순위 기능:
+
+- YouTube 미디어 탭
+- 종료된 스트리밍 영상 조회
+- Follow / 알림
+
+즉 프론트는 지금 당장은 `FanPost + ArtistPost + FanLetter 실연동`을 안정적으로 붙이고, 그다음은 `artist-page 검토 대응`, `동시성/캐싱 대비 구조`, `dashboard 실연동 대비`, `YouTube/스트리밍 후속 기능 대비 UI` 순서로 가는 것이 가장 안전하다.

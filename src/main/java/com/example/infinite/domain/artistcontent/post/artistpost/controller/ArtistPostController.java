@@ -52,6 +52,7 @@ public class ArtistPostController {
             @PathVariable Long artistId,
             @RequestParam(required = false) Long cursor
     ) {
+        // 목록은 무한 스크롤 기준 cursor slice 응답으로 고정한다.
         return ResponseEntity.ok(ApiResponse.success(artistPostService.getArtistPosts(artistId, cursor)));
     }
 
@@ -61,6 +62,7 @@ public class ArtistPostController {
             @PathVariable Long artistPostId,
             @RequestParam(name = "commentCursor", required = false) Long commentCursor
     ) {
+        // 상세는 게시글 본문 + 루트 댓글 slice를 함께 내려준다.
         return ResponseEntity.ok(ApiResponse.success(
                 artistPostService.getArtistPost(artistId, artistPostId, commentCursor)
         ));
@@ -76,6 +78,7 @@ public class ArtistPostController {
             @PathVariable Long artistPostId,
             @Valid @ModelAttribute ArtistPostUpdateRequest request
     ) {
+        // 수정도 multipart로 받아 본문과 첨부 교체를 한 요청에서 끝낸다.
         return ResponseEntity.ok(ApiResponse.success(
                 artistPostService.update(memberDetails, artistId, artistPostId, request)
         ));
@@ -87,6 +90,7 @@ public class ArtistPostController {
             @PathVariable Long artistId,
             @PathVariable Long artistPostId
     ) {
+        // 삭제는 soft delete + media 정리를 서비스 계층에서 수행한다.
         artistPostService.delete(memberDetails, artistId, artistPostId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }

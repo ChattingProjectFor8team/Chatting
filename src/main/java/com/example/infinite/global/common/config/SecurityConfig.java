@@ -53,7 +53,6 @@ public class SecurityConfig {
                                 "/api/post/v1/artists/*/fan-posts/**",
                                 "/api/post/v1/artists/*/fan-posts/*/comments/*/replies",
                                 "/api/post/v1/hashtags/**",
-                                "/api/post/v1/artist-posts/**",
                                 "/api/post/v1/artists/*/artist-posts/**",
                                 "/api/post/v1/artists/*/artist-posts/*/comments/*/replies",
                                 "/api/media/v1/**",
@@ -81,7 +80,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/artists/*/raffles/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/artists/*/lives/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/artists/*/dm/**").hasAnyRole("ARTIST", "SUPER_ADMIN")
-                        .requestMatchers("/api/post/v1/artist-posts").hasAnyRole("ARTIST", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/post/v1/artists/*/artist-posts").hasRole("ARTIST")
                         .requestMatchers(HttpMethod.PATCH, "/api/post/v1/artists/*/artist-posts/*").hasRole("ARTIST")
                         .requestMatchers(HttpMethod.DELETE, "/api/post/v1/artists/*/artist-posts/*").hasRole("ARTIST")

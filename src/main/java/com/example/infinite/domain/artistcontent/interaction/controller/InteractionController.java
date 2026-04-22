@@ -37,6 +37,7 @@ public class InteractionController {
             @PathVariable Long artistId,
             @PathVariable Long artistPostId
     ) {
+        // ArtistPost도 FanPost와 같은 toggle 계약을 사용해 프론트가 동일한 좋아요 버튼 로직을 재사용하게 한다.
         return ResponseEntity.ok(ApiResponse.success(
                 interactionService.toggleArtistPostLike(memberDetails, artistId, artistPostId)
         ));

@@ -11,6 +11,8 @@ import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor
+// ArtistPost 생성은 FanPost와 같은 multipart 계약을 사용한다.
+// 본문과 첨부를 분리 API로 나누지 않고 한 번에 받아 공식 게시글 작성 UX를 단순하게 유지한다.
 public class ArtistPostCreateRequest {
 
     // FanPost와 같은 multipart 패턴을 재사용해 본문과 첨부를 함께 바인딩한다.

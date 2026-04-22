@@ -45,6 +45,7 @@ public class FanPostService {
 
     // 팬 게시글 목록은 10개 고정 cursor slice 정책을 사용한다.
     private static final int FAN_POST_SLICE_SIZE = 10;
+    private static final int FAN_POST_LIST_MEDIA_PREVIEW_LIMIT = 6;
 
     private final FanPostRepository fanPostRepository;
     private final MediaRepository mediaRepository;
@@ -204,7 +205,7 @@ public class FanPostService {
 
         // 응답 조립은 "본문 row / media / hashtag / writer badge"를 각각 배치 조회한 뒤 메모리에서 합친다.
         // 이렇게 해야 게시글별 media/hashtag/badge 개별 조회로 인한 N+1을 피할 수 있다.
-        Map<Long, List<FanPostMediaResponse>> mediaMap = loadMediaMap(postIds);
+        Map<Long, List<FanPostMediaResponse>> mediaMap = loadPreviewMediaMap(postIds);
         Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, postIds);
         Map<Long, WriterSubscriptionBadge> badgeByWriterId = subscriptionMembershipService.getWriterBadges(
                 visibleRows.get(0).artistId(),
@@ -239,6 +240,25 @@ public class FanPostService {
 
         // 미디어는 targetId 묶음 조회 후 게시글별로 그룹핑해 목록 조회의 N+1을 방지한다.
         return mediaRepository.findByTargetTypeAndTargetIdInOrderByTargetIdAscSortOrderAsc(PostType.FAN_POST, fanPostIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        Media::getTargetId,
+                        Collectors.mapping(FanPostMediaResponse::from, Collectors.toList())
+                ));
+    }
+
+    private Map<Long, List<FanPostMediaResponse>> loadPreviewMediaMap(Collection<Long> fanPostIds) {
+        if (fanPostIds.isEmpty()) {
+            return Map.of();
+        }
+
+        // 목록 카드는 post당 앞쪽 6장만 내려주고,
+        // 전체 mediaCount는 별도 필드로 유지해 프론트가 "+N"을 계산할 수 있게 한다.
+        return mediaRepository.findPreviewByTargetTypeAndTargetIdInOrderByTargetIdAscSortOrderAsc(
+                        PostType.FAN_POST,
+                        fanPostIds,
+                        FAN_POST_LIST_MEDIA_PREVIEW_LIMIT
+                )
                 .stream()
                 .collect(Collectors.groupingBy(
                         Media::getTargetId,

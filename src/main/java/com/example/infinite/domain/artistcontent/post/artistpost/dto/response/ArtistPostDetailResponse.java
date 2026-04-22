@@ -6,6 +6,7 @@ import com.example.infinite.global.common.dto.CursorSliceResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// 상세 응답은 목록 구조를 유지한 채 댓글 슬라이스만 추가한 형태다.
 public record ArtistPostDetailResponse(
         Long artistPostId,
         Long artistId,
