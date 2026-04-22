@@ -122,7 +122,8 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'   # main push에서만 배포 (PR에서는 CI만 실행)
+    if: contains(fromJson('["refs/heads/main", "refs/heads/develop"]'), github.ref)
+#    if: github.ref == 'refs/heads/main'   # main push에서만 배포 (PR에서는 CI만 실행)
     runs-on: ubuntu-latest
 
     steps:
@@ -141,7 +142,6 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
-          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
           ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 
