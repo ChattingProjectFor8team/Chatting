@@ -17,27 +17,30 @@ public class ChargeHistoryService {
     private final AutoChargeHistoryRepository autoChargeHistoryRepository;
 
     // 성공 이력 저장 - 기존 트랜잭션에 참여 (충전과 같은 트랜잭션으로 묶임)
+    // portOnePaymentId: 환불 시 PortOne 취소 API 호출에 필요한 결제 식별자
     @Transactional
-    public void saveSuccess(Long userId, AutoChargeSetting setting) {
-        save(userId, setting, true, null);
+    public void saveSuccess(Long userId, AutoChargeSetting setting, String portOnePaymentId) {
+        save(userId, setting, true, null, portOnePaymentId);
     }
 
-    // [추가] 실패 이력 저장 - REQUIRES_NEW로 독립 트랜잭션 사용
+    // 실패 이력 저장 - REQUIRES_NEW로 독립 트랜잭션 사용
     // 바깥 트랜잭션(jellyService.charge)이 롤백돼도 이 커밋은 유지됨
     // → 운영 중 실패 추적 및 결제 감사 로그 보장
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveFailure(Long userId, AutoChargeSetting setting, String reason) {
-        save(userId, setting, false, reason);
+        save(userId, setting, false, reason, null);
     }
 
     // 이력 저장 공통 메서드
-    private void save(Long userId, AutoChargeSetting setting, boolean success, String failReason) {
+    private void save(Long userId, AutoChargeSetting setting, boolean success,
+                      String failReason, String portOnePaymentId) {
         autoChargeHistoryRepository.save(AutoChargeHistory.builder()
                 .userId(userId)
                 .billingKey(setting.getBillingKey())
                 .jellyAmount(setting.getJellyAmount())
                 .success(success)
                 .failReason(failReason)
+                .portOnePaymentId(portOnePaymentId)
                 .build());
     }
 }
