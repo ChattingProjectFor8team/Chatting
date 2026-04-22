@@ -64,7 +64,7 @@ jobs:
 
       # Step 5-2: 테스트 실행
       - name: Run tests
-        run: ./gradlew test -Dspring.profiles.active=test --info
+        run: ./gradlew test -Dspring.profiles.active=test
         env:
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
