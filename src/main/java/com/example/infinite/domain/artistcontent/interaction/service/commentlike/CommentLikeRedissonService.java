@@ -3,7 +3,7 @@ package com.example.infinite.domain.artistcontent.interaction.service.commentlik
 import com.example.infinite.domain.artistcontent.interaction.dto.response.InteractionResponse;
 import com.example.infinite.domain.artistcontent.interaction.error.InteractionErrorCode;
 import com.example.infinite.domain.artistcontent.interaction.error.InteractionException;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.global.lock.LockException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

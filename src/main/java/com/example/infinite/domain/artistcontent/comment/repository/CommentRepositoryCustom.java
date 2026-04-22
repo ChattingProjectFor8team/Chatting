@@ -1,7 +1,7 @@
 package com.example.infinite.domain.artistcontent.comment.repository;
 
 import com.example.infinite.domain.artistcontent.comment.entity.Comment;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 
 import java.util.Collection;
 import java.util.List;

@@ -4,7 +4,7 @@ import com.example.infinite.domain.artistcontent.comment.entity.Comment;
 import com.example.infinite.domain.artistcontent.comment.error.CommentErrorCode;
 import com.example.infinite.domain.artistcontent.comment.error.CommentException;
 import com.example.infinite.domain.artistcontent.comment.repository.CommentRepository;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -7,7 +7,7 @@ import com.example.infinite.domain.artistcontent.comment.error.CommentErrorCode;
 import com.example.infinite.domain.artistcontent.comment.error.CommentException;
 import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
 import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.member.member.entity.Member;
 import com.example.infinite.domain.member.member.support.MemberInputSupport;
 import com.example.infinite.domain.member.member.support.MemberReader;

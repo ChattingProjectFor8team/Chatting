@@ -1,4 +1,4 @@
-package com.example.infinite.domain.artistcontent.post.eunms;
+package com.example.infinite.domain.artistcontent.post.enums;
 
 public enum PostType {
     FAN_POST,

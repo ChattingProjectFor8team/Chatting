@@ -8,7 +8,7 @@ import com.example.infinite.domain.artistcontent.hashtag.error.HashtagException;
 import com.example.infinite.domain.artistcontent.hashtag.repository.ContentHashtagRepository;
 import com.example.infinite.domain.artistcontent.hashtag.repository.HashtagRepository;
 import com.example.infinite.domain.artistcontent.hashtag.support.HashtagParser;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;

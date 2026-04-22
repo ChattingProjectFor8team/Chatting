@@ -9,7 +9,7 @@ import com.example.infinite.domain.artistcontent.media.storage.UploadedObject;
 import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPost;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.post.fanletter.entity.FanLetter;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;
 import lombok.RequiredArgsConstructor;
