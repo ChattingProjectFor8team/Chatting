@@ -138,6 +138,9 @@ public class SecurityConfig {
                         // 업로드는 반드시 로그인한 사용자만 가능
                         .requestMatchers(HttpMethod.POST, "/files/upload").authenticated()
 
+                        //프로젝트니깐 모니터링은 누구나
+                        .requestMatchers("/actuator/**").permitAll()
+
 
 
                 )
