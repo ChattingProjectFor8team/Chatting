@@ -25,3 +25,4 @@ spring:
 # JWT 시크릿 키를 Base64 형식의 안전한 값으로 설정 (중요!) 가짜값입니다.
 jwt:
   secret: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
+  expiration: 3600000

@@ -92,6 +92,8 @@ jobs:
           JWT_SECRET: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
           JWT_SECRET_KEY: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
 
+          JWT_EXPIRATION: 3600000
+
 
 #          # 테스트 코드가 localhost:6379로 붙을 수 있게 설정
 #          SPRING_DATA_REDIS_HOST: localhost
