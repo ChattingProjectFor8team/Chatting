@@ -73,6 +73,10 @@ public class MemberHomeDashboardService {
                 .toList();
         Map<Long, Artist> artistById = artistRepository.findAllById(artistIds).stream()
                 .collect(Collectors.toMap(Artist::getId, Function.identity()));
+        Map<Long, List<ArtistPostResponse>> postsByArtistId = artistPostService.getLatestArtistPostsByArtistIds(
+                artistIds,
+                SUBSCRIBED_ARTIST_POST_LIMIT
+        );
 
         return artistIds.stream()
                 .map(artistId -> {
@@ -80,10 +84,7 @@ public class MemberHomeDashboardService {
                     if (artist == null) {
                         return null;
                     }
-                    List<ArtistPostResponse> posts = artistPostService.getLatestArtistPosts(
-                            artistId,
-                            SUBSCRIBED_ARTIST_POST_LIMIT
-                    );
+                    List<ArtistPostResponse> posts = postsByArtistId.getOrDefault(artistId, List.of());
                     if (posts.isEmpty()) {
                         return null;
                     }

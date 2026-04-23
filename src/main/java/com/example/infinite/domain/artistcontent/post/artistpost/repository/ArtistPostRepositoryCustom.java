@@ -18,4 +18,7 @@ public interface ArtistPostRepositoryCustom {
 
     // 홈 대시보드의 "팔로우한 멤버 최신 글" 섹션은 writer 기준 전역 최신 몇 건만 필요하다.
     List<ArtistPostReadRow> findLatestRowsByWriterIds(Collection<Long> writerIds, int limit);
+
+    // 홈 대시보드의 "구독한 아티스트별 최신 n건" 섹션은 artist별 상위 몇 건을 한 번에 읽는다.
+    List<ArtistPostReadRow> findLatestRowsByArtistIds(Collection<Long> artistIds, int perArtistLimit);
 }

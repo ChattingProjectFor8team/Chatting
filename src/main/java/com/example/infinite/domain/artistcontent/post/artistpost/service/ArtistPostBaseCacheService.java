@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -129,6 +130,29 @@ public class ArtistPostBaseCacheService {
 
     public List<ArtistPostBaseResponse> loadLatestArtistPostBasesByWriterIds(Collection<Long> writerIds, int limit) {
         return buildBaseResponses(artistPostRepository.findLatestRowsByWriterIds(writerIds, limit));
+    }
+
+    public Map<Long, List<ArtistPostBaseResponse>> loadLatestArtistPostBaseMapByArtistIds(
+            Collection<Long> artistIds,
+            int perArtistLimit
+    ) {
+        if (artistIds == null || artistIds.isEmpty() || perArtistLimit < 1) {
+            return Map.of();
+        }
+
+        List<ArtistPostBaseResponse> baseResponses = buildBaseResponses(
+                artistPostRepository.findLatestRowsByArtistIds(artistIds, perArtistLimit)
+        );
+        if (baseResponses.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<ArtistPostBaseResponse>> baseResponseMap = new LinkedHashMap<>();
+        for (ArtistPostBaseResponse baseResponse : baseResponses) {
+            baseResponseMap.computeIfAbsent(baseResponse.artistId(), ignored -> new java.util.ArrayList<>())
+                    .add(baseResponse);
+        }
+        return baseResponseMap;
     }
 
     private List<ArtistPostBaseResponse> buildBaseResponses(List<ArtistPostReadRow> rows) {

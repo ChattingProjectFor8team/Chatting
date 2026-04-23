@@ -36,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 
 @Service
 @RequiredArgsConstructor
@@ -124,6 +126,47 @@ public class ArtistPostService {
         }
         // 팔로우 섹션은 여러 writer의 글을 하나의 최신순 피드로 합쳐 보여 준다.
         return mapToArtistPostResponses(artistPostBaseCacheService.loadLatestArtistPostBasesByWriterIds(writerIds, limit));
+    }
+
+    public Map<Long, List<ArtistPostResponse>> getLatestArtistPostsByArtistIds(
+            Collection<Long> artistIds,
+            int perArtistLimit
+    ) {
+        if (artistIds == null || artistIds.isEmpty() || perArtistLimit < 1) {
+            return Map.of();
+        }
+
+        List<Long> distinctArtistIds = new java.util.ArrayList<>(new LinkedHashSet<>(artistIds));
+        Map<Long, List<ArtistPostBaseResponse>> baseResponseMap =
+                artistPostBaseCacheService.loadLatestArtistPostBaseMapByArtistIds(distinctArtistIds, perArtistLimit);
+        if (baseResponseMap.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, PostHotData> hotDataByPostId = postHotDataCacheService.getPostHotDataMap(
+                PostType.ARTIST_POST,
+                baseResponseMap.values().stream()
+                        .flatMap(List::stream)
+                        .map(ArtistPostBaseResponse::artistPostId)
+                        .toList()
+        );
+
+        Map<Long, List<ArtistPostResponse>> result = new LinkedHashMap<>();
+        for (Long artistId : distinctArtistIds) {
+            List<ArtistPostBaseResponse> baseResponses = baseResponseMap.get(artistId);
+            if (baseResponses == null || baseResponses.isEmpty()) {
+                continue;
+            }
+
+            List<ArtistPostResponse> responses = baseResponses.stream()
+                    .map(baseResponse -> ArtistPostResponse.from(
+                            baseResponse,
+                            hotDataByPostId.getOrDefault(baseResponse.artistPostId(), PostHotData.empty())
+                    ))
+                    .toList();
+            result.put(artistId, responses);
+        }
+        return result;
     }
 
     public ArtistPostDetailResponse getArtistPost(Long artistId, Long artistPostId, Long commentCursor) {

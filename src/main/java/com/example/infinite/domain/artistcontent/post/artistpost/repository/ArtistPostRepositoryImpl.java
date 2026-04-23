@@ -7,6 +7,7 @@ import com.example.infinite.global.common.util.querydsl.CursorSliceUtils;
 import com.example.infinite.global.common.util.querydsl.QuerydslUtils;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 
@@ -133,6 +134,49 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
                 .where(member.id.in(writerIds))
                 .orderBy(CursorSliceUtils.orderByIdDesc(artistPost.id))
                 .limit(limit)
+                .fetch();
+    }
+
+    @Override
+    public List<ArtistPostReadRow> findLatestRowsByArtistIds(Collection<Long> artistIds, int perArtistLimit) {
+        QArtistPost artistPost = QArtistPost.artistPost;
+        QArtistPost newerArtistPost = new QArtistPost("newerArtistPost");
+        QMember member = QMember.member;
+
+        if (artistIds == null || artistIds.isEmpty() || perArtistLimit < 1) {
+            return List.of();
+        }
+
+        return queryFactory
+                .select(Projections.constructor(
+                        ArtistPostReadRow.class,
+                        artistPost.id,
+                        artistPost.artist.id,
+                        member.id,
+                        member.nickname,
+                        member.profileImageUrl,
+                        Expressions.constant(Boolean.TRUE),
+                        artistPost.content,
+                        artistPost.mediaCount,
+                        artistPost.createdAt
+                ))
+                .from(artistPost)
+                .join(artistPost.writer, member)
+                .where(
+                        artistPost.artist.id.in(artistIds),
+                        JPAExpressions
+                                .select(newerArtistPost.count())
+                                .from(newerArtistPost)
+                                .where(
+                                        newerArtistPost.artist.id.eq(artistPost.artist.id),
+                                        newerArtistPost.id.gt(artistPost.id)
+                                )
+                                .lt((long) perArtistLimit)
+                )
+                .orderBy(
+                        artistPost.artist.id.asc(),
+                        CursorSliceUtils.orderByIdDesc(artistPost.id)
+                )
                 .fetch();
     }
 }

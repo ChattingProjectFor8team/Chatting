@@ -419,7 +419,8 @@ YouTube 카드 응답 필드:
 정책:
 
 - 등록은 아티스트 계정이면서 해당 artist 소속 `ArtistMember`만 가능
-- 요청 body는 `youtubeUrl`, `writerArtistMemberId`
+- 요청 body는 `youtubeUrl` 하나만 받는다
+- 작성자 정보는 로그인 사용자와 `artistId` 소속 `ArtistMember`를 서버가 확인해 추론한다
 - 서버가 YouTube Data API로 메타데이터를 읽어 저장한다
 - 목록은 `CursorSliceResponse` 기반 `id DESC`
 

@@ -12,8 +12,6 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
@@ -31,14 +29,13 @@ import java.time.LocalDateTime;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLDelete(sql = "UPDATE artist_youtube_videos SET deleted_at = current_timestamp WHERE id = ?")
-@SQLRestriction("deleted_at IS NULL")
 /*
  * 게시글 첨부 Media 와 별개로, 아티스트 탭에 노출할 유튜브 영상 메타데이터만 저장한다.
  *
  * 설계 포인트:
  * - 실제 영상 파일은 유튜브에 있고 DB 에는 카드 렌더링에 필요한 값만 남긴다.
  * - 작성자 표시가 나중에 바뀌지 않도록 활동명/프로필 URL 을 스냅샷으로 저장한다.
+ * - 중복 영상 재등록 정책을 단순하게 유지하기 위해 YouTube 카드 엔티티는 hard delete 전제로 둔다.
  * - 목록은 id DESC 커서 슬라이스로 읽기 때문에 artist_id + id 인덱스를 둔다.
  */
 public class ArtistYoutubeVideo extends BaseEntity {
