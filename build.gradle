@@ -96,7 +96,6 @@ dependencies {
     // 1. Spring Cloud AWS의 버전을 3.2.1 이상으로 명시합니다.
     // 만약 4.0 부트 환경이라면 3.3.0-SNAPSHOT이나 정식 릴리스된 최신 버전을 확인해야 합니다.
 //    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.2.1'
-    implementation 'io.awspring.cloud:spring-cloud-aws-starter'
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
 }
 
