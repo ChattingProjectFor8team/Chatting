@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/api/auth/v1/**",
                                 "/h2-console/**",
                                 "/swagger-ui/**",
-                                "/v3/api-docs/**"
+                                "/v3/api-docs/**",
+                                "/", "/index.html", "/components/**"
                         ).permitAll()
 
                         // 공개 GET: 팬포스트, 해시태그, 아티스트 포스트, 미디어, 아티스트 상세
