@@ -1,6 +1,6 @@
 // Connectfin — Desktop shell: global nav + content column + right sidebar
 
-function DesktopShell({ t, theme, children, activeArtist, onNavGlobal, globalView, onArtistOpen, onNavProfile, profileTab }) {
+function DesktopShell({ t, theme, children, activeArtist, onNavGlobal, globalView, onArtistOpen, onNavProfile, profileTab, authUser, onShowLogin, onLogout }) {
   return (
     <div style={{
       minHeight: '100vh', width: '100%', background: t.bg, color: t.text,
@@ -8,7 +8,7 @@ function DesktopShell({ t, theme, children, activeArtist, onNavGlobal, globalVie
     }}>
       <DesktopLeftNav t={t} theme={theme} globalView={globalView} onNavGlobal={onNavGlobal} onArtistOpen={onArtistOpen}/>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <DesktopTopbar t={t} theme={theme} activeArtist={activeArtist} globalView={globalView} profileTab={profileTab} onNavProfile={onNavProfile}/>
+        <DesktopTopbar t={t} theme={theme} activeArtist={activeArtist} globalView={globalView} profileTab={profileTab} onNavProfile={onNavProfile} authUser={authUser} onShowLogin={onShowLogin} onLogout={onLogout}/>
         <div style={{ flex: 1, minWidth: 0 }}>
           {children}
         </div>
@@ -39,7 +39,7 @@ function DesktopLeftNav({ t, theme, globalView, onNavGlobal, onArtistOpen }) {
       {ARTISTS.slice(0, 6).map(a => (
         <NavArtist key={a.id} artist={a} t={t} onClick={() => onArtistOpen(a.id)}/>
       ))}
-      <NavItem t={t} icon="⊕" label="커뮤니티 찾기"/>
+      <ArtistSearchSection t={t} theme={theme} onArtistOpen={onArtistOpen}/>
 
       <NavSection t={t} label="서비스 바로가기"/>
       <NavItem t={t} icon="🛍" label="Shop" onClick={() => onNavGlobal('shop')} active={globalView === 'shop'}/>
@@ -103,7 +103,7 @@ function NavArtist({ artist, t, onClick }) {
 }
 
 // ───────── Top bar (profile tabs live here when on artist page) ─────────
-function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavProfile }) {
+function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavProfile, authUser, onShowLogin, onLogout }) {
   const dark = theme === 'dark';
   return (
     <header style={{
@@ -152,11 +152,19 @@ function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavPr
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginLeft: 'auto' }}>
         <span style={{ fontFamily: t.fontMono, fontSize: 11, color: t.textDim }}>142 🍮</span>
         <span style={{ fontSize: 18, cursor: 'pointer' }}>🔔</span>
-        <div style={{
-          width: 30, height: 30, borderRadius: '50%', background: t.gradient,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer',
-        }}>ME</div>
+        {authUser ? (
+          <button onClick={onLogout} style={{
+            padding: '6px 14px', borderRadius: 14, border: `1px solid ${t.line}`,
+            background: 'transparent', color: t.text, fontSize: 12, fontWeight: 600,
+            cursor: 'pointer', fontFamily: t.fontMono,
+          }}>로그아웃</button>
+        ) : (
+          <button onClick={onShowLogin} style={{
+            padding: '6px 14px', borderRadius: 14, border: 'none',
+            background: t.gradient, color: '#fff', fontSize: 12, fontWeight: 700,
+            cursor: 'pointer', fontFamily: t.fontMono,
+          }}>로그인</button>
+        )}
       </div>
     </header>
   );
@@ -267,6 +275,117 @@ function DesktopRightSidebar({ t, theme, artist, onOpenDM, onOpenMembership }) {
         </div>
       )}
     </aside>
+  );
+}
+
+// ───────── Artist search (left nav) ─────────
+function ArtistSearchSection({ t, theme, onArtistOpen }) {
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState(null);
+  const [popular, setPopular] = React.useState([]);
+  const [showSearch, setShowSearch] = React.useState(false);
+  const debounceRef = React.useRef(null);
+
+  // 인기 검색어 로드 (최초 1회)
+  React.useEffect(() => {
+    window.ConnectfinAPI.api('/api/member/v1/artists/search/popular?limit=5')
+      .then(data => setPopular(data || []))
+      .catch(() => {});
+  }, []);
+
+  // 검색 (debounce 300ms)
+  React.useEffect(() => {
+    if (!query.trim()) {
+      setResults(null);
+      return;
+    }
+    if (!window.ConnectfinAPI.getToken()) return;
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      window.ConnectfinAPI.api(`/api/member/v2/artists/search?keyword=${encodeURIComponent(query)}`)
+        .then(data => setResults(data.content || []))
+        .catch(() => setResults([]));
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
+
+  if (!showSearch) {
+    return (
+      <button onClick={() => setShowSearch(true)} style={{
+        display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
+        padding: '9px 10px', borderRadius: 10,
+        background: 'transparent', color: t.text,
+        border: 'none', cursor: 'pointer',
+        fontSize: 14, fontWeight: 500, fontFamily: t.font, marginBottom: 2,
+      }}>
+        <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>⌕</span>
+        <span>커뮤니티 찾기</span>
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        <input
+          type="text" value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="아티스트 검색..." autoFocus
+          style={{
+            flex: 1, padding: '8px 12px', borderRadius: 8,
+            border: `1px solid ${t.line}`,
+            background: theme === 'dark' ? '#12141C' : '#fff',
+            color: t.text, fontSize: 13, fontFamily: t.font,
+          }}
+        />
+        <button onClick={() => { setShowSearch(false); setQuery(''); setResults(null); }} style={{
+          padding: '6px 10px', borderRadius: 8, border: `1px solid ${t.line}`,
+          background: 'transparent', color: t.textDim, fontSize: 12, cursor: 'pointer',
+        }}>✕</button>
+      </div>
+
+      {/* 검색 결과 */}
+      {results !== null && (
+        <div style={{ marginBottom: 8 }}>
+          {results.length === 0 ? (
+            <div style={{ padding: '8px 10px', fontSize: 12, color: t.textDim }}>검색 결과가 없습니다</div>
+          ) : results.map(a => (
+            <button key={a.id} onClick={() => { onArtistOpen(a.id); setShowSearch(false); setQuery(''); setResults(null); }} style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+              padding: '8px 10px', borderRadius: 8,
+              background: 'transparent', border: 'none', cursor: 'pointer', color: t.text,
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', background: t.gradient,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: 10, fontWeight: 800,
+              }}>{a.name?.slice(0, 2)}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{a.name}</div>
+                <div style={{ fontSize: 10, color: t.textDim, fontFamily: t.fontMono }}>@{a.slug}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 인기 검색어 (검색 중이 아닐 때만) */}
+      {results === null && popular.length > 0 && (
+        <div style={{ padding: '4px 10px' }}>
+          <div style={{ fontSize: 10, color: t.textMuted, fontFamily: t.fontMono, letterSpacing: 0.5, marginBottom: 6 }}>인기 검색어</div>
+          {popular.map((item, i) => (
+            <button key={item.keyword} onClick={() => setQuery(item.keyword)} style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+              padding: '5px 0', background: 'transparent', border: 'none',
+              cursor: 'pointer', color: t.text, fontSize: 12,
+            }}>
+              <span style={{ fontFamily: t.fontMono, fontSize: 11, color: t.accent, fontWeight: 700, width: 16 }}>{i + 1}</span>
+              <span>{item.keyword}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
