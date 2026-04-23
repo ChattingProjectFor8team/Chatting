@@ -144,7 +144,34 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # Step 2: Launch Template 새 버전 생성
+      # Step 2-1: .env 파일 생성 및 S3 업로드 (리뷰어 피드백 반영!)
+      - name: Create and Upload .env to S3
+        env:
+          # 시크릿 변수 불러오기
+          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+          RDS_HOST: ${{ vars.RDS_HOST }}
+          RDS_USERNAME: ${{ vars.RDS_USERNAME }}
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+          REDIS_HOST: ${{ vars.REDIS_HOST }}
+          REDIS_PORT: ${{ vars.REDIS_PORT }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        run: |
+          # 1. 깃허브 액션 러너 내부에 .env 파일 임시 생성
+          cat <<EOF > .env
+          SPRING_PROFILES_ACTIVE=prod
+          RDS_HOST=${RDS_HOST}
+          RDS_USERNAME=${RDS_USERNAME}
+          RDS_PASSWORD=${RDS_PASSWORD}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
+          S3_BUCKET_NAME=${S3_BUCKET_NAME}
+          JWT_SECRET_KEY=${JWT_SECRET_KEY}
+          EOF
+          
+          # 2. 생성된 .env 파일을 S3 버킷의 deploy 폴더로 업로드 (노출 방지)
+          aws s3 cp .env s3://${S3_BUCKET_NAME}/deploy/.env
+
+      # Step 2-2: Launch Template 새 버전 생성
       - name: Update Launch Template
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
@@ -152,28 +179,15 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
-          # 👇 GitHub Variables & Secrets 불러오기
-          RDS_HOST: ${{ vars.RDS_HOST }}
-          RDS_USERNAME: ${{ vars.RDS_USERNAME }}
-          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
-          REDIS_HOST: ${{ vars.REDIS_HOST }}
-          REDIS_PORT: ${{ vars.REDIS_PORT }}
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
-          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          # 스크립트 내부 변수를 실제 값으로 치환 (sed 활용)
+          # ⚠️ 이제 sed 치환에 민감한 비밀번호가 전혀 들어가지 않습니다!
           USER_DATA=$(cat <<'USERDATA' | sed \
             "s|__IMAGE_TAG__|${IMAGE_TAG}|g; \
              s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; \
              s|__AWS_REGION__|${AWS_REGION}|g; \
              s|__ECR_REPOSITORY__|${ECR_REPOSITORY}|g; \
-             s|__RDS_HOST__|${RDS_HOST}|g; \
-             s|__RDS_USERNAME__|${RDS_USERNAME}|g; \
-             s|__RDS_PASSWORD__|${RDS_PASSWORD}|g; \
-             s|__REDIS_HOST__|${REDIS_HOST}|g; \
-             s|__REDIS_PORT__|${REDIS_PORT}|g; \
-             s|__S3_BUCKET_NAME__|${S3_BUCKET_NAME}|g; \
-             s|__JWT_SECRET_KEY__|${JWT_SECRET_KEY}|g" | base64 -w 0
+             s|__S3_BUCKET_NAME__|${S3_BUCKET_NAME}|g" | base64 -w 0
           #!/bin/bash
           set -e
           
@@ -182,20 +196,20 @@ jobs:
           systemctl enable docker
           systemctl start docker
           
+          # 🌟 핵심 1: EC2 부팅 시 S3에서 .env 파일을 몰래 다운로드
+          aws s3 cp s3://__S3_BUCKET_NAME__/deploy/.env /tmp/.env
+          chmod 600 /tmp/.env
+          
           aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com
           docker pull __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          # 👇 도커 컨테이너 실행 시 환경 변수 주입!
+          # 🌟 핵심 2: 길고 위험했던 -e 옵션들 대신 --env-file 하나로 안전하게 주입
           docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo \
-            -e SPRING_PROFILES_ACTIVE=prod \
-            -e RDS_HOST="__RDS_HOST__" \
-            -e RDS_USERNAME="__RDS_USERNAME__" \
-            -e RDS_PASSWORD="__RDS_PASSWORD__" \
-            -e REDIS_HOST="__REDIS_HOST__" \
-            -e REDIS_PORT="__REDIS_PORT__" \
-            -e S3_BUCKET_NAME="__S3_BUCKET_NAME__" \
-            -e JWT_SECRET_KEY="__JWT_SECRET_KEY__" \
+            --env-file /tmp/.env \
             __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
+          
+          # 🌟 핵심 3: 컨테이너 실행 후 서버에 남은 .env 파일 삭제 (보안)
+          rm -f /tmp/.env
           USERDATA
           )
 
