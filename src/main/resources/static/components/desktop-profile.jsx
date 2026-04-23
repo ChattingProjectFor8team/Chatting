@@ -1,5 +1,27 @@
 // Connectfin — Desktop artist profile (8 tabs)
 
+// ── API 응답 → 기존 카드 컴포넌트 호환 포맷 변환 ──
+function mapFanPost(fp) {
+  return {
+    id: fp.fanPostId,
+    artistId: fp.artistId,
+    author: fp.writerNickname,
+    body: fp.content,
+    likes: window.ConnectfinAPI.formatCount(fp.likeCount),
+    comments: fp.commentCount,
+    timeAgo: window.ConnectfinAPI.formatTime(fp.createdAt),
+    hasGrid: fp.mediaCount > 0,
+    gridCount: Math.min(fp.mediaCount, 6),
+    // API 전용 필드 (카드에서 선택적 사용)
+    mediaCount: fp.mediaCount,
+    media: fp.media || [],
+    hashtags: fp.hashtags || [],
+    fanMembershipSubscribed: fp.fanMembershipSubscribed,
+    dmSubscribed: fp.dmSubscribed,
+    writerProfileImageUrl: fp.writerProfileImageUrl,
+  };
+}
+
 // Artist cover hero (top banner with gradient)
 function ArtistCoverBanner({ artist, t, theme }) {
   return (
@@ -17,7 +39,7 @@ function ArtistCoverBanner({ artist, t, theme }) {
       }}>
         <div style={{ fontFamily: t.fontDisplay, fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>{artist.name}.</div>
         <div style={{ fontSize: 12, opacity: 0.85, fontFamily: t.fontMono, letterSpacing: 0.3 }}>
-          가입하고 최신 소식을 받아보세요!
+          {artist.intro || '가입하고 최신 소식을 받아보세요!'}
         </div>
       </div>
       <button style={{
@@ -31,22 +53,39 @@ function ArtistCoverBanner({ artist, t, theme }) {
 
 // Main desktop profile router
 function DesktopArtistProfile({ t, theme, artist, tab, onNavProfile, onOpenLive, onOpenDM, onOpenMembership }) {
+  const [artistDetail, setArtistDetail] = React.useState(null);
+
+  React.useEffect(() => {
+    window.ConnectfinAPI.api(`/api/member/v2/artists/${artist.id}`)
+      .then(data => setArtistDetail(data))
+      .catch(() => { /* mock 유지 */ });
+  }, [artist.id]);
+
+  const displayArtist = artistDetail ? {
+    ...artist,
+    name: artistDetail.name,
+    intro: artistDetail.intro,
+    coverImageUrl: artistDetail.coverImageUrl,
+    profileImageUrl: artistDetail.profileImageUrl,
+    artistMembers: artistDetail.artistMembers || [],
+  } : artist;
+
   let body;
-  if (tab === 'highlight') body = <TabHighlight t={t} theme={theme} artist={artist} onNavProfile={onNavProfile}/>;
-  else if (tab === 'fan') body = <TabFan t={t} theme={theme} artist={artist}/>;
-  else if (tab === 'artist') body = <TabArtistPosts t={t} theme={theme} artist={artist}/>;
-  else if (tab === 'fanletter') body = <TabFanLetter t={t} theme={theme} artist={artist}/>;
-  else if (tab === 'media') body = <TabMedia t={t} theme={theme} artist={artist}/>;
-  else if (tab === 'live') body = <TabLive t={t} theme={theme} artist={artist} onOpenLive={onOpenLive}/>;
-  else if (tab === 'notice') body = <TabNotice t={t} theme={theme} artist={artist}/>;
-  else if (tab === 'shop') body = <TabShop t={t} theme={theme} artist={artist}/>;
+  if (tab === 'highlight') body = <TabHighlight t={t} theme={theme} artist={displayArtist} onNavProfile={onNavProfile}/>;
+  else if (tab === 'fan') body = <TabFan t={t} theme={theme} artist={displayArtist}/>;
+  else if (tab === 'artist') body = <TabArtistPosts t={t} theme={theme} artist={displayArtist}/>;
+  else if (tab === 'fanletter') body = <TabFanLetter t={t} theme={theme} artist={displayArtist}/>;
+  else if (tab === 'media') body = <TabMedia t={t} theme={theme} artist={displayArtist}/>;
+  else if (tab === 'live') body = <TabLive t={t} theme={theme} artist={displayArtist} onOpenLive={onOpenLive}/>;
+  else if (tab === 'notice') body = <TabNotice t={t} theme={theme} artist={displayArtist}/>;
+  else if (tab === 'shop') body = <TabShop t={t} theme={theme} artist={displayArtist}/>;
 
   return (
     <div>
-      <ArtistCoverBanner artist={artist} t={t} theme={theme}/>
+      <ArtistCoverBanner artist={displayArtist} t={t} theme={theme}/>
       <div style={{ display: 'flex', maxWidth: 1320, margin: '0 auto', padding: '20px 24px 60px', gap: 24 }}>
         <div style={{ flex: 1, minWidth: 0 }}>{body}</div>
-        <DesktopRightSidebar t={t} theme={theme} artist={artist} onOpenDM={onOpenDM} onOpenMembership={onOpenMembership}/>
+        <DesktopRightSidebar t={t} theme={theme} artist={displayArtist} onOpenDM={onOpenDM} onOpenMembership={onOpenMembership}/>
       </div>
     </div>
   );
@@ -102,26 +141,52 @@ function TabHighlight({ t, theme, artist, onNavProfile }) {
 
 // ────────── FAN (팬 포스트 타임라인) ──────────
 function TabFan({ t, theme, artist }) {
-  const posts = FAN_POSTS.filter(p => p.artistId === artist.id);
-  const [activeTab, setActiveTab] = React.useState('all');
-  const visiblePosts = activeTab === 'hot'
-    ? posts.filter(post => isHotFanPost(post))
-    : posts;
+  const mockPosts = FAN_POSTS.filter(p => p.artistId === artist.id);
+  const [posts, setPosts] = React.useState(mockPosts);
+  const [loading, setLoading] = React.useState(false);
+  const [hasNext, setHasNext] = React.useState(false);
+  const [nextCursor, setNextCursor] = React.useState(null);
+
+  React.useEffect(() => {
+    setLoading(true);
+    window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-posts`)
+      .then(data => {
+        setPosts(data.content.map(mapFanPost));
+        setHasNext(data.hasNext);
+        setNextCursor(data.nextCursor);
+      })
+      .catch(() => { /* mock 유지 */ })
+      .finally(() => setLoading(false));
+  }, [artist.id]);
+
+  const loadMore = () => {
+    if (!hasNext || !nextCursor || loading) return;
+    setLoading(true);
+    window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-posts?cursor=${nextCursor}`)
+      .then(data => {
+        setPosts(prev => [...prev, ...data.content.map(mapFanPost)]);
+        setHasNext(data.hasNext);
+        setNextCursor(data.nextCursor);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
 
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        <Chip t={t} active={activeTab === 'all'} onClick={() => setActiveTab('all')}>전체</Chip>
-        <Chip t={t} active={activeTab === 'hot'} onClick={() => setActiveTab('hot')}><span>🔥</span> Hot</Chip>
+        <Chip t={t} active>전체</Chip>
+        <Chip t={t}><span>🔥</span> Hot</Chip>
       </div>
-      {visiblePosts.length === 0 ? (
-        // HOT 후보가 없을 때는 "데이터 없음"을 숨기지 않고 안내 문구를 그대로 보여 준다.
-        // 실제 API 연동으로 바꿔도 이 문구는 그대로 재사용할 수 있다.
-        <HotEmptyState t={t}/>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {visiblePosts.map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {posts.map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
+      </div>
+      {hasNext && (
+        <button onClick={loadMore} disabled={loading} style={{
+          width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
+          border: `1px solid ${t.line}`, background: 'transparent',
+          color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
+        }}>{loading ? '로딩 중...' : '더 보기'}</button>
       )}
     </div>
   );
@@ -161,29 +226,18 @@ function TabArtistPosts({ t, theme, artist }) {
 function TabFanLetter({ t, theme, artist }) {
   const letters = FAN_LETTERS.filter(l => l.artistId === artist.id);
   const [selected, setSelected] = React.useState(null);
-  const [activeTab, setActiveTab] = React.useState('all');
-  const visibleLetters = activeTab === 'hot'
-    ? letters.filter(letter => isHotFanLetter(letter))
-    : letters;
 
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        <Chip t={t} active={activeTab === 'all'} onClick={() => setActiveTab('all')}>전체</Chip>
-        <Chip t={t} active={activeTab === 'hot'} onClick={() => setActiveTab('hot')}><span>🔥</span> Hot</Chip>
+        <Chip t={t} active>전체</Chip>
+        <Chip t={t}><span>🔥</span> Hot</Chip>
         <div style={{ flex: 1 }}/>
         <Chip t={t}>🌐 한국어</Chip>
       </div>
-      {visibleLetters.length === 0 ? (
-        // FanLetter 목업 데이터에는 아직 좋아요 필드가 없어서
-        // HOT 탭에 들어가면 이 빈 상태가 먼저 보인다.
-        // 이후 API 실연동 시에는 letter.likeCount 기준으로 자연스럽게 대체된다.
-        <HotEmptyState t={t}/>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          {visibleLetters.map(l => <FanLetterCard key={l.id} letter={l} artist={artist} t={t} theme={theme} onClick={() => setSelected(l)}/>)}
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {letters.map(l => <FanLetterCard key={l.id} letter={l} artist={artist} t={t} theme={theme} onClick={() => setSelected(l)}/>)}
+      </div>
 
       {selected && <FanLetterModal letter={selected} artist={artist} t={t} theme={theme} onClose={() => setSelected(null)}/>}
     </div>
@@ -470,60 +524,15 @@ function Section({ t, theme, children, style }) {
   );
 }
 
-function Chip({ t, active, children, onClick }) {
+function Chip({ t, active, children }) {
   return (
-    <button onClick={onClick} style={{
+    <button style={{
       padding: '6px 14px', borderRadius: 16, border: active ? 'none' : `1px solid ${t.line}`,
       background: active ? (t.name === 'Y2K Pop' ? t.hot : t.hot) : 'transparent',
       color: active ? '#fff' : t.text, fontSize: 12, fontWeight: 700, cursor: 'pointer',
       fontFamily: t.font, display: 'inline-flex', alignItems: 'center', gap: 4,
     }}>{children}</button>
   );
-}
-
-function HotEmptyState({ t }) {
-  return (
-    <div style={{
-      padding: '22px 18px',
-      borderRadius: 12,
-      border: `1px dashed ${t.line}`,
-      color: t.textDim,
-      fontSize: 13,
-      lineHeight: 1.6,
-      background: 'transparent',
-      textAlign: 'center',
-    }}>
-      Hot콘텐츠가 없습니다 더많은 최신글을 확인해 보세요
-    </div>
-  );
-}
-
-function toHotCount(value) {
-  // 목업 데이터는 20, 35 같은 숫자도 있고 "4.2K" 같은 문자열도 섞여 있다.
-  // HOT 탭 필터를 테스트할 때 포맷 차이 때문에 조건이 깨지지 않게 숫자로 정규화한다.
-  if (typeof value === 'number') return value;
-  if (typeof value !== 'string') return 0;
-
-  const normalized = value.trim().toUpperCase();
-  if (normalized.endsWith('K')) {
-    return Number(normalized.replace('K', '')) * 1000;
-  }
-  if (normalized.endsWith('M')) {
-    return Number(normalized.replace('M', '')) * 1000000;
-  }
-  return Number(normalized) || 0;
-}
-
-function isHotFanPost(post) {
-  // 백엔드 HOT 정책과 맞춘다:
-  // 좋아요 5개 이상 또는 댓글 5개 이상이면 HOT 후보로 본다.
-  return toHotCount(post.likes) >= 5 || toHotCount(post.comments) >= 5;
-}
-
-function isHotFanLetter(letter) {
-  // FanLetter HOT 정책은 좋아요 5개 이상이다.
-  // 현재 목업에는 likes가 없어서 대부분 false가 되어 empty state를 확인할 수 있다.
-  return toHotCount(letter.likeCount ?? letter.likes) >= 5;
 }
 
 function linkBtn(t) {
@@ -577,11 +586,23 @@ function FanPostFullCard({ post, artist, t, theme }) {
           color: '#fff', fontWeight: 800, fontSize: 11,
         }}>{post.author.slice(0, 2)}</div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{post.author} <span style={{ color: t.accent2 }}>✓✓</span></div>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>
+            {post.author}
+            {post.fanMembershipSubscribed && <span style={{ color: t.accent2, marginLeft: 4 }}>✓</span>}
+            {post.dmSubscribed && <span style={{ color: t.accent, marginLeft: 2 }}>✉</span>}
+            {!post.fanMembershipSubscribed && !post.dmSubscribed && <span style={{ color: t.accent2 }}> ✓✓</span>}
+          </div>
           <div style={{ fontSize: 11, color: t.textDim, fontFamily: t.fontMono }}>{post.timeAgo}</div>
         </div>
       </div>
       {post.tag && <div style={{ color: t.hot, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{post.tag}</div>}
+      {post.hashtags && post.hashtags.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+          {post.hashtags.map(tag => (
+            <span key={tag} style={{ color: t.accent, fontSize: 12, fontWeight: 600 }}>#{tag}</span>
+          ))}
+        </div>
+      )}
       <div style={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-line', color: t.text }}>{post.body}</div>
       {post.hasGrid && (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${post.gridCount}, 1fr)`, gap: 4, marginTop: 12 }}>

@@ -5,6 +5,7 @@ import io.awspring.cloud.s3.InMemoryBufferingS3OutputStreamProvider;
 import io.awspring.cloud.s3.S3ObjectConverter;
 import io.awspring.cloud.s3.S3Template;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -13,13 +14,10 @@ import org.springframework.beans.factory.annotation.Value;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.io.InputStream;
 
-
-// s3자동설정을 꺼버려서 bean등록을 해줘야함
 @Configuration
 @RequiredArgsConstructor
 public class S3Config {
@@ -35,26 +33,14 @@ public class S3Config {
     @Value("${spring.cloud.aws.region.static}")
     private String region;
 
+    // S3Client가 활성화될 때(enabled=true)만 S3Template도 생성
     @Bean
-    public S3Client s3Client() {
-        AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
-
-        return S3Client.builder()
-                .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(credentials))
-                .build();
-    }
-
-
-
-
-    // 👈 이 부분을 새로 추가하세요!
-    @Bean
+    @ConditionalOnProperty(prefix = "media.storage", name = "enabled", havingValue = "true")
     public S3Template s3Template(S3Client s3Client) {
-        // 1. 컨버터 구현 (인터페이스 규격에 완벽 일치)
+        // 1. 컨버터 구현
         S3ObjectConverter objectConverter = new S3ObjectConverter() {
             @Override
-            public <T> RequestBody write(T object) { // 👈 인자 1개인 경우
+            public <T> RequestBody write(T object) {
                 try {
                     return RequestBody.fromBytes(objectMapper.writeValueAsBytes(object));
                 } catch (Exception e) {
@@ -63,7 +49,7 @@ public class S3Config {
             }
 
             @Override
-            public <T> T read(InputStream is, Class<T> clazz) { // 👈 인자 2개인 경우
+            public <T> T read(InputStream is, Class<T> clazz) {
                 try {
                     return objectMapper.readValue(is, clazz);
                 } catch (Exception e) {
@@ -77,7 +63,6 @@ public class S3Config {
             }
         };
 
-        // 2. 최종 조립
         return new S3Template(
                 s3Client,
                 new InMemoryBufferingS3OutputStreamProvider(s3Client, null),
