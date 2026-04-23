@@ -32,9 +32,16 @@ public class ArtistPostCommentCountFlushScheduler {
             return;
         }
 
-        for (ArtistPostCommentDelta delta : deltas) {
-            // commentCount는 요청 경로 대신 flush 배치가 주기적으로 반영한다.
-            artistPostRepository.changeCommentCountBy(delta.artistPostId(), delta.delta());
+        try {
+            for (ArtistPostCommentDelta delta : deltas) {
+                // commentCount는 요청 경로 대신 flush 배치가 주기적으로 반영한다.
+                artistPostRepository.changeCommentCountBy(delta.artistPostId(), delta.delta());
+            }
+        } catch (RuntimeException e) {
+            // DB 반영이 실패하면 트랜잭션은 롤백되지만,
+            // drainAll()로 이미 Redis에서 빠진 delta는 직접 되돌려야 다음 주기에 재시도할 수 있다.
+            artistPostCommentDeltaBuffer.restoreAll(deltas);
+            throw e;
         }
     }
 
