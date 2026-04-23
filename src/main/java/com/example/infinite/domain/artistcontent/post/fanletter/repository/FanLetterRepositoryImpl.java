@@ -121,7 +121,6 @@ public class FanLetterRepositoryImpl implements FanLetterRepositoryCustom {
                         .otherwise(artist.profileImageUrl),
                 artist.name,
                 artist.profileImageUrl,
-                fanLetter.likeCount,
                 fanLetter.createdAt
         );
     }

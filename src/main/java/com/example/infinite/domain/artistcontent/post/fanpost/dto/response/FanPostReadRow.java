@@ -12,8 +12,6 @@ public record FanPostReadRow(
         Boolean fanMembershipSubscribed,
         Boolean dmSubscribed,
         String content,
-        Long likeCount,
-        Long commentCount,
         Integer mediaCount,
         LocalDateTime createdAt
 ) {

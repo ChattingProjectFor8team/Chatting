@@ -18,6 +18,8 @@ public interface CommentRepository extends JpaRepository<Comment, Long>, Comment
 
     List<Comment> findByParentIdOrderByIdAsc(Long parentId);
 
+    long countByParentId(Long parentId);
+
     boolean existsByParentId(Long parentId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -34,8 +34,6 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
                         member.profileImageUrl,
                         Expressions.constant(Boolean.TRUE),
                         artistPost.content,
-                        artistPost.likeCount,
-                        artistPost.commentCount,
                         artistPost.mediaCount,
                         artistPost.createdAt
                 ))
@@ -67,8 +65,6 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
                         member.profileImageUrl,
                         Expressions.constant(Boolean.TRUE),
                         artistPost.content,
-                        artistPost.likeCount,
-                        artistPost.commentCount,
                         artistPost.mediaCount,
                         artistPost.createdAt
                 ))

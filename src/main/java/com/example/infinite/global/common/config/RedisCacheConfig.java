@@ -20,16 +20,21 @@ import java.util.Map;
 /**
  * Spring Cache + Redis 설정.
  *
- * <p>현재 프로젝트는 Redis를 인기 검색어 집계, 분산 락, 래플 상태 저장에도 사용하고 있다.
- * 여기에 Spring Cache 추상화를 추가로 얹어 "조회 결과 캐시"를 같은 Redis 안에서 분리 운영한다.</p>
+ * <p>현재 프로젝트는 Redis를 인기 검색어 집계, 분산 락, Redis Stream 보조 상태, 조회 캐시에 함께 사용한다.
+ * 같은 Redis를 쓰더라도 용도를 분리해서 봐야 하므로, Spring Cache는 "읽기 최적화용 namespace"로 따로 운영한다.</p>
  *
- * <p>이번 설정의 목적은 아티스트 상세 조회 v2를 Cache-aside 전략으로 캐싱하는 것이다.
- * 즉, 캐시 miss 때만 DB/Querydsl 원본 조회를 수행하고, hit면 Redis 값을 바로 반환한다.</p>
+ * <p>학습 포인트:
+ * <ul>
+ *   <li>base cache: 본문/미디어/해시태그처럼 상대적으로 덜 변하는 조립 결과</li>
+ *   <li>hot cache: like/comment count처럼 매우 자주 바뀌는 숫자</li>
+ *   <li>comment cache: 구조 전체가 같이 움직이므로 짧은 TTL 통캐시</li>
+ * </ul>
+ * </p>
  *
  * <p>핵심 설정 포인트:
  * <ul>
  *   <li>TTL을 명시해 캐시 데이터가 영구히 남지 않게 한다.</li>
- *   <li>key prefix를 분리해 기존 Redis 직접 사용 키(ZSet/Lock/Lua)와 충돌을 방지한다.</li>
+ *   <li>key prefix를 분리해 기존 Redis 직접 사용 키(ZSet/Lock/Lua/Stream 보조 키)와 충돌을 방지한다.</li>
  *   <li>값 직렬화는 JSON으로 맞춰 redis-cli에서 확인 가능한 형태를 유지한다.</li>
  * </ul>
  * </p>
@@ -53,9 +58,22 @@ public class RedisCacheConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer));
 
         // 캐시별 성격에 따라 TTL을 다르게 둘 수 있도록 분리한다.
-        Map<String, RedisCacheConfiguration> perCacheConfig = Map.of(
+        Map<String, RedisCacheConfiguration> perCacheConfig = Map.ofEntries(
                 // 아티스트 상세는 수정 빈도가 검색 결과보다 적지 않으므로 너무 길지 않은 5분 TTL을 둔다.
-                CacheNames.ARTIST_DETAIL_V2, defaultConfig.entryTtl(Duration.ofMinutes(5))
+                Map.entry(CacheNames.ARTIST_DETAIL_V2, defaultConfig.entryTtl(Duration.ofMinutes(5))),
+                // post base 캐시는 본문/작성자/미디어/해시태그처럼 상대적으로 덜 변하는 읽기 조립 결과다.
+                Map.entry(CacheNames.ARTIST_POST_LIST_BASE, defaultConfig.entryTtl(Duration.ofMinutes(10))),
+                Map.entry(CacheNames.ARTIST_POST_DETAIL_BASE, defaultConfig.entryTtl(Duration.ofMinutes(10))),
+                Map.entry(CacheNames.FAN_POST_LIST_BASE, defaultConfig.entryTtl(Duration.ofMinutes(10))),
+                Map.entry(CacheNames.FAN_POST_DETAIL_BASE, defaultConfig.entryTtl(Duration.ofMinutes(10))),
+                Map.entry(CacheNames.FAN_LETTER_LIST_BASE, defaultConfig.entryTtl(Duration.ofMinutes(10))),
+                Map.entry(CacheNames.FAN_LETTER_DETAIL_BASE, defaultConfig.entryTtl(Duration.ofMinutes(10))),
+                // hot data는 like/comment count처럼 flush 주기와 함께 움직이는 짧은 수명 캐시다.
+                // ArtistPost는 현재 3초 flush 배치에 맞춰 eventual consistency를 설명하는 구조다.
+                Map.entry(CacheNames.POST_HOT_DATA, defaultConfig.entryTtl(Duration.ofSeconds(3))),
+                // 댓글 목록은 구조 전체가 같이 움직이므로 base/hot 분리 대신 짧은 TTL 통캐시를 사용한다.
+                Map.entry(CacheNames.COMMENT_ROOT_SLICE, defaultConfig.entryTtl(Duration.ofSeconds(3))),
+                Map.entry(CacheNames.COMMENT_REPLY_LIST, defaultConfig.entryTtl(Duration.ofSeconds(3)))
         );
 
         return RedisCacheManager.builder(redisConnectionFactory)

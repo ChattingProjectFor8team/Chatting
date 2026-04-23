@@ -1,11 +1,14 @@
 package com.example.infinite.domain.artistcontent.post.fanletter.repository;
 
+import com.example.infinite.domain.artistcontent.post.cache.PostHotRow;
 import com.example.infinite.domain.artistcontent.post.fanletter.entity.FanLetter;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface FanLetterRepository extends JpaRepository<FanLetter, Long>, FanLetterRepositoryCustom {
@@ -28,4 +31,14 @@ public interface FanLetterRepository extends JpaRepository<FanLetter, Long>, Fan
 
     @Query("select fanLetter.likeCount from FanLetter fanLetter where fanLetter.id = :fanLetterId")
     Optional<Long> findLikeCountById(@Param("fanLetterId") Long fanLetterId);
+
+    @Query("""
+            select new com.example.infinite.domain.artistcontent.post.cache.PostHotRow(
+                fanLetter.id,
+                fanLetter.likeCount
+            )
+              from FanLetter fanLetter
+             where fanLetter.id in :fanLetterIds
+            """)
+    List<PostHotRow> findHotRowsByIds(@Param("fanLetterIds") Collection<Long> fanLetterIds);
 }

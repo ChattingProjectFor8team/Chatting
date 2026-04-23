@@ -1,5 +1,7 @@
 package com.example.infinite.domain.artistcontent.post.artistpost.dto.response;
 
+import com.example.infinite.domain.artistcontent.post.cache.PostHotData;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,26 +22,22 @@ public record ArtistPostResponse(
         List<String> hashtags,
         LocalDateTime createdAt
 ) {
-    public static ArtistPostResponse from(
-            ArtistPostReadRow row,
-            List<ArtistPostMediaResponse> media,
-            List<String> hashtags
-    ) {
-        // QueryDSL projection row + media + hashtag를 최종 API 응답 구조로 조립한다.
+    public static ArtistPostResponse from(ArtistPostBaseResponse baseResponse, PostHotData hotData) {
+        // base/hot 분리 캐시를 쓴 뒤, 응답 직전에만 하나로 합친다.
         return new ArtistPostResponse(
-                row.artistPostId(),
-                row.artistId(),
-                row.writerId(),
-                row.writerNickname(),
-                row.writerProfileImageUrl(),
-                Boolean.TRUE.equals(row.artistBadge()),
-                row.content(),
-                row.likeCount() == null ? 0L : row.likeCount(),
-                row.commentCount() == null ? 0L : row.commentCount(),
-                row.mediaCount() == null ? 0 : row.mediaCount(),
-                media,
-                hashtags,
-                row.createdAt()
+                baseResponse.artistPostId(),
+                baseResponse.artistId(),
+                baseResponse.writerId(),
+                baseResponse.writerNickname(),
+                baseResponse.writerProfileImageUrl(),
+                baseResponse.artistBadge(),
+                baseResponse.content(),
+                hotData.likeCount(),
+                hotData.commentCount(),
+                baseResponse.mediaCount(),
+                baseResponse.media(),
+                baseResponse.hashtags(),
+                baseResponse.createdAt()
         );
     }
 }

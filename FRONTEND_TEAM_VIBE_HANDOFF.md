@@ -31,7 +31,8 @@
 
 - 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, ArtistPost CRUD, ArtistPost 좋아요, ArtistPost 댓글/대댓글 조회, FanLetter CRUD, FanLetter 좋아요, Hashtag 추천, FanPost/ArtistPost/FanLetter 미디어 업로드 구조, 실시간 스트리밍 메타데이터/채팅 기본 구조
 - 부분 구현: Follow 엔티티
-- 필수 구현 예정: 아티스트페이지 코드 검토, 포스트페이지 동시성·캐싱, 메인 홈 대시보드/아티스트 홈 대시보드
+- 필수 구현 예정: 아티스트페이지 코드 검토, 메인 홈 대시보드/아티스트 홈 대시보드
+- 최근 반영 완료: FanPost / ArtistPost / FanLetter base/hot 캐시 분리, 댓글 조건부 짧은 TTL 캐시
 - 구현 예정이지만 미구현으로 끝날 수도 있음: YouTube 미디어 탭, 종료된 스트리밍 영상 보관 조회, Follow API, 알림
 
 ## 2. 가장 중요한 고정 정책
@@ -284,6 +285,10 @@ FanPost 댓글 현재 정책:
 - 작성자 옆 구독 배지 boolean은 현재 실제 subscription 조회 결과가 내려온다
 - FanPost는 별도 상위 버전 route가 없으므로 현재 route가 곧 최신 구현이다
 - 내부적으로는 백엔드가 Redisson 락/atomic update 구조로 바뀌었지만 응답 계약은 그대로다
+- 조회 캐시도 이미 1차 반영됐다
+- 포스트 본문/작성자/미디어/해시태그/배지 쪽은 base cache
+- `likeCount`, `commentCount`는 hot cache로 분리된다
+- 댓글 루트 슬라이스/대댓글 목록은 짧은 TTL 조건부 캐시를 쓴다
 
 프론트가 지금 바로 실연동 가능한 화면:
 
@@ -427,6 +432,11 @@ FanPost 댓글 현재 정책:
 - 새 `v2/v3`는 비동기 command enqueue 용도라 `202 Accepted` + queued metadata를 반환한다
 - ArtistPost 댓글 생성/삭제는 반드시 `v2`를 기준으로 붙여야 한다
 - ArtistPost 댓글 `v1`은 레거시 호환용으로만 남아 있다
+- 조회 캐시도 이미 반영됐다
+- 포스트 본문/작성자/미디어/해시태그/아티스트 배지 쪽은 base cache
+- `likeCount`, `commentCount`는 `3초` hot cache를 쓴다
+- 댓글 루트 슬라이스/대댓글 목록은 짧은 TTL 조건부 캐시를 쓴다
+- 따라서 프론트는 좋아요/댓글 수를 장시간 프론트 단독 truth로 잡기보다 서버 재조회 값으로 다시 맞춰지는 전제를 두는 편이 안전하다
 
 프론트가 지금 해두면 좋은 것:
 
@@ -460,6 +470,9 @@ FanPost 댓글 현재 정책:
 - FanLetter는 이제 mock 우선이 아니라 실연동 가능 영역이다
 - 다만 목록 응답과 상세 응답의 필드 구성이 다르다
 - special-like는 "아티스트 멤버 중 한 명이라도 좋아요했는가" 기준이다
+- 조회 캐시도 이미 반영됐다
+- 본문/수신자/이미지/special-like 표시용 안정 필드는 base cache
+- `likeCount`는 hot cache로 분리돼 있다
 
 프론트가 지금 해두면 좋은 것:
 
@@ -521,7 +534,8 @@ Dashboard B:
 
 아래는 현재 고정된 우선순위다.
 
-- `5-1 ~ 5-3`은 필수 구현 예정으로 보는 것이 맞다
+- `5-1`과 `5-3`은 필수 구현 예정으로 보는 것이 맞다
+- `5-2`의 포스트페이지 동시성/캐싱은 1차 구현이 끝났고, 이제는 검증/튜닝 단계로 보는 것이 맞다
 - `5-4 ~ 5-6`은 후순위라 이번 작업 범위에서 미구현으로 끝날 수 있다
 
 ## 5-1. 필수 1순위: 아티스트페이지 코드 검토
@@ -536,19 +550,25 @@ Dashboard B:
 - ArtistPost/artist-page 화면을 먼저 안정적으로 붙이는 게 우선이다
 - 이 단계에서는 큰 신규 API보다 세부 응답 shape 정리와 edge case 보정 가능성을 열어두는 편이 좋다
 
-## 5-2. 필수 2순위: 포스트페이지 동시성 / 캐싱
+## 5-2. 상태 반영: 포스트페이지 동시성 / 캐싱
 
-백엔드 예정 작업:
+백엔드 현재 반영 상태:
 
-- FanPost + FanLetter 동시성/캐싱
-- ArtistPost 대용량 동시성/캐싱
-- 캐싱/락/무효화 전략 정리
-- 관련 검증 테스트 추가
+- FanPost / ArtistPost / FanLetter는 post base cache + hot count cache로 분리되었다
+- `likeCount`, `commentCount` 같은 빠르게 바뀌는 숫자는 hot cache로 읽는다
+- ArtistPost hot count는 현재 `3초` TTL 기준으로 맞춰져 있다
+- 댓글은 base/hot 분리가 아니라 짧은 TTL 통캐시다
+- 부모댓글(root slice)은 보수적으로 조건부 캐시한다
+  - `post.commentCount >= 20 AND 10초 안에 5회 조회`
+- 자식댓글(replies)은 더 공격적으로 조건부 캐시한다
+  - `replyCount >= 20 OR 10초 안에 5회 조회`
+- 댓글 캐시 TTL은 현재 `3초`다
 
 프론트 준비 포인트:
 
-- count를 프론트 단독 truth로 두지 않는 구조가 좋다
-- optimistic UI는 가능하지만 서버 응답 덮어쓰기와 실패 롤백 경로가 필요하다
+- count를 프론트 단독 truth로 오래 들고 가지 않는 구조가 좋다
+- optimistic UI는 가능하지만 짧은 시간 뒤 서버 재조회 값으로 덮어쓸 수 있게 짜는 편이 안전하다
+- 댓글은 상세 진입 직후와 대댓글 펼침 시 재조회될 수 있으니, 로컬 상태와 서버 상태를 쉽게 동기화할 수 있게 두는 것이 좋다
 - HOT/최신 탭 전환이 생겨도 데이터 소스가 분리될 수 있게 컴포넌트를 짜두는 편이 좋다
 
 ## 5-3. 필수 3순위: 메인 홈 대시보드 / 아티스트 홈 대시보드
@@ -782,12 +802,17 @@ mock 우선:
 
 지금 프론트가 가장 안정적으로 붙일 수 있는 실구현 영역은 `검색 + 아티스트 상세 + FanPost 전체 + ArtistPost 전체 + FanLetter 전체 + Hashtag 추천`이다.
 
+추가로 알아둘 현재 백엔드 상태:
+
+- 포스트 조회는 base cache + hot count cache로 분리돼 있다
+- 댓글 조회는 짧은 TTL 조건부 캐시를 사용한다
+- 따라서 프론트는 숫자 count와 댓글 목록이 아주 짧은 간격으로 재동기화될 수 있음을 전제로 짜는 편이 안전하다
+
 앞으로 내가 구현할 핵심은 아래다.
 
 필수 구현 예정:
 
 - 아티스트페이지 코드 검토
-- 포스트페이지 동시성/캐싱
 - 메인 홈 대시보드 / 아티스트 홈 대시보드
 
 후순위 기능:

@@ -20,6 +20,17 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class LettuceLockService implements LockService {
 
+    /**
+     * Redis의 SET NX EX를 직접 사용해 분산 락을 구현한 버전이다.
+     *
+     * 학습 포인트:
+     * - Redisson처럼 추상화된 락 객체를 쓰지 않고
+     * - "키가 없을 때만 저장" + TTL + 소유자 UUID 검증을 직접 조합한다.
+     *
+     * 그래서 V1은 동작 원리를 이해하기 좋지만,
+     * 재시도/해제/소유권 관리까지 모두 직접 책임져야 해 코드가 더 거칠다.
+     */
+
     private final StringRedisTemplate stringRedisTemplate;
 
     /**
@@ -55,12 +66,15 @@ public class LettuceLockService implements LockService {
 
     @Override
     public void lock(String key, long waitTime, long leaseTime, TimeUnit timeUnit) {
+        // 같은 키를 잡으려는 요청끼리만 경쟁시키고,
+        // value에는 소유자 UUID를 저장해 "누가 락을 잡았는지"를 식별한다.
         String uuid = UUID.randomUUID().toString();
         long waitTimeMs = timeUnit.toMillis(waitTime);
         long leaseTimeSec = timeUnit.toSeconds(leaseTime);
         long deadline = System.currentTimeMillis() + waitTimeMs;
 
         while (System.currentTimeMillis() < deadline) {
+            // SET NX EX 한 번으로 "없으면 저장 + TTL 부여"를 원자적으로 수행한다.
             Boolean acquired = stringRedisTemplate.opsForValue()
                     .setIfAbsent(key, uuid, Duration.ofSeconds(leaseTimeSec));
 
@@ -71,6 +85,7 @@ public class LettuceLockService implements LockService {
             }
 
             try {
+                // V1은 별도 큐 없이 짧게 잠들었다가 다시 시도하는 스핀락 패턴이다.
                 Thread.sleep(SPIN_LOCK_RETRY_INTERVAL_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -104,6 +119,8 @@ public class LettuceLockService implements LockService {
         if (result != null && result == 1L) {
             log.debug("락 해제 완료 [Lettuce]: key={}, uuid={}", key, uuid);
         } else {
+            // TTL 만료 뒤 다른 요청이 같은 키를 재사용했을 수 있으므로,
+            // 값 비교 없이 DEL 하면 남의 락을 지우는 심각한 버그가 된다.
             log.warn("락 해제 실패 (이미 만료 또는 소유자 불일치) [Lettuce]: key={}", key);
         }
     }
