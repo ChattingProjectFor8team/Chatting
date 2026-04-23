@@ -14,6 +14,12 @@ spring:
     aws:
       s3:
         bucket: ${S3_BUCKET_NAME}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
 jwt:
   secret: ${JWT_SECRET_KEY}
   expiration: 3600000
+

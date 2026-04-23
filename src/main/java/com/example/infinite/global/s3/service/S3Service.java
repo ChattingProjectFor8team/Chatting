@@ -7,14 +7,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.net.URL;
 import java.time.Duration;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty; // 추가
+
 
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "media.storage", name = "enabled", havingValue = "true") //
 public class S3Service {
 
     private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
