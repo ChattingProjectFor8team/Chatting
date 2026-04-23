@@ -538,7 +538,7 @@ function DesktopLiveViewer({ t, theme, artistId, speed, liveOn, onExit }) {
 }
 
 // ───────── Mobile app (phone view) ─────────
-function MobileApp({ tweaks, setTweaks, t, showTweaks, setShowTweaks, screen, setScreen, artistId, setArtistId, threadId, setThreadId, raffleId, setRaffleId }) {
+function MobileApp({ tweaks, setTweaks, t, showTweaks, setShowTweaks, screen, setScreen, artistId, setArtistId, threadId, setThreadId, raffleId, setRaffleId, authUser, onShowLogin, onLogout }) {
   const nav = (k) => {
     if (k === 'me') { setScreen('membership'); return; }
     if (k === 'live') {
