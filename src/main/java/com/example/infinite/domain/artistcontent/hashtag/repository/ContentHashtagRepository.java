@@ -1,7 +1,7 @@
 package com.example.infinite.domain.artistcontent.hashtag.repository;
 
 import com.example.infinite.domain.artistcontent.hashtag.entity.ContentHashtag;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 

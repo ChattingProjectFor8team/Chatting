@@ -1,7 +1,7 @@
 package com.example.infinite.domain.artistcontent.comment.repository;
 
 import com.example.infinite.domain.artistcontent.comment.entity.Comment;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

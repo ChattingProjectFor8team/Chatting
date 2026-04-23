@@ -4,7 +4,7 @@ import com.example.infinite.domain.artistcontent.interaction.dto.response.Intera
 import com.example.infinite.domain.artistcontent.interaction.entity.Reaction;
 import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.interaction.repository.InteractionRepository;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.post.fanletter.repository.FanLetterRepository;
 import com.example.infinite.domain.artistcontent.post.fanletter.support.FanLetterReader;
 import lombok.RequiredArgsConstructor;

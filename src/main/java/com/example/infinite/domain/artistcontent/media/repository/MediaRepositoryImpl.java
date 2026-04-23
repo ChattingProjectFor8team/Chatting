@@ -1,7 +1,7 @@
 package com.example.infinite.domain.artistcontent.media.repository;
 
 import com.example.infinite.domain.artistcontent.media.entity.Media;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
