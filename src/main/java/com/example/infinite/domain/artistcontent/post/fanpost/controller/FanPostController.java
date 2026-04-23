@@ -9,6 +9,7 @@ import com.example.infinite.domain.artistcontent.post.fanpost.service.FanPostSer
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
+import com.example.infinite.global.common.dto.ScoreCursorSliceResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -55,6 +56,20 @@ public class FanPostController {
     ) {
         // 전체 개수 기반 page보다 무한 스크롤 UX가 중요하므로 cursor slice 응답을 사용한다.
         return ResponseEntity.ok(ApiResponse.success(fanPostService.getFanPosts(artistId, cursor)));
+    }
+
+    @GetMapping("/v1/artists/{artistId}/fan-posts/hot")
+    public ResponseEntity<ApiResponse<ScoreCursorSliceResponse<FanPostResponse>>> getHotFanPosts(
+            @PathVariable Long artistId,
+            @RequestParam(required = false) Long scoreCursor,
+            @RequestParam(required = false) Long idCursor,
+            @RequestParam(required = false) Integer size
+    ) {
+        // FanPost HOT은 점수 정렬이 계속 바뀔 수 있어
+        // score/id 복합커서를 함께 주고받는 전용 slice 응답을 사용한다.
+        return ResponseEntity.ok(ApiResponse.success(
+                fanPostService.getHotFanPosts(artistId, scoreCursor, idCursor, size)
+        ));
     }
 
     @GetMapping("/v1/artists/{artistId}/fan-posts/{fanPostId}")

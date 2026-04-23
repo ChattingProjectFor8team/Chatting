@@ -80,4 +80,8 @@ public class QuerydslUtils {
     public static BooleanExpression eq(EnumPath field, Enum val) {
         return val != null ? field.eq(val) : null;
     }
+
+    public static BooleanExpression goe(NumberPath<Long> field, Long val) {
+        return val != null ? field.goe(val) : null;
+    }
 }

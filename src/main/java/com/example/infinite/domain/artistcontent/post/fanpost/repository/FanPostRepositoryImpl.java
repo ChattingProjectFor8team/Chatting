@@ -1,14 +1,18 @@
 package com.example.infinite.domain.artistcontent.post.fanpost.repository;
 
+import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostHotReadRow;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostReadRow;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.QFanPost;
 import com.example.infinite.domain.member.member.entity.QMember;
 import com.example.infinite.global.common.util.querydsl.CursorSliceUtils;
+import com.example.infinite.global.common.util.querydsl.QuerydslUtils;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -78,5 +82,59 @@ public class FanPostRepositoryImpl implements FanPostRepositoryCustom {
                         fanPost.id.eq(fanPostId)
                 )
                 .fetchOne());
+    }
+
+    @Override
+    public List<FanPostHotReadRow> findHotSliceRowsByArtistId(
+            Long artistId,
+            LocalDateTime since,
+            Long scoreCursor,
+            Long idCursor,
+            int limit,
+            Long minLikeCount,
+            Long minCommentCount
+    ) {
+        QFanPost fanPost = QFanPost.fanPost;
+        QMember member = QMember.member;
+        NumberExpression<Long> hotScore = fanPost.likeCount.add(fanPost.commentCount);
+
+        // HOT 목록도 카드 조립 축은 일반 목록과 같게 유지하되,
+        // 복합커서 계산을 위해 score를 함께 읽는다.
+        return queryFactory
+                .select(Projections.constructor(
+                        FanPostHotReadRow.class,
+                        fanPost.id,
+                        fanPost.artist.id,
+                        member.id,
+                        member.nickname,
+                        member.profileImageUrl,
+                        Expressions.constant(Boolean.FALSE),
+                        Expressions.constant(Boolean.FALSE),
+                        fanPost.content,
+                        fanPost.mediaCount,
+                        fanPost.createdAt,
+                        hotScore
+                ))
+                .from(fanPost)
+                .join(fanPost.writer, member)
+                .where(
+                        fanPost.artist.id.eq(artistId),
+                        // HOT은 최근 24시간 안이면서,
+                        // 좋아요 5개 이상 또는 댓글 5개 이상 반응이 붙은 글만 후보로 본다.
+                        fanPost.createdAt.goe(since),
+                        QuerydslUtils.goe(fanPost.likeCount, minLikeCount)
+                                .or(QuerydslUtils.goe(fanPost.commentCount, minCommentCount)),
+                        // 정렬이 score DESC, id DESC 이므로
+                        // 다음 페이지도 같은 정렬 규칙을 깨지 않도록 복합커서를 건다.
+                        CursorSliceUtils.ltCompositeCursor(hotScore, scoreCursor, fanPost.id, idCursor)
+                )
+                // HOT 점수는 좋아요 + 댓글 수 합계다.
+                // 동점이면 최신 id가 먼저 오게 해 정렬과 커서 규칙을 일관되게 맞춘다.
+                .orderBy(
+                        CursorSliceUtils.orderByScoreDesc(hotScore),
+                        CursorSliceUtils.orderByIdDesc(fanPost.id)
+                )
+                .limit(limit)
+                .fetch();
     }
 }

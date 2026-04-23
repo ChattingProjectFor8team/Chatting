@@ -5,12 +5,14 @@ import com.example.infinite.domain.artistcontent.interaction.service.Interaction
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.request.FanLetterCreateRequest;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.request.FanLetterUpdateRequest;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterCreateResponse;
+import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterHotResponse;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterListResponse;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterResponse;
 import com.example.infinite.domain.artistcontent.post.fanletter.service.FanLetterService;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
+import com.example.infinite.global.common.dto.OffsetSliceResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -58,6 +60,19 @@ public class FanLetterController {
     ) {
         // 목록은 카드 렌더링에 필요한 최소 정보만 내려준다.
         return ResponseEntity.ok(ApiResponse.success(fanLetterService.getFanLetters(artistId, cursor)));
+    }
+
+    @GetMapping("/v1/artists/{artistId}/fan-letters/hot")
+    public ResponseEntity<ApiResponse<OffsetSliceResponse<FanLetterHotResponse>>> getHotFanLetters(
+            @PathVariable Long artistId,
+            @RequestParam(required = false) Integer offset,
+            @RequestParam(required = false) Integer size
+    ) {
+        // FanLetter HOT은 FanPost와 다르게 offset slice 를 사용해
+        // "복합커서 vs 오프셋" 비교 학습이 가능하게 둔다.
+        return ResponseEntity.ok(ApiResponse.success(
+                fanLetterService.getHotFanLetters(artistId, offset, size)
+        ));
     }
 
     @GetMapping("/v1/artists/{artistId}/fan-letters/{fanLetterId}")

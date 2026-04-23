@@ -7,6 +7,8 @@ import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostBaseResponse;
+import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostHotBaseSlice;
+import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostHotReadRow;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostMediaResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostReadRow;
 import com.example.infinite.domain.artistcontent.post.fanpost.repository.FanPostRepository;
@@ -19,6 +21,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -76,41 +79,7 @@ public class FanPostBaseCacheService {
             return new CursorSliceResponse<>(List.of(), null, hasNext, FAN_POST_SLICE_SIZE);
         }
 
-        List<Long> postIds = visibleRows.stream()
-                .map(FanPostReadRow::fanPostId)
-                .toList();
-        Map<Long, List<FanPostMediaResponse>> mediaMap = loadPreviewMediaMap(postIds);
-        Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, postIds);
-        Map<Long, WriterSubscriptionBadge> badgeByWriterId = subscriptionMembershipService.getWriterBadges(
-                artistId,
-                visibleRows.stream().map(FanPostReadRow::writerId).toList()
-        );
-
-        List<FanPostBaseResponse> content = visibleRows.stream()
-                .map(row -> {
-                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
-                            row.writerId(),
-                            WriterSubscriptionBadge.empty(row.writerId())
-                    );
-                    FanPostReadRow rowWithBadge = new FanPostReadRow(
-                            row.fanPostId(),
-                            row.artistId(),
-                            row.writerId(),
-                            row.writerNickname(),
-                            row.writerProfileImageUrl(),
-                            writerBadge.fanMembershipSubscribed(),
-                            writerBadge.dmSubscribed(),
-                            row.content(),
-                            row.mediaCount(),
-                            row.createdAt()
-                    );
-                    return FanPostBaseResponse.from(
-                            rowWithBadge,
-                            mediaMap.getOrDefault(row.fanPostId(), List.of()),
-                            hashtagMap.getOrDefault(row.fanPostId(), List.of())
-                    );
-                })
-                .toList();
+        List<FanPostBaseResponse> content = buildBaseResponses(artistId, visibleRows, true);
 
         Long nextCursor = hasNext
                 ? visibleRows.get(visibleRows.size() - 1).fanPostId()
@@ -139,6 +108,89 @@ public class FanPostBaseCacheService {
         List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, List.of(fanPostId))
                 .getOrDefault(fanPostId, List.of());
         return FanPostBaseResponse.from(rowWithBadge, media, hashtags);
+    }
+
+    public FanPostHotBaseSlice loadHotFanPostBaseSlice(
+            Long artistId,
+            LocalDateTime since,
+            Long scoreCursor,
+            Long idCursor,
+            int size,
+            Long minLikeCount,
+            Long minCommentCount
+    ) {
+        // HOT은 latest slice cache 와 정렬 기준이 다르므로
+        // score/id 복합커서 전용 조회를 따로 사용한다.
+        List<FanPostHotReadRow> rows = fanPostRepository.findHotSliceRowsByArtistId(
+                artistId,
+                since,
+                scoreCursor,
+                idCursor,
+                size + 1,
+                minLikeCount,
+                minCommentCount
+        );
+        boolean hasNext = rows.size() > size;
+        List<FanPostHotReadRow> visibleRows = hasNext ? rows.subList(0, size) : rows;
+        List<FanPostBaseResponse> content = buildBaseResponses(
+                artistId,
+                visibleRows.stream().map(FanPostHotReadRow::toBaseReadRow).toList(),
+                true
+        );
+
+        Long nextScoreCursor = hasNext
+                ? visibleRows.get(visibleRows.size() - 1).hotScore()
+                : null;
+        Long nextIdCursor = hasNext
+                ? visibleRows.get(visibleRows.size() - 1).fanPostId()
+                : null;
+
+        return new FanPostHotBaseSlice(content, nextScoreCursor, nextIdCursor, hasNext, size);
+    }
+
+    private List<FanPostBaseResponse> buildBaseResponses(Long artistId, List<FanPostReadRow> rows, boolean previewMedia) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> postIds = rows.stream()
+                .map(FanPostReadRow::fanPostId)
+                .toList();
+        Map<Long, List<FanPostMediaResponse>> mediaMap = previewMedia
+                ? loadPreviewMediaMap(postIds)
+                : loadMediaMap(postIds);
+        // HOT도 일반 목록 카드와 같은 표시 규칙을 써야 하므로 미디어 preview, 해시태그, 작성자 배지를 동일하게 합친다.
+        Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.FAN_POST, postIds);
+        Map<Long, WriterSubscriptionBadge> badgeByWriterId = subscriptionMembershipService.getWriterBadges(
+                artistId,
+                rows.stream().map(FanPostReadRow::writerId).toList()
+        );
+
+        return rows.stream()
+                .map(row -> {
+                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
+                            row.writerId(),
+                            WriterSubscriptionBadge.empty(row.writerId())
+                    );
+                    FanPostReadRow rowWithBadge = new FanPostReadRow(
+                            row.fanPostId(),
+                            row.artistId(),
+                            row.writerId(),
+                            row.writerNickname(),
+                            row.writerProfileImageUrl(),
+                            writerBadge.fanMembershipSubscribed(),
+                            writerBadge.dmSubscribed(),
+                            row.content(),
+                            row.mediaCount(),
+                            row.createdAt()
+                    );
+                    return FanPostBaseResponse.from(
+                            rowWithBadge,
+                            mediaMap.getOrDefault(row.fanPostId(), List.of()),
+                            hashtagMap.getOrDefault(row.fanPostId(), List.of())
+                    );
+                })
+                .toList();
     }
 
     private Map<Long, List<FanPostMediaResponse>> loadMediaMap(Collection<Long> fanPostIds) {

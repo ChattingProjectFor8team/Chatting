@@ -14,6 +14,7 @@ import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,6 +65,46 @@ public class FanLetterRepositoryImpl implements FanLetterRepositoryCustom {
                         QuerydslUtils.eq(fanLetter.id, fanLetterId)
                 )
                 .fetchOne());
+    }
+
+    @Override
+    public List<FanLetterListRow> findHotRowsByArtistId(
+            Long artistId,
+            LocalDateTime since,
+            int offset,
+            int limit,
+            Long minLikeCount
+    ) {
+        QFanLetter fanLetter = QFanLetter.fanLetter;
+        QArtist artist = QArtist.artist;
+        QArtistMember recipientArtistMember = new QArtistMember("recipientArtistMember");
+        QMember recipientMember = new QMember("recipientMember");
+
+        // 목록 카드에 필요한 projection 을 그대로 재사용해
+        // HOT 여부와 무관하게 recipient/special-like 조립 방식이 갈라지지 않게 유지한다.
+        return queryFactory
+                .select(listProjection(fanLetter, artist, recipientArtistMember, recipientMember))
+                .from(fanLetter)
+                .join(fanLetter.artist, artist)
+                .leftJoin(fanLetter.recipientArtistMember, recipientArtistMember)
+                .leftJoin(recipientArtistMember.member, recipientMember)
+                .where(
+                        QuerydslUtils.eq(artist.id, artistId),
+                        // 팬레터 HOT도 최근 24시간 제한을 그대로 적용한다.
+                        fanLetter.createdAt.goe(since),
+                        // FanLetter는 댓글이 없으므로 좋아요 5개 이상만 HOT 후보로 잡는다.
+                        QuerydslUtils.goe(fanLetter.likeCount, minLikeCount)
+                )
+                // FanLetter는 댓글이 없으므로 HOT score를 likeCount 하나로 본다.
+                .orderBy(
+                        fanLetter.likeCount.desc(),
+                        fanLetter.id.desc()
+                )
+                // 후보군이 이미 필터로 줄어든 목록이라
+                // FanLetter HOT은 offset slice 구현을 채택해 FanPost와 비교 학습이 가능하게 둔다.
+                .offset(offset)
+                .limit(limit)
+                .fetch();
     }
 
     private com.querydsl.core.types.ConstructorExpression<FanLetterListRow> listProjection(

@@ -1,6 +1,6 @@
 # Frontend Team Vibe Handoff
 
-작성일: 2026-04-21
+작성일: 2026-04-23
 
 이 문서는 같은 팀 프론트엔드 담당자가 AI 바이브 코딩에 바로 넣을 수 있게, 현재 백엔드 코드와 `HANDOFF_revised.md`를 기준으로 내 담당 범위의 구현 상태와 앞으로 구현할 것을 꼼꼼하게 정리한 문서다.
 
@@ -19,6 +19,7 @@
 
 - 메인 홈 일부
 - 아티스트 상세 / 커뮤니티 헤더
+- 아티스트 홈 대시보드
 - FanPost
 - ArtistPost
 - FanLetter
@@ -29,10 +30,10 @@
 
 지금 기준으로 상태를 한 줄로 요약하면 아래다.
 
-- 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, ArtistPost CRUD, ArtistPost 좋아요, ArtistPost 댓글/대댓글 조회, FanLetter CRUD, FanLetter 좋아요, Hashtag 추천, FanPost/ArtistPost/FanLetter 미디어 업로드 구조, 실시간 스트리밍 메타데이터/채팅 기본 구조
+- 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, 아티스트 홈 대시보드, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, FanPost HOT, ArtistPost CRUD, ArtistPost 좋아요, ArtistPost 댓글/대댓글 조회, FanLetter CRUD, FanLetter 좋아요, FanLetter HOT, Hashtag 추천, FanPost/ArtistPost/FanLetter 미디어 업로드 구조, 실시간 스트리밍 메타데이터/채팅 기본 구조
 - 부분 구현: Follow 엔티티
-- 필수 구현 예정: 아티스트페이지 코드 검토, 메인 홈 대시보드/아티스트 홈 대시보드
-- 최근 반영 완료: FanPost / ArtistPost / FanLetter base/hot 캐시 분리, 댓글 조건부 짧은 TTL 캐시
+- 필수 구현 예정: 메인 홈 대시보드
+- 최근 반영 완료: FanPost / ArtistPost / FanLetter base/hot 캐시 분리, 댓글 조건부 짧은 TTL 캐시, FanPost/FanLetter HOT
 - 구현 예정이지만 미구현으로 끝날 수도 있음: YouTube 미디어 탭, 종료된 스트리밍 영상 보관 조회, Follow API, 알림
 
 ## 2. 가장 중요한 고정 정책
@@ -50,8 +51,11 @@
 - 커서 기준은 `id DESC`
 - 무한 스크롤 기준
 - HOT 기준은 최근 24시간 내 게시글
-- HOT 정렬 점수는 `likeCount + commentCount`
-- FanLetter는 댓글이 없으므로 실제로는 HOT 계산 시 `likeCount` 중심으로 동작하게 된다
+- FanPost HOT 후보 조건은 `likeCount >= 5 OR commentCount >= 5`
+- FanPost HOT 정렬 점수는 `likeCount + commentCount`
+- FanPost HOT은 `scoreCursor + idCursor` 복합커서를 사용한다
+- FanLetter HOT 후보 조건은 `likeCount >= 5`
+- FanLetter HOT은 `likeCount DESC, id DESC` 뒤 `offset + size`를 사용한다
 - `likeCount`, `commentCount`, `mediaCount`는 엔티티 컬럼에 실시간 반영하고 나중에 배치로 보정할 수 있다
 
 ### 2-3. 댓글
@@ -131,6 +135,7 @@
 
 - `GET /api/member/v1/artists/{artistId}`
 - `GET /api/member/v2/artists/{artistId}`
+- `GET /api/member/v1/artists/{artistId}/dashboard`
 
 현재 응답 필드:
 
@@ -166,6 +171,20 @@
 - 커버 이미지
 - 소개글
 - 멤버 캐러셀 또는 멤버 리스트
+- 아티스트 홈 하이라이트
+
+아티스트 홈 대시보드 응답 구조:
+
+- `latestArtistPost`
+- `hotFanPosts`
+- `hotFanLetters`
+
+세부 정책:
+
+- `latestArtistPost`: 최신 ArtistPost 1건
+- `hotFanPosts`: HOT FanPost 6개
+- `hotFanLetters`: HOT FanLetter 4개
+- 현재는 대시보드 전체 캐시 없이 조회 시점 조합으로 내려온다
 
 ## 3-3. ArtistMember 관리
 
@@ -186,6 +205,7 @@
 
 - `POST /api/post/v1/artists/{artistId}/fan-posts`
 - `GET /api/post/v1/artists/{artistId}/fan-posts`
+- `GET /api/post/v1/artists/{artistId}/fan-posts/hot`
 - `GET /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}`
 - `PATCH /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}`
 - `DELETE /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}`
@@ -289,6 +309,10 @@ FanPost 댓글 현재 정책:
 - 포스트 본문/작성자/미디어/해시태그/배지 쪽은 base cache
 - `likeCount`, `commentCount`는 hot cache로 분리된다
 - 댓글 루트 슬라이스/대댓글 목록은 짧은 TTL 조건부 캐시를 쓴다
+- HOT 전용 API는 복합커서를 쓴다
+  - query param: `scoreCursor`, `idCursor`, `size`
+  - 응답: `ApiResponse<ScoreCursorSliceResponse<FanPostResponse>>`
+- HOT 결과가 비면 `Hot콘텐츠가 없습니다 더많은 최신글을 확인해 보세요` 문구를 보여주면 된다
 
 프론트가 지금 바로 실연동 가능한 화면:
 
@@ -454,6 +478,7 @@ FanPost 댓글 현재 정책:
 - 실API 구현 완료
 - `FanLetterController`, `FanLetterService`, `FanLetterRepository` 모두 연결됨
 - 경로는 `/api/post/v1/artists/{artistId}/fan-letters/**`
+- HOT 경로는 `GET /api/post/v1/artists/{artistId}/fan-letters/hot`
 - FanLetter 작성/수정은 `multipart/form-data`
 - 수신 대상 선택 가능
   - `recipientType=ARTIST`
@@ -473,6 +498,10 @@ FanPost 댓글 현재 정책:
 - 조회 캐시도 이미 반영됐다
 - 본문/수신자/이미지/special-like 표시용 안정 필드는 base cache
 - `likeCount`는 hot cache로 분리돼 있다
+- HOT 전용 API는 offset slice를 쓴다
+  - query param: `offset`, `size`
+  - 응답: `ApiResponse<OffsetSliceResponse<FanLetterHotResponse>>`
+- HOT 결과가 비면 `Hot콘텐츠가 없습니다 더많은 최신글을 확인해 보세요` 문구를 보여주면 된다
 
 프론트가 지금 해두면 좋은 것:
 
@@ -534,23 +563,11 @@ Dashboard B:
 
 아래는 현재 고정된 우선순위다.
 
-- `5-1`과 `5-3`은 필수 구현 예정으로 보는 것이 맞다
-- `5-2`의 포스트페이지 동시성/캐싱은 1차 구현이 끝났고, 이제는 검증/튜닝 단계로 보는 것이 맞다
-- `5-4 ~ 5-6`은 후순위라 이번 작업 범위에서 미구현으로 끝날 수 있다
+- `5-1`은 이미 1차 반영이 끝난 상태 정리용이다
+- `5-2`가 현재 실제 1순위다
+- `5-3 ~ 5-5`는 후순위라 이번 작업 범위에서 미구현으로 끝날 수 있다
 
-## 5-1. 필수 1순위: 아티스트페이지 코드 검토
-
-백엔드 예정 작업:
-
-- 방금 붙은 ArtistPost/artist-page 관련 코드 재검토
-- 응답 shape, 권한, 댓글/좋아요/미디어 연결, 프론트에서 쓰는 화면 흐름 재확인
-
-프론트 준비 포인트:
-
-- ArtistPost/artist-page 화면을 먼저 안정적으로 붙이는 게 우선이다
-- 이 단계에서는 큰 신규 API보다 세부 응답 shape 정리와 edge case 보정 가능성을 열어두는 편이 좋다
-
-## 5-2. 상태 반영: 포스트페이지 동시성 / 캐싱
+## 5-1. 상태 반영: 포스트페이지 동시성 / 캐싱
 
 백엔드 현재 반영 상태:
 
@@ -571,19 +588,18 @@ Dashboard B:
 - 댓글은 상세 진입 직후와 대댓글 펼침 시 재조회될 수 있으니, 로컬 상태와 서버 상태를 쉽게 동기화할 수 있게 두는 것이 좋다
 - HOT/최신 탭 전환이 생겨도 데이터 소스가 분리될 수 있게 컴포넌트를 짜두는 편이 좋다
 
-## 5-3. 필수 3순위: 메인 홈 대시보드 / 아티스트 홈 대시보드
+## 5-2. 필수 1순위: 메인 홈 대시보드
 
 백엔드 예정 작업:
 
 - 메인 홈 화면의 대시보드성 조회
-- 아티스트 페이지 홈 화면의 최신글 대시보드성 조회
 
 프론트 준비 포인트:
 
-- 아티스트/아티스트멤버 대시보드와 아티스트 홈 최신글 영역을 별도 섹션으로 열어두는 편이 좋다
+- 아티스트/아티스트멤버 대시보드를 별도 섹션으로 열어두는 편이 좋다
 - 이 구간은 mock에서 실연동으로 넘어갈 가능성이 있다
 
-## 5-4. 후순위 기능: YouTube 미디어 탭
+## 5-3. 후순위 기능: YouTube 미디어 탭
 
 백엔드 예정 방향:
 
@@ -596,7 +612,7 @@ Dashboard B:
 - 아직 실제 구현은 확인되지 않았다
 - 프론트는 미디어 탭을 만든다면 "영상 카드 + 외부 링크" 형태를 먼저 생각하는 편이 안전하다
 
-## 5-5. 후순위 기능: 종료된 스트리밍 영상 조회
+## 5-4. 후순위 기능: 종료된 스트리밍 영상 조회
 
 백엔드 예정 방향:
 
@@ -609,7 +625,7 @@ Dashboard B:
 - 하지만 종료 영상 저장/조회(VOD)는 아직 확인되지 않았다
 - 프론트는 라이브와 VOD를 같은 카드로 묶을지 분리할지 열어두는 편이 좋다
 
-## 5-6. 후순위 기능: Follow / 알림
+## 5-5. 후순위 기능: Follow / 알림
 
 백엔드 예정 가능 작업:
 
@@ -659,6 +675,41 @@ Dashboard B:
   "data": {
     "content": [],
     "nextCursor": 120,
+    "hasNext": true,
+    "size": 10
+  },
+  "error": null
+}
+```
+
+## 6-3A. ScoreCursorSliceResponse
+
+FanPost HOT은 아래 응답을 사용한다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": [],
+    "nextScoreCursor": 14,
+    "nextIdCursor": 120,
+    "hasNext": true,
+    "size": 10
+  },
+  "error": null
+}
+```
+
+## 6-3B. OffsetSliceResponse
+
+FanLetter HOT은 아래 응답을 사용한다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": [],
+    "nextOffset": 10,
     "hasNext": true,
     "size": 10
   },
@@ -790,6 +841,9 @@ mock 우선:
 - FanLetter는 텍스트 피드처럼 만들면 정책과 어긋난다
 - FanLetter 목록은 작성자 프로필/배지가 기본 노출 대상이 아니다
 - HOT은 단순 인기순이 아니라 최근 24시간 제한이 붙는다
+- FanPost HOT과 FanLetter HOT의 페이지네이션 방식이 다르다
+- FanPost HOT은 `scoreCursor + idCursor`
+- FanLetter HOT은 `offset + size`
 - 로컬 환경에서는 media storage가 기본 비활성화라 업로드 테스트가 실패할 수 있다
 
 ## 10. 프론트 AI에 넘기기 좋은 설명
@@ -812,8 +866,7 @@ mock 우선:
 
 필수 구현 예정:
 
-- 아티스트페이지 코드 검토
-- 메인 홈 대시보드 / 아티스트 홈 대시보드
+- 메인 홈 대시보드
 
 후순위 기능:
 
@@ -821,4 +874,4 @@ mock 우선:
 - 종료된 스트리밍 영상 조회
 - Follow / 알림
 
-즉 프론트는 지금 당장은 `FanPost + ArtistPost + FanLetter 실연동`을 안정적으로 붙이고, 그다음은 `artist-page 검토 대응`, `동시성/캐싱 대비 구조`, `dashboard 실연동 대비`, `YouTube/스트리밍 후속 기능 대비 UI` 순서로 가는 것이 가장 안전하다.
+즉 프론트는 지금 당장은 `FanPost + ArtistPost + FanLetter 실연동`과 `HOT 탭 계약 반영`을 안정적으로 붙이고, 그다음은 `동시성/캐싱 대비 구조`, `dashboard 실연동 대비`, `YouTube/스트리밍 후속 기능 대비 UI` 순서로 가는 것이 가장 안전하다.

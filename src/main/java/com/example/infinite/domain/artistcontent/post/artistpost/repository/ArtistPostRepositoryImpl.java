@@ -50,6 +50,34 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
     }
 
     @Override
+    public Optional<ArtistPostReadRow> findLatestRowByArtistId(Long artistId) {
+        QArtistPost artistPost = QArtistPost.artistPost;
+        QMember member = QMember.member;
+
+        // 하이라이트/대시보드는 최신 1건만 필요하므로
+        // 목록 10건 slice 대신 최신 row 1건만 바로 읽는다.
+        return Optional.ofNullable(queryFactory
+                .select(Projections.constructor(
+                        ArtistPostReadRow.class,
+                        artistPost.id,
+                        artistPost.artist.id,
+                        member.id,
+                        member.nickname,
+                        member.profileImageUrl,
+                        Expressions.constant(Boolean.TRUE),
+                        artistPost.content,
+                        artistPost.mediaCount,
+                        artistPost.createdAt
+                ))
+                .from(artistPost)
+                .join(artistPost.writer, member)
+                .where(QuerydslUtils.eq(artistPost.artist.id, artistId))
+                .orderBy(CursorSliceUtils.orderByIdDesc(artistPost.id))
+                .limit(1)
+                .fetchOne());
+    }
+
+    @Override
     public Optional<ArtistPostReadRow> findDetailRowByArtistIdAndArtistPostId(Long artistId, Long artistPostId) {
         QArtistPost artistPost = QArtistPost.artistPost;
         QMember member = QMember.member;

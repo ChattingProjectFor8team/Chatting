@@ -51,7 +51,14 @@ public class ArtistPostLikeCountFlushScheduler {
         } catch (RuntimeException e) {
             // DB 반영 실패 시 drained delta를 Redis에 다시 넣어야
             // 롤백 이후에도 다음 flush/reconcile 전까지 값이 증발하지 않는다.
-            artistPostLikeDeltaBuffer.restoreAll(deltas);
+            try {
+                artistPostLikeDeltaBuffer.restoreAll(deltas);
+            } catch (RuntimeException restoreException) {
+                // 복구도 실패하면 이번 배치 delta를 자동으로 되살릴 수 없으므로,
+                // 운영자가 수동 복구할 수 있게 실패한 대상과 delta를 로그로 남긴다.
+                log.error("ArtistPost likeCount flush restore failed: deltas={}", deltas, restoreException);
+                e.addSuppressed(restoreException);
+            }
             throw e;
         }
     }

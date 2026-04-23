@@ -10,6 +10,7 @@ import com.example.infinite.domain.artistcontent.post.fanletter.dto.request.FanL
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.request.FanLetterUpdateRequest;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterBaseResponse;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterCreateResponse;
+import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterHotResponse;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterListResponse;
 import com.example.infinite.domain.artistcontent.post.fanletter.dto.response.FanLetterResponse;
 import com.example.infinite.domain.artistcontent.post.fanletter.entity.FanLetter;
@@ -26,6 +27,8 @@ import com.example.infinite.domain.subscriptionmembership.service.SubscriptionMe
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.constant.CacheNames;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
+import com.example.infinite.global.common.dto.OffsetSliceResponse;
+import com.example.infinite.global.common.util.querydsl.CursorSliceUtils;
 import com.example.infinite.global.error.ErrorCode;
 import com.example.infinite.global.error.SubscriptionMembershipException;
 import lombok.RequiredArgsConstructor;
@@ -34,10 +37,19 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class FanLetterService {
+
+    private static final int HOT_FAN_LETTER_DEFAULT_SIZE = 10;
+    private static final int HOT_FAN_LETTER_MAX_SIZE = 30;
+    private static final long HOT_LOOKBACK_HOURS = 24L;
+    private static final long HOT_MIN_LIKE_COUNT = 5L;
 
     private final FanLetterRepository fanLetterRepository;
     private final FanLetterReader fanLetterReader;
@@ -81,6 +93,47 @@ public class FanLetterService {
         artistReader.findArtistByIdOrThrow(artistId);
         // fan letter 목록은 count를 포함하지 않으므로 base 응답 자체를 길게 캐시해도 된다.
         return fanLetterBaseCacheService.getFanLetterListBaseSlice(artistId, cursor);
+    }
+
+    public OffsetSliceResponse<FanLetterHotResponse> getHotFanLetters(
+            Long artistId,
+            Integer offset,
+            Integer size
+    ) {
+        artistReader.findArtistByIdOrThrow(artistId);
+        int resolvedOffset = CursorSliceUtils.resolveOffset(offset);
+        int resolvedSize = CursorSliceUtils.resolveLimit(size, HOT_FAN_LETTER_DEFAULT_SIZE, HOT_FAN_LETTER_MAX_SIZE);
+
+        // FanLetter HOT도 최신글 목록 캐시를 재사용하지 않고,
+        // 최근 24시간 + 좋아요 5개 이상 기준으로 후보를 좁힌 뒤 offset slice 를 적용한다.
+        // content 가 비어 있으면 프론트에서 empty state 문구를 그대로 노출하면 된다.
+        OffsetSliceResponse<FanLetterListResponse> baseSlice = fanLetterBaseCacheService.loadHotFanLetterListBase(
+                artistId,
+                LocalDateTime.now().minusHours(HOT_LOOKBACK_HOURS),
+                resolvedOffset,
+                resolvedSize,
+                HOT_MIN_LIKE_COUNT
+        );
+        Map<Long, PostHotData> hotDataByLetterId = postHotDataCacheService.getPostHotDataMap(
+                PostType.FAN_LETTER,
+                baseSlice.content().stream().map(FanLetterListResponse::fanLetterId).toList()
+        );
+
+        // 일반 목록 응답 shape를 최대한 유지하고,
+        // HOT 탭에서 실제로 필요한 likeCount만 추가한 전용 DTO로 마무리한다.
+        List<FanLetterHotResponse> content = baseSlice.content().stream()
+                .map(baseResponse -> FanLetterHotResponse.from(
+                        baseResponse,
+                        hotDataByLetterId.getOrDefault(baseResponse.fanLetterId(), PostHotData.empty())
+                ))
+                .toList();
+
+        return new OffsetSliceResponse<>(
+                content,
+                baseSlice.nextOffset(),
+                baseSlice.hasNext(),
+                baseSlice.size()
+        );
     }
 
     public FanLetterResponse getFanLetter(Long artistId, Long fanLetterId) {

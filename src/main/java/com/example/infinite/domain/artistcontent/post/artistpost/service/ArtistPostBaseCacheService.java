@@ -106,6 +106,22 @@ public class ArtistPostBaseCacheService {
         return ArtistPostBaseResponse.from(row, media, hashtags);
     }
 
+    public ArtistPostBaseResponse loadLatestArtistPostBase(Long artistId) {
+        // 대시보드는 "최신 1건"만 보여 주는 요약 블록이므로
+        // 목록 slice 전체를 만들지 않고 최신 row 하나만 골라 조립한다.
+        ArtistPostReadRow row = artistPostRepository.findLatestRowByArtistId(artistId)
+                .orElse(null);
+        if (row == null) {
+            return null;
+        }
+
+        List<ArtistPostMediaResponse> media = loadPreviewMediaMap(List.of(row.artistPostId()))
+                .getOrDefault(row.artistPostId(), List.of());
+        List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.ARTIST_POST, List.of(row.artistPostId()))
+                .getOrDefault(row.artistPostId(), List.of());
+        return ArtistPostBaseResponse.from(row, media, hashtags);
+    }
+
     private Map<Long, List<ArtistPostMediaResponse>> loadMediaMap(Collection<Long> artistPostIds) {
         if (artistPostIds.isEmpty()) {
             return Map.of();

@@ -97,6 +97,20 @@ public class ArtistPostService {
         return new CursorSliceResponse<>(content, baseSlice.nextCursor(), baseSlice.hasNext(), baseSlice.size());
     }
 
+    public ArtistPostResponse getLatestArtistPost(Long artistId) {
+        artistReader.findArtistByIdOrThrow(artistId);
+
+        // 아티스트 홈 하이라이트는 최신 1건만 쓰므로
+        // 목록 10개 slice 대신 최신 row 1건만 읽어 조립한다.
+        ArtistPostBaseResponse baseResponse = artistPostBaseCacheService.loadLatestArtistPostBase(artistId);
+        if (baseResponse == null) {
+            return null;
+        }
+
+        PostHotData hotData = postHotDataCacheService.getPostHotData(PostType.ARTIST_POST, baseResponse.artistPostId());
+        return ArtistPostResponse.from(baseResponse, hotData);
+    }
+
     public ArtistPostDetailResponse getArtistPost(Long artistId, Long artistPostId, Long commentCursor) {
         artistReader.findArtistByIdOrThrow(artistId);
 

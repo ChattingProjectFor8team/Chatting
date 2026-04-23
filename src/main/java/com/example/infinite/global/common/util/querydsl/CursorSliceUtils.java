@@ -4,6 +4,7 @@ import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.DateTimePath;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.NumberPath;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,6 +22,11 @@ public class CursorSliceUtils {
             return defaultSize;
         }
         return Math.min(size, maxSize);
+    }
+
+    // offset 기반 slice 에서는 음수/누락 입력을 0으로 정규화한다.
+    public static int resolveOffset(Integer offset) {
+        return offset == null || offset < 0 ? 0 : offset;
     }
 
     // id 내림차순 무한 스크롤에서 마지막 id 다음 구간만 조회할 때 사용한다.
@@ -46,5 +52,26 @@ public class CursorSliceUtils {
     // 오름차순 커서 탐색이 필요할 때 사용할 정렬 유틸이다.
     public static OrderSpecifier<Long> orderByIdAsc(NumberPath<Long> idPath) {
         return new OrderSpecifier<>(Order.ASC, idPath);
+    }
+
+    // HOT처럼 score DESC, id DESC 정렬을 쓰는 목록에서는
+    // 마지막 본 (score, id)보다 "뒤에 있는" 구간만 복합 조건으로 잘라야 한다.
+    public static BooleanExpression ltCompositeCursor(
+            NumberExpression<Long> scoreExpression,
+            Long scoreCursor,
+            NumberPath<Long> idPath,
+            Long idCursor
+    ) {
+        if (scoreCursor == null || idCursor == null) {
+            return null;
+        }
+
+        return scoreExpression.lt(scoreCursor)
+                .or(scoreExpression.eq(scoreCursor).and(idPath.lt(idCursor)));
+    }
+
+    // score 중심 정렬 목록의 1차 정렬 기준을 공통화한다.
+    public static OrderSpecifier<Long> orderByScoreDesc(NumberExpression<Long> scoreExpression) {
+        return new OrderSpecifier<>(Order.DESC, scoreExpression);
     }
 }

@@ -40,7 +40,14 @@ public class ArtistPostCommentCountFlushScheduler {
         } catch (RuntimeException e) {
             // DB 반영이 실패하면 트랜잭션은 롤백되지만,
             // drainAll()로 이미 Redis에서 빠진 delta는 직접 되돌려야 다음 주기에 재시도할 수 있다.
-            artistPostCommentDeltaBuffer.restoreAll(deltas);
+            try {
+                artistPostCommentDeltaBuffer.restoreAll(deltas);
+            } catch (RuntimeException restoreException) {
+                // 복구마저 실패하면 이번 배치 delta가 유실될 수 있으므로,
+                // 운영자가 수동 복구할 수 있게 대상 post와 delta를 에러 로그에 남긴다.
+                log.error("ArtistPost commentCount flush restore failed: deltas={}", deltas, restoreException);
+                e.addSuppressed(restoreException);
+            }
             throw e;
         }
     }
