@@ -20,6 +20,10 @@ spring:
         enabled: true
         bucket: ${AWS_S3_BUCKET}
         domain: ${CLOUDFRONT_DOMAIN:http://localhost:8080}
+      parameterstore:
+        enabled: false
+      secretsmanager:
+        enabled: false
 
 
 

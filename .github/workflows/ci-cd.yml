@@ -168,7 +168,7 @@ jobs:
           JWT_SECRET_KEY=${JWT_SECRET_KEY}
           EOF
           
-          # 2. 생성된 .env 파일을 S3 버킷의 deploy 폴더로 업로드 (노출 방지)
+        # 2. 생성된 .env 파일을 S3 버킷의 deploy 폴더로 업로드 (노출 방지)
           aws s3 cp .env s3://${S3_BUCKET_NAME}/deploy/.env
 
       # Step 2-2: Launch Template 새 버전 생성
@@ -181,7 +181,7 @@ jobs:
           LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
         run: |
-          # ⚠️ 이제 sed 치환에 민감한 비밀번호가 전혀 들어가지 않습니다!
+        # ⚠️ 이제 sed 치환에 민감한 비밀번호가 전혀 들어가지 않습니다!
           USER_DATA=$(cat <<'USERDATA' | sed \
             "s|__IMAGE_TAG__|${IMAGE_TAG}|g; \
              s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; \
@@ -196,19 +196,19 @@ jobs:
           systemctl enable docker
           systemctl start docker
           
-          # 🌟 핵심 1: EC2 부팅 시 S3에서 .env 파일을 몰래 다운로드
+        # 🌟 핵심 1: EC2 부팅 시 S3에서 .env 파일을 몰래 다운로드
           aws s3 cp s3://__S3_BUCKET_NAME__/deploy/.env /tmp/.env
           chmod 600 /tmp/.env
           
           aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com
           docker pull __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          # 🌟 핵심 2: 길고 위험했던 -e 옵션들 대신 --env-file 하나로 안전하게 주입
+        # 🌟 핵심 2: 길고 위험했던 -e 옵션들 대신 --env-file 하나로 안전하게 주입
           docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo \
             --env-file /tmp/.env \
             __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          # 🌟 핵심 3: 컨테이너 실행 후 서버에 남은 .env 파일 삭제 (보안)
+        # 🌟 핵심 3: 컨테이너 실행 후 서버에 남은 .env 파일 삭제 (보안)
           rm -f /tmp/.env
           USERDATA
           )
