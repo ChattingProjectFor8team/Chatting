@@ -57,24 +57,13 @@ jobs:
         with:
           java-version: '21'
           distribution: 'corretto'
+          cache: 'gradle'
 
-      # Step 4: Gradle 캐시
-      - name: Cache Gradle packages
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-            
-
-      # Step 5-1: 실행 권한 부여 (추가 권장)
+      # Step 4: 실행 권한 부여 (추가 권장)
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # Step 5-2: 테스트 실행
+      # Step 4-2: 테스트 실행
       - name: Run tests
         run: ./gradlew test --stacktrace --info
         env:
@@ -163,29 +152,53 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
+          # 👇 GitHub Variables & Secrets 불러오기
+          RDS_HOST: ${{ vars.RDS_HOST }}
+          RDS_USERNAME: ${{ vars.RDS_USERNAME }}
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+          REDIS_HOST: ${{ vars.REDIS_HOST }}
+          REDIS_PORT: ${{ vars.REDIS_PORT }}
+          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
-
-          # base64 인코딩 (줄바꿈 방지)
-          USER_DATA=$(cat <<'USERDATA' | sed "s|__IMAGE_TAG__|${IMAGE_TAG}|g; s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; s|__AWS_REGION__|${AWS_REGION}|g; s|__ECR_REPOSITORY__|${ECR_REPOSITORY}|g" | base64 -w 0
+          # 스크립트 내부 변수를 실제 값으로 치환 (sed 활용)
+          USER_DATA=$(cat <<'USERDATA' | sed \
+            "s|__IMAGE_TAG__|${IMAGE_TAG}|g; \
+             s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; \
+             s|__AWS_REGION__|${AWS_REGION}|g; \
+             s|__ECR_REPOSITORY__|${ECR_REPOSITORY}|g; \
+             s|__RDS_HOST__|${RDS_HOST}|g; \
+             s|__RDS_USERNAME__|${RDS_USERNAME}|g; \
+             s|__RDS_PASSWORD__|${RDS_PASSWORD}|g; \
+             s|__REDIS_HOST__|${REDIS_HOST}|g; \
+             s|__REDIS_PORT__|${REDIS_PORT}|g; \
+             s|__S3_BUCKET_NAME__|${S3_BUCKET_NAME}|g; \
+             s|__JWT_SECRET_KEY__|${JWT_SECRET_KEY}|g" | base64 -w 0
           #!/bin/bash
           set -e
-          AWS_REGION="__AWS_REGION__"
-          AWS_ACCOUNT_ID="__AWS_ACCOUNT_ID__"
-          ECR_REPOSITORY="__ECR_REPOSITORY__"
-          IMAGE_TAG="__IMAGE_TAG__"
-          ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+          
           dnf update -y
           dnf install -y docker
           systemctl enable docker
           systemctl start docker
-          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-          docker pull ${ECR_URI}:${IMAGE_TAG}
-          docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo -e SPRING_PROFILES_ACTIVE=prod ${ECR_URI}:${IMAGE_TAG}
+          
+          aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com
+          docker pull __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
+          
+          # 👇 도커 컨테이너 실행 시 환경 변수 주입!
+          docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo \
+            -e SPRING_PROFILES_ACTIVE=prod \
+            -e RDS_HOST="__RDS_HOST__" \
+            -e RDS_USERNAME="__RDS_USERNAME__" \
+            -e RDS_PASSWORD="__RDS_PASSWORD__" \
+            -e REDIS_HOST="__REDIS_HOST__" \
+            -e REDIS_PORT="__REDIS_PORT__" \
+            -e S3_BUCKET_NAME="__S3_BUCKET_NAME__" \
+            -e JWT_SECRET_KEY="__JWT_SECRET_KEY__" \
+            __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           USERDATA
           )
 
-          # [중요] 변수를 큰따옴표로 감싸서 공백 에러 방지
           NEW_VERSION=$(aws ec2 create-launch-template-version \
             --launch-template-id "$LAUNCH_TEMPLATE_ID" \
             --source-version '$Latest' \

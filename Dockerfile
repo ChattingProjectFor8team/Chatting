@@ -2,11 +2,21 @@
 FROM amazoncorretto:21-alpine AS build
 WORKDIR /app
 
-# 전체 복사 후 빌드
-COPY . .
+# 🌟 핵심 1: 소스코드를 빼고, Gradle 설정 파일들만 먼저 복사합니다.
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle settings.gradle ./
 
-# 테스트 실패 시 빌드 자체가 중단되도록 보장
-RUN chmod +x gradlew && ./gradlew bootJar -x test
+# 🌟 핵심 2: 소스코드가 없어도 라이브러리들을 미리 다 다운로드 받습니다.
+# 코드가 수정되어도 이 단계는 '캐시'되어 1초 만에 지나갑니다!
+RUN chmod +x gradlew
+RUN ./gradlew dependencies --no-daemon || true
+
+# 🌟 핵심 3: 진짜 소스코드는 라이브러리를 다 받은 후에 복사합니다.
+COPY src src
+
+# 실제 빌드 (이미 도커 안에 라이브러리가 다 있어서 1~2분 안에 끝납니다)
+RUN ./gradlew bootJar -x test --no-daemon
 
 # 2. 실행 스테이지
 FROM amazoncorretto:21-alpine
@@ -17,7 +27,6 @@ COPY --from=build /app/build/libs/*.jar app.jar
 
 EXPOSE 8080
 
-# 컨테이너 실행 시 Spring 프로파일이나 환경변수를 유연하게 받을 수 있도록 설정
+# 컨테이너 실행
 ENTRYPOINT ["java", "-jar", "app.jar"]
-
 
