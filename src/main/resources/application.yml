@@ -72,6 +72,9 @@ media:
     max-video-size-bytes: 104857600
     allowed-image-extensions: jpg,jpeg,png,gif,webp
     allowed-video-extensions: mp4,mov,webm
+  youtube:
+    # 아티스트 미디어 탭에서 유튜브 링크 import 시 metadata 조회에 사용한다.
+    api-key: ${YOUTUBE_DATA_API_KEY:}
 
 
 #for prometheus
