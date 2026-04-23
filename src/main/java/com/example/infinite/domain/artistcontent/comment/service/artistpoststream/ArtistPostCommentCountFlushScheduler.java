@@ -8,11 +8,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ArtistPostCommentCountFlushScheduler {
+
+    private static final int LOG_SAMPLE_SIZE = 10;
 
     private final ArtistPostCommentDeltaBuffer artistPostCommentDeltaBuffer;
     private final ArtistPostRepository artistPostRepository;
@@ -45,7 +48,12 @@ public class ArtistPostCommentCountFlushScheduler {
             } catch (RuntimeException restoreException) {
                 // 복구마저 실패하면 이번 배치 delta가 유실될 수 있으므로,
                 // 운영자가 수동 복구할 수 있게 대상 post와 delta를 에러 로그에 남긴다.
-                log.error("ArtistPost commentCount flush restore failed: deltas={}", deltas, restoreException);
+                log.error(
+                        "ArtistPost commentCount flush restore failed: deltaCount={}, sample={}",
+                        deltas.size(),
+                        summarizeDeltas(deltas),
+                        restoreException
+                );
                 e.addSuppressed(restoreException);
             }
             throw e;
@@ -63,5 +71,12 @@ public class ArtistPostCommentCountFlushScheduler {
     public void reconcileAll() {
         int updatedRows = artistPostRepository.reconcileAllCommentCounts();
         log.info("ArtistPost commentCount full reconcile completed: updatedRows={}", updatedRows);
+    }
+
+    private String summarizeDeltas(List<ArtistPostCommentDelta> deltas) {
+        return deltas.stream()
+                .limit(LOG_SAMPLE_SIZE)
+                .map(delta -> delta.artistPostId() + ":" + delta.delta())
+                .collect(Collectors.joining(", ", "[", deltas.size() > LOG_SAMPLE_SIZE ? ", ...]" : "]"));
     }
 }

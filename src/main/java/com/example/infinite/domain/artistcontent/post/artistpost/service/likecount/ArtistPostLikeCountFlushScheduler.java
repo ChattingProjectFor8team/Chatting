@@ -8,11 +8,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ArtistPostLikeCountFlushScheduler {
+
+    private static final int LOG_SAMPLE_SIZE = 10;
 
     private final ArtistPostLikeDeltaBuffer artistPostLikeDeltaBuffer;
     private final ArtistPostRepository artistPostRepository;
@@ -56,7 +59,12 @@ public class ArtistPostLikeCountFlushScheduler {
             } catch (RuntimeException restoreException) {
                 // 복구도 실패하면 이번 배치 delta를 자동으로 되살릴 수 없으므로,
                 // 운영자가 수동 복구할 수 있게 실패한 대상과 delta를 로그로 남긴다.
-                log.error("ArtistPost likeCount flush restore failed: deltas={}", deltas, restoreException);
+                log.error(
+                        "ArtistPost likeCount flush restore failed: deltaCount={}, sample={}",
+                        deltas.size(),
+                        summarizeDeltas(deltas),
+                        restoreException
+                );
                 e.addSuppressed(restoreException);
             }
             throw e;
@@ -82,5 +90,12 @@ public class ArtistPostLikeCountFlushScheduler {
         // 하루 1회 원본 Reaction 집계를 다시 세어 delta flush 누락이나 운영 중 드리프트를 최종 보정한다.
         int updatedRowCount = artistPostRepository.reconcileAllLikeCounts();
         log.info("ArtistPost likeCount full reconcile completed: updatedRows={}", updatedRowCount);
+    }
+
+    private String summarizeDeltas(List<ArtistPostLikeDelta> deltas) {
+        return deltas.stream()
+                .limit(LOG_SAMPLE_SIZE)
+                .map(delta -> delta.artistPostId() + ":" + delta.delta())
+                .collect(Collectors.joining(", ", "[", deltas.size() > LOG_SAMPLE_SIZE ? ", ...]" : "]"));
     }
 }

@@ -12,6 +12,7 @@ import com.example.infinite.domain.member.member.support.MemberInputSupport;
 import com.example.infinite.domain.member.member.support.MemberReader;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,8 +47,21 @@ public class FollowService {
                     return FollowResponse.of(artistMemberId, false);
                 })
                 .orElseGet(() -> {
-                    followRepository.save(Follow.create(follower, targetArtistMember));
-                    return FollowResponse.of(artistMemberId, true);
+                    try {
+                        // 같은 사용자가 같은 대상을 거의 동시에 follow 하면 둘 다 "미존재"를 보고 insert를 시도할 수 있다.
+                        // 이 경우 unique 제약이 최종 방어선이 되므로, saveAndFlush로 여기서 바로 감지하고 현재 상태를 다시 해석한다.
+                        followRepository.saveAndFlush(Follow.create(follower, targetArtistMember));
+                        return FollowResponse.of(artistMemberId, true);
+                    } catch (DataIntegrityViolationException exception) {
+                        boolean followed = followRepository.findByFollowerMemberIdAndTargetArtistMemberId(
+                                follower.getId(),
+                                artistMemberId
+                        ).isPresent();
+                        if (followed) {
+                            return FollowResponse.of(artistMemberId, true);
+                        }
+                        throw exception;
+                    }
                 });
     }
 
