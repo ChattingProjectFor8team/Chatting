@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Connectfin — Fan Platform Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100vh; background: #0A0B10; font-family: 'Pretendard Variable', system-ui, sans-serif; }
+  body { overflow-x: hidden; }
+  button { font-family: inherit; }
+  input, textarea { font-family: inherit; outline: none; }
+  input::placeholder { color: rgba(128,128,128,0.6); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @keyframes connectfin-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.85); } }
+  @keyframes connectfin-shimmer { 0% { transform: translateX(0) translateY(0); } 100% { transform: translateX(-48px) translateY(-48px); } }
+  @keyframes connectfin-float { 0% { transform: translateY(0) scale(0.8); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-220px) scale(1.1); opacity: 0; } }
+  @keyframes connectfin-chatin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes connectfin-fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes tweak-hint-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.55; } }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7B2CFF"/>
+      <stop offset="100%" stop-color="#FF3DA1"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="36" fill="url(#bg)"/>
+  <g transform="translate(100 100)" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round">
+    <path d="M-32 0 C-32 -18 -14 -18 -14 0 C-14 18 14 18 14 0 C14 -18 32 -18 32 0 C32 18 14 18 14 0 C14 -18 -14 -18 -14 0 C-14 18 -32 18 -32 0 Z"/>
+  </g>
+  <text x="100" y="170" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="#fff" text-anchor="middle" letter-spacing="2">CONNECTFIN</text>
+</svg>
+</template>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
+
+<script type="text/babel" src="components/tokens.jsx"></script>
+<script type="text/babel" src="components/api-client.jsx"></script>
+<script type="text/babel" src="components/desktop-data.jsx"></script>
+<script type="text/babel" src="components/screens-main.jsx"></script>
+<script type="text/babel" src="components/screens-realtime.jsx"></script>
+<script type="text/babel" src="components/screens-raffle.jsx"></script>
+<script type="text/babel" src="components/desktop-shell.jsx"></script>
+<script type="text/babel" src="components/desktop-profile.jsx"></script>
+<script type="text/babel" src="components/desktop-global.jsx"></script>
+<script type="text/babel" src="components/desktop-dm.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "theme": "dark",
+  "liveOn": true,
+  "simSpeed": 0.5,
+  "viewMode": "mobile",
+  "accentHue": 150,
+  "desktopView": false
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweaks] = React.useState(() => {
+    try { return { ...TWEAKS, ...(JSON.parse(localStorage.getItem('connectfin_tweaks') || '{}')) }; }
+    catch { return TWEAKS; }
+  });
+  const [showTweaks, setShowTweaks] = React.useState(false);
+
+  // Global view (for desktop)
+  const [globalView, setGlobalView] = React.useState('home'); // home | artist | jelly | shop | live | dm
+  const [artistId, setArtistId] = React.useState(1);
+  const [profileTab, setProfileTab] = React.useState('highlight');
+  // Mobile screen
+  const [mobileScreen, setMobileScreen] = React.useState('home');
+  const [threadId, setThreadId] = React.useState(1);
+  const [raffleId, setRaffleId] = React.useState(1);
+
+  // Auth state
+  const [authUser, setAuthUser] = React.useState(() => {
+    const token = window.ConnectfinAPI?.getToken();
+    return token ? { token } : null;
+  });
+  const [showLogin, setShowLogin] = React.useState(false);
+
+  const handleLogin = async (email, password) => {
+    try {
+      const res = await window.ConnectfinAPI.api('/api/auth/v1/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      window.ConnectfinAPI.setToken(res.accessToken);
+      setAuthUser({ token: res.accessToken, email });
+      setShowLogin(false);
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const handleLogout = () => {
+    window.ConnectfinAPI.clearToken();
+    setAuthUser(null);
+  };
+
+  React.useEffect(() => {
+    localStorage.setItem('connectfin_tweaks', JSON.stringify(tweaks));
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: tweaks }, '*'); } catch {}
+  }, [tweaks]);
+
+  // Tweaks host protocol + keyboard shortcut
+  React.useEffect(() => {
+    const msgHandler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setShowTweaks(true);
+      if (e.data?.type === '__deactivate_edit_mode') setShowTweaks(false);
+    };
+    const keyHandler = (e) => {
+      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        const tag = (document.activeElement?.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return;
+        e.preventDefault();
+        setShowTweaks(v => !v);
+      }
+      if (e.key === 'Escape') setShowTweaks(false);
+    };
+    window.addEventListener('message', msgHandler);
+    window.addEventListener('keydown', keyHandler);
+    try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch {}
+    return () => {
+      window.removeEventListener('message', msgHandler);
+      window.removeEventListener('keydown', keyHandler);
+    };
+  }, []);
+
+  const baseTheme = THEMES[tweaks.theme] || THEMES.dark;
+  const t = React.useMemo(() => {
+    if (tweaks.theme !== 'dark') return baseTheme;
+    const h = tweaks.accentHue;
+    const accent = `oklch(0.72 0.22 ${h})`;
+    const accent2 = `oklch(0.78 0.18 ${(h + 140) % 360})`;
+    return {
+      ...baseTheme,
+      accent, accent2,
+      chip: `oklch(0.72 0.22 ${h} / 0.18)`,
+      gradient: `linear-gradient(135deg, ${accent} 0%, ${accent2} 100%)`,
+    };
+  }, [baseTheme, tweaks.accentHue, tweaks.theme]);
+
+  // ── Desktop mode ──
+  if (tweaks.viewMode === 'desktop') {
+    const artist = ARTISTS.find(a => a.id === artistId) || ARTISTS[0];
+
+    const openArtist = (id) => { setArtistId(id); setGlobalView('artist'); setProfileTab('highlight'); };
+    const goLive = (id) => { setArtistId(id); setMobileScreen('live'); setGlobalView('live'); };
+    const openDM = () => { setGlobalView('dm'); };
+    const openMembership = () => { setTweaks(tw => ({ ...tw, viewMode: 'mobile' })); setMobileScreen('membership'); };
+
+    let body;
+    if (globalView === 'home') body = <DesktopHome t={t} theme={tweaks.theme} onArtistOpen={openArtist} onOpenLive={goLive} onNavGlobal={setGlobalView}/>;
+    else if (globalView === 'artist') body = <DesktopArtistProfile t={t} theme={tweaks.theme} artist={artist} tab={profileTab} onNavProfile={setProfileTab} onOpenLive={goLive} onOpenDM={openDM} onOpenMembership={openMembership}/>;
+    else if (globalView === 'jelly') body = <DesktopJellyShop t={t} theme={tweaks.theme}/>;
+    else if (globalView === 'shop') body = <DesktopShop t={t} theme={tweaks.theme}/>;
+    else if (globalView === 'live') body = <DesktopLiveViewer t={t} theme={tweaks.theme} artistId={artistId} speed={tweaks.simSpeed} liveOn={tweaks.liveOn} onExit={() => setGlobalView('artist')}/>;
+    else if (globalView === 'dm') body = <DesktopDMScreen t={t} theme={tweaks.theme} onExit={() => setGlobalView('home')}/>;
+
+    return (
+      <>
+        {showLogin && <LoginModal t={t} theme={tweaks.theme} onLogin={handleLogin} onClose={() => setShowLogin(false)}/>}
+        <DesktopShell t={t} theme={tweaks.theme}
+          activeArtist={globalView === 'artist' ? artist : null}
+          globalView={globalView}
+          profileTab={profileTab}
+          onNavGlobal={(v) => { setGlobalView(v); }}
+          onNavProfile={setProfileTab}
+          onArtistOpen={openArtist}
+          authUser={authUser}
+          onShowLogin={() => setShowLogin(true)}
+          onLogout={handleLogout}
+        >
+          {body}
+        </DesktopShell>
+        {globalView !== 'dm' && <DMFloatingShortcut t={t} theme={tweaks.theme} onOpenDM={openDM}/>}
+        <HiddenTweaksTrigger show={showTweaks} onShow={() => setShowTweaks(true)} t={t}/>
+        {showTweaks && <TweaksPanel tweaks={tweaks} setTweaks={setTweaks} t={t} theme={tweaks.theme} onClose={() => setShowTweaks(false)}/>}
+      </>
+    );
+  }
+
+  // ── Mobile mode ──
+  return <MobileApp
+    tweaks={tweaks} setTweaks={setTweaks} t={t} showTweaks={showTweaks} setShowTweaks={setShowTweaks}
+    screen={mobileScreen} setScreen={setMobileScreen}
+    artistId={artistId} setArtistId={setArtistId}
+    threadId={threadId} setThreadId={setThreadId}
+    raffleId={raffleId} setRaffleId={setRaffleId}
+    authUser={authUser}
+    onShowLogin={() => setShowLogin(true)}
+    onLogout={handleLogout}
+  />;
+}
+
+// ───────── DM Floating Shortcut (desktop) ─────────
+function DMFloatingShortcut({ t, theme, onOpenDM }) {
+  const [open, setOpen] = React.useState(false);
+  const threads = (typeof DM_THREADS !== 'undefined' ? DM_THREADS : []).slice(0, 4);
+  const unread = threads.reduce((sum, x) => sum + (x.unread || 0), 0);
+
+  return (
+    <>
+      {/* Backdrop for panel */}
+      {open && (
+        <div onClick={() => setOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 79,
+          background: 'transparent',
+        }}/>
+      )}
+
+      {/* Preview panel */}
+      {open && (
+        <div style={{
+          position: 'fixed', right: 24, bottom: 94, zIndex: 81,
+          width: 340,
+          background: theme === 'dark' ? 'rgba(18,20,28,0.97)' : 'rgba(255,255,255,0.98)',
+          color: t.text,
+          border: `1px solid ${t.lineStrong}`,
+          borderRadius: 16,
+          boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(24px)',
+          overflow: 'hidden',
+          animation: 'connectfin-fadein 160ms ease-out',
+        }}>
+          <div style={{
+            padding: '14px 18px',
+            borderBottom: `1px solid ${t.line}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ fontFamily: t.fontMono, fontSize: 10, letterSpacing: 1, color: t.textDim }}>DIRECT MESSAGE</div>
+              <div style={{ fontFamily: t.fontDisplay, fontWeight: 800, fontSize: 16 }}>
+                아티스트와의 대화
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} style={{
+              background: 'transparent', border: 'none', color: t.textDim,
+              fontSize: 20, cursor: 'pointer', lineHeight: 1,
+            }}>×</button>
+          </div>
+
+          <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+            {threads.length === 0 ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center', color: t.textDim, fontSize: 13 }}>
+                아직 대화가 없어요
+              </div>
+            ) : threads.map(th => {
+              const artist = (typeof ARTISTS !== 'undefined' ? ARTISTS : []).find(a => a.id === th.artistId) || {};
+              return (
+                <div key={th.id} onClick={() => { setOpen(false); onOpenDM(); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 18px', cursor: 'pointer',
+                  borderBottom: `1px solid ${t.line}`,
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{
+                    width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+                    background: artist.color1 && artist.color2
+                      ? `linear-gradient(135deg, ${artist.color1}, ${artist.color2})`
+                      : t.gradient,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontWeight: 800, fontSize: 13,
+                    position: 'relative',
+                  }}>
+                    {artist.name?.slice(0, 2) || '??'}
+                    {(th.unread || 0) > 0 && (
+                      <div style={{
+                        position: 'absolute', top: -2, right: -2,
+                        minWidth: 18, height: 18, borderRadius: 9,
+                        background: t.hot, color: '#fff',
+                        fontSize: 10, fontWeight: 800,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '0 5px',
+                        border: `2px solid ${theme === 'dark' ? '#121420' : '#fff'}`,
+                      }}>{th.unread}</div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {artist.name}
+                        {th.subscribed && <span style={{ color: t.accent2, marginLeft: 4 }}>✓</span>}
+                      </div>
+                      <div style={{ fontSize: 10, color: t.textDim, fontFamily: t.fontMono, flexShrink: 0 }}>
+                        {th.time || ''}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: 12, color: (th.unread || 0) > 0 ? t.text : t.textDim,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      marginTop: 2, fontWeight: (th.unread || 0) > 0 ? 600 : 400,
+                    }}>
+                      {th.last || '대화 시작하기'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button onClick={() => { setOpen(false); onOpenDM(); }} style={{
+            width: '100%', padding: '14px 18px',
+            border: 'none', background: t.gradient, color: '#fff',
+            fontWeight: 800, fontSize: 13, cursor: 'pointer',
+            fontFamily: t.fontMono, letterSpacing: 0.5,
+          }}>
+            전체 DM 보기 →
+          </button>
+        </div>
+      )}
+
+      {/* Floating button */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-label="DM 바로가기"
+        style={{
+          position: 'fixed', right: 24, bottom: 24, zIndex: 82,
+          width: 58, height: 58, borderRadius: '50%',
+          border: 'none', cursor: 'pointer',
+          background: t.gradient,
+          boxShadow: open
+            ? `0 0 0 4px ${t.chip}, 0 16px 40px rgba(0,0,0,0.4)`
+            : '0 10px 30px rgba(0,0,0,0.35)',
+          color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 200ms ease',
+          transform: open ? 'scale(0.94)' : 'scale(1)',
+        }}
+        onMouseEnter={e => { if (!open) e.currentTarget.style.transform = 'scale(1.06)'; }}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.transform = 'scale(1)'; }}
+      >
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+        </svg>
+        {unread > 0 && !open && (
+          <div style={{
+            position: 'absolute', top: -2, right: -2,
+            minWidth: 22, height: 22, borderRadius: 11,
+            background: t.hot, color: '#fff',
+            fontSize: 11, fontWeight: 800,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 6px',
+            border: `2px solid ${theme === 'dark' ? '#0A0B10' : '#fff'}`,
+            fontFamily: t.fontMono,
+          }}>{unread > 99 ? '99+' : unread}</div>
+        )}
+      </button>
+    </>
+  );
+}
+
+// ───────── Hidden tweaks trigger ─────────
+function HiddenTweaksTrigger({ show, onShow, t }) {
+  const [hovered, setHovered] = React.useState(false);
+  if (show) return null;
+  return (
+    <div style={{
+      position: 'fixed', bottom: 10, left: 10, zIndex: 90,
+      padding: 8, cursor: 'pointer',
+    }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onShow}
+      title="Shift+T to toggle Tweaks"
+    >
+      <div style={{
+        width: hovered ? 'auto' : 8, height: 8,
+        padding: hovered ? '4px 10px' : 0, borderRadius: 20,
+        background: hovered ? t.accent : t.textMuted,
+        opacity: hovered ? 1 : 0.35,
+        animation: hovered ? 'none' : 'tweak-hint-pulse 2.4s ease-in-out infinite',
+        display: 'flex', alignItems: 'center', gap: 6,
+        color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+        fontFamily: t.fontMono, transition: 'all 160ms',
+        boxShadow: hovered ? '0 6px 20px rgba(0,0,0,0.3)' : 'none',
+      }}>
+        {hovered && <span>⚙ TWEAKS · ⇧T</span>}
+      </div>
+    </div>
+  );
+}
+
+// ───────── Desktop Live Viewer (uses same layout as artist) ─────────
+function DesktopLiveViewer({ t, theme, artistId, speed, liveOn, onExit }) {
+  const a = ARTISTS.find(x => x.id === artistId) || ARTISTS[0];
+  const [messages, setMessages] = React.useState(() => LIVE_SEEDS.map((s, i) => ({ ...s, id: i, t: s.t || 'fan' })));
+  const [viewers, setViewers] = React.useState(a.viewers || 58_000);
+  const [input, setInput] = React.useState('');
+  const [hearts, setHearts] = React.useState([]);
+  const nextId = React.useRef(100);
+  const listRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!liveOn) return;
+    const id = setInterval(() => {
+      const seed = LIVE_SEEDS[Math.floor(Math.random() * LIVE_SEEDS.length)];
+      setMessages(m => [...m.slice(-80), { ...seed, id: nextId.current++, t: seed.t || 'fan' }]);
+      setViewers(v => Math.max(1000, v + Math.round((Math.random() - 0.4) * 300 * speed)));
+      if (Math.random() < 0.6) {
+        setHearts(h => [...h.slice(-15), { id: nextId.current++, x: 10 + Math.random() * 80, d: 1600 + Math.random() * 2200 }]);
+      }
+    }, 550 / speed);
+    return () => clearInterval(id);
+  }, [speed, liveOn]);
+
+  React.useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [messages]);
+
+  const send = () => {
+    if (!input.trim()) return;
+    setMessages(m => [...m, { id: nextId.current++, u: 'me', m: input, t: 'me' }]);
+    setInput('');
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', height: 'calc(100vh - 56px)' }}>
+      <div style={{ position: 'relative', overflow: 'hidden', background: '#000' }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: `repeating-linear-gradient(30deg, ${a.color1} 0 28px, ${a.color2} 28px 56px)`,
+          animation: liveOn ? 'connectfin-shimmer 10s linear infinite' : 'none',
+        }}/>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 25%, transparent 65%, rgba(0,0,0,0.75) 100%)' }}/>
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontFamily: t.fontMono, color: 'rgba(255,255,255,0.6)', fontSize: 13, letterSpacing: 2 }}>[ LIVE VIDEO · {a.name} · 1080p ]</div>
+
+        <div style={{ position: 'absolute', top: 16, left: 18, display: 'flex', gap: 8 }}>
+          <div style={{ padding: '6px 12px', borderRadius: 6, background: t.liveGradient, fontSize: 12, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'connectfin-pulse 1.2s ease-in-out infinite' }}/> LIVE
+          </div>
+          <div style={{ padding: '6px 12px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', fontSize: 12, fontFamily: t.fontMono, backdropFilter: 'blur(10px)', color: '#fff' }}>
+            👁 {viewers.toLocaleString()}
+          </div>
+        </div>
+
+        <div style={{ position: 'absolute', bottom: 28, left: 28, right: 28, color: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+            <ArtistAvatar artist={a} size={56} t={t} ring/>
+            <div>
+              <div style={{ fontFamily: t.fontDisplay, fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>{a.stage}</div>
+              <div style={{ fontSize: 12, opacity: 0.75, fontFamily: t.fontMono }}>@{a.name.toLowerCase()} · {a.genre} · {a.followers} followers</div>
+            </div>
+          </div>
+          <div style={{ fontFamily: t.fontDisplay, fontSize: 22, fontWeight: 800, maxWidth: 600, lineHeight: 1.25 }}>
+            🌙 퇴근길 LIVE · 오늘도 고생했어
+          </div>
+        </div>
+
+        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 100, height: '60%', pointerEvents: 'none' }}>
+          {hearts.map(h => (
+            <div key={h.id} style={{ position: 'absolute', bottom: 0, left: `${h.x}%`, fontSize: 22, animation: `connectfin-float ${h.d}ms ease-out forwards` }}>💜</div>
+          ))}
+        </div>
+
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '14px 20px 12px', display: 'flex', alignItems: 'center', gap: 14, background: 'linear-gradient(0deg, rgba(0,0,0,0.6), transparent)', color: '#fff' }}>
+          <span style={{ fontSize: 18 }}>⏸</span>
+          <span style={{ fontSize: 16 }}>🔊</span>
+          <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.2)', borderRadius: 2, position: 'relative' }}>
+            <div style={{ position: 'absolute', inset: 0, width: '100%', background: t.liveGradient, borderRadius: 2 }}/>
+          </div>
+          <span style={{ fontFamily: t.fontMono, fontSize: 11 }}>LIVE</span>
+          <button onClick={onExit} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid rgba(255,255,255,0.3)`, background: 'transparent', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: t.fontMono }}>← 프로필</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', borderLeft: `1px solid ${t.line}`, background: theme === 'dark' ? '#0B0D15' : t.surface, color: t.text }}>
+        <div style={{ padding: '14px 18px 12px', borderBottom: `1px solid ${t.line}` }}>
+          <div style={{ fontFamily: t.fontDisplay, fontWeight: 800, fontSize: 15 }}>실시간 채팅</div>
+          <div style={{ fontSize: 11, color: t.textDim, fontFamily: t.fontMono }}>
+            ws · /live/{a.id} · {messages.length} msgs buffered
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            {['전체','팬클럽','아티스트만'].map((tab, i) => (
+              <button key={tab} style={{
+                padding: '4px 10px', borderRadius: 12,
+                background: i === 0 ? t.chip : 'transparent',
+                color: i === 0 ? t.accent : t.textDim, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: t.fontMono,
+              }}>{tab}</button>
+            ))}
+          </div>
+        </div>
+
+        <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+          {messages.map(msg => {
+            const isArtist = msg.t === 'artist';
+            const isMe = msg.t === 'me';
+            return (
+              <div key={msg.id} style={{
+                display: 'flex', gap: 8, alignItems: 'flex-start',
+                padding: isArtist ? '6px 10px' : '2px 0',
+                borderRadius: isArtist ? 8 : 0,
+                background: isArtist ? t.chip : 'transparent',
+                lineHeight: 1.45, animation: 'connectfin-chatin 240ms ease-out',
+              }}>
+                <span style={{
+                  fontWeight: isArtist ? 800 : 700,
+                  color: isArtist ? t.accent : isMe ? t.accent2 : t.textDim,
+                  flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12,
+                }}>
+                  {isArtist && '⭐ '}{msg.u}
+                </span>
+                <span style={{ flex: 1, wordBreak: 'break-word' }}>{msg.m}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: '10px 14px 14px', display: 'flex', gap: 8, borderTop: `1px solid ${t.line}` }}>
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="채팅 · Enter로 전송"
+            style={{ flex: 1, padding: '10px 14px', borderRadius: 20, border: `1px solid ${t.line}`, background: theme === 'dark' ? '#12141C' : '#fff', color: t.text, fontSize: 13 }}/>
+          <button onClick={send} style={{ padding: '0 16px', borderRadius: 20, border: 'none', background: t.gradient, color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>SEND</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────── Mobile app (phone view) ─────────
+function MobileApp({ tweaks, setTweaks, t, showTweaks, setShowTweaks, screen, setScreen, artistId, setArtistId, threadId, setThreadId, raffleId, setRaffleId }) {
+  const nav = (k) => {
+    if (k === 'me') { setScreen('membership'); return; }
+    if (k === 'live') {
+      const la = ARTISTS.find(a => a.live);
+      if (la && tweaks.liveOn) { setArtistId(la.id); setScreen('live'); return; }
+    }
+    setScreen(k);
+  };
+
+  let content;
+  if (screen === 'login') content = <LoginScreen t={t} onLogin={() => setScreen('home')}/>;
+  else if (screen === 'home') content = <HomeScreen t={t} theme={tweaks.theme} speed={tweaks.simSpeed} liveOn={tweaks.liveOn} onNav={nav} onOpenLive={(id) => { setArtistId(id); setScreen('live'); }} onOpenArtist={(id) => { setArtistId(id); setScreen('artist'); }}/>;
+  else if (screen === 'artist') content = <ArtistScreen t={t} theme={tweaks.theme} artistId={artistId} onBack={() => setScreen('home')} onOpenLive={(id) => { setArtistId(id); setScreen('live'); }} onOpenDM={(id) => { const th = DM_THREADS.find(x => x.artistId === id); setThreadId(th?.id || 1); setScreen('dm-thread'); }}/>;
+  else if (screen === 'live') content = <LiveScreen t={t} theme={tweaks.theme} artistId={artistId} speed={tweaks.simSpeed} liveOn={tweaks.liveOn} onBack={() => setScreen('home')} onNav={nav}/>;
+  else if (screen === 'dm') content = <DMListScreen t={t} onOpenDM={(id) => { setThreadId(id); setScreen('dm-thread'); }}/>;
+  else if (screen === 'dm-thread') content = <DMThreadScreen t={t} theme={tweaks.theme} threadId={threadId} onBack={() => setScreen('dm')}/>;
+  else if (screen === 'community') content = <CommunityScreen t={t} artistId={artistId} onBack={() => setScreen('artist')}/>;
+  else if (screen === 'media') content = <MediaScreen t={t} onBack={() => setScreen('home')}/>;
+  else if (screen === 'membership') content = <MembershipScreen t={t} onOpenRaffles={() => setScreen('raffle-list')}/>;
+  else if (screen === 'raffle-list') content = <RaffleListScreen t={t} onBack={() => setScreen('membership')} onOpenRaffle={(id) => { setRaffleId(id); setScreen('raffle-detail'); }}/>;
+  else if (screen === 'raffle-detail') content = <RaffleDetailScreen t={t} theme={tweaks.theme} raffleId={raffleId} onBack={() => setScreen('raffle-list')} onEnter={() => {}}/>;
+
+  const showTabBar = !['login','live','dm-thread','raffle-detail'].includes(screen);
+
+  return (
+    <div style={{
+      minHeight: '100vh', width: '100%',
+      background: tweaks.theme === 'dark'
+        ? 'radial-gradient(ellipse at 20% 10%, #1a0f2e 0%, #080814 50%, #000 100%)'
+        : 'radial-gradient(ellipse at 30% 10%, #FFD6EE 0%, #E9D4FF 50%, #FFE9F3 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '40px 20px', fontFamily: t.font,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+        <Phone theme={tweaks.theme} t={t}>
+          {content}
+          {showTabBar && <TabBar current={
+            screen === 'home' ? 'home' : screen === 'dm' ? 'dm' : screen === 'media' ? 'media' :
+            screen === 'membership' ? 'me' : screen === 'live' ? 'live' : ''
+          } onNav={nav} t={t} theme={tweaks.theme}/>}
+        </Phone>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, color: t.text }}>
+          <button onClick={() => setTweaks(tw => ({ ...tw, viewMode: 'desktop' }))} style={{
+            padding: '10px 16px', borderRadius: 10, border: `1px solid ${t.line}`,
+            background: t.gradient, color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            fontFamily: t.fontMono, letterSpacing: 0.5,
+          }}>← DESKTOP 웹으로</button>
+          <div style={{ fontFamily: t.fontMono, fontSize: 10, color: t.textDim, lineHeight: 1.6, maxWidth: 220 }}>
+            모바일 프로토타입<br/>
+            11개 화면 · 라이브 채팅 · DM · 커뮤니티
+          </div>
+        </div>
+      </div>
+      <HiddenTweaksTrigger show={showTweaks} onShow={() => setShowTweaks(true)} t={t}/>
+      {showTweaks && <TweaksPanel tweaks={tweaks} setTweaks={setTweaks} t={t} theme={tweaks.theme} onClose={() => setShowTweaks(false)}/>}
+    </div>
+  );
+}
+
+// ───────── Login modal ─────────
+function LoginModal({ t, theme, onLogin, onClose }) {
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  const submit = async () => {
+    if (!email || !password) return;
+    setLoading(true);
+    setError('');
+    try {
+      await onLogin(email, password);
+    } catch (err) {
+      setError(err.message || '로그인 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') submit();
+    if (e.key === 'Escape') onClose();
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: 360, padding: 32, borderRadius: 20,
+        background: theme === 'dark' ? 'rgba(18,20,28,0.98)' : 'rgba(255,255,255,0.98)',
+        border: `1px solid ${t.line}`,
+        boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+      }}>
+        <div style={{ fontFamily: t.fontDisplay, fontSize: 22, fontWeight: 800, marginBottom: 6 }}>로그인</div>
+        <div style={{ fontSize: 13, color: t.textDim, marginBottom: 24 }}>Connectfin 계정으로 로그인하세요</div>
+
+        <input
+          type="email" placeholder="이메일" value={email}
+          onChange={e => setEmail(e.target.value)} onKeyDown={handleKeyDown}
+          autoFocus
+          style={{
+            width: '100%', padding: '12px 14px', marginBottom: 10, borderRadius: 10,
+            border: `1px solid ${t.line}`, background: t.surface2 || 'transparent',
+            color: t.text, fontSize: 14, fontFamily: t.font,
+          }}
+        />
+        <input
+          type="password" placeholder="비밀번호 (8자 이상)" value={password}
+          onChange={e => setPassword(e.target.value)} onKeyDown={handleKeyDown}
+          style={{
+            width: '100%', padding: '12px 14px', marginBottom: 16, borderRadius: 10,
+            border: `1px solid ${t.line}`, background: t.surface2 || 'transparent',
+            color: t.text, fontSize: 14, fontFamily: t.font,
+          }}
+        />
+
+        {error && (
+          <div style={{ fontSize: 12, color: '#ff6b6b', marginBottom: 12, lineHeight: 1.4 }}>{error}</div>
+        )}
+
+        <button onClick={submit} disabled={loading || !email || !password} style={{
+          width: '100%', padding: '13px 0', borderRadius: 12, border: 'none',
+          background: (!email || !password) ? (t.line || '#333') : (t.gradient || t.accent),
+          color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'wait' : 'pointer',
+          fontFamily: t.font, opacity: loading ? 0.6 : 1,
+        }}>
+          {loading ? '로그인 중...' : '로그인'}
+        </button>
+
+        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: t.textMuted, fontFamily: t.fontMono }}>
+          POST /api/auth/v1/login
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────── Tweaks panel ─────────
+function TweaksPanel({ tweaks, setTweaks, t, theme, onClose }) {
+  const upd = (k, v) => setTweaks(tw => ({ ...tw, [k]: v }));
+  return (
+    <div style={{
+      position: 'fixed', right: 20, bottom: 20, width: 320, zIndex: 100,
+      background: theme === 'dark' ? 'rgba(18,20,28,0.96)' : 'rgba(255,255,255,0.98)',
+      color: t.text, borderRadius: 16,
+      border: `1px solid ${t.lineStrong}`,
+      boxShadow: '0 30px 70px rgba(0,0,0,0.45)',
+      backdropFilter: 'blur(24px)',
+      fontFamily: t.font, padding: 18,
+      animation: 'connectfin-fadein 180ms ease-out',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontFamily: t.fontMono, fontSize: 10, letterSpacing: 1, color: t.textDim }}>CONNECTFIN · ⇧T</div>
+          <div style={{ fontFamily: t.fontDisplay, fontWeight: 800, fontSize: 18 }}>Tweaks</div>
+        </div>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: t.textDim, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+      </div>
+
+      <TweakRow label="View">
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[['desktop','DESKTOP'], ['mobile','MOBILE']].map(([k, l]) => (
+            <button key={k} onClick={() => upd('viewMode', k)} style={btnStyle(tweaks.viewMode === k, t)}>{l}</button>
+          ))}
+        </div>
+      </TweakRow>
+
+      <TweakRow label="Theme">
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['dark','y2k'].map(k => (
+            <button key={k} onClick={() => upd('theme', k)} style={btnStyle(tweaks.theme === k, t)}>
+              {k === 'dark' ? 'Dark Neon' : 'Y2K Pop'}
+            </button>
+          ))}
+        </div>
+      </TweakRow>
+
+      {tweaks.theme === 'dark' && (
+        <TweakRow label={`Accent hue · ${tweaks.accentHue}°`}>
+          <input type="range" min="0" max="360" step="1" value={tweaks.accentHue}
+            onChange={e => upd('accentHue', +e.target.value)}
+            style={{
+              width: '100%', height: 6, borderRadius: 3, appearance: 'none',
+              background: 'linear-gradient(90deg, oklch(0.72 0.22 0), oklch(0.72 0.22 60), oklch(0.72 0.22 120), oklch(0.72 0.22 180), oklch(0.72 0.22 240), oklch(0.72 0.22 300), oklch(0.72 0.22 360))',
+            }}/>
+        </TweakRow>
+      )}
+
+      <TweakRow label="Live simulation">
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => upd('liveOn', true)} style={btnStyle(tweaks.liveOn, t)}>ON</button>
+          <button onClick={() => upd('liveOn', false)} style={btnStyle(!tweaks.liveOn, t)}>OFF</button>
+        </div>
+      </TweakRow>
+
+      <TweakRow label={`Chat speed · ${tweaks.simSpeed}×`}>
+        <input type="range" min="0.5" max="5" step="0.5" value={tweaks.simSpeed}
+          onChange={e => upd('simSpeed', +e.target.value)}
+          style={{ width: '100%' }}/>
+      </TweakRow>
+
+      <div style={{
+        marginTop: 14, padding: 10, borderRadius: 10, background: t.surface2,
+        fontSize: 11, color: t.textDim, lineHeight: 1.5, fontFamily: t.fontMono,
+      }}>
+        💡 평소에는 우하단 점(·)이 희미하게 깜빡입니다. <b>Shift + T</b> 또는 점 hover로 언제든 열 수 있어요.
+        ESC로 즉시 닫기.
+      </div>
+    </div>
+  );
+}
+
+function TweakRow({ label, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, marginBottom: 6, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 0.3 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function btnStyle(active, t) {
+  return {
+    flex: 1, padding: '8px 0', borderRadius: 8,
+    border: active ? `1px solid ${t.accent}` : `1px solid ${t.line}`,
+    background: active ? t.chip : 'transparent',
+    color: active ? t.accent : t.text,
+    fontWeight: 700, fontSize: 12, cursor: 'pointer',
+    fontFamily: 'JetBrains Mono, monospace', letterSpacing: 0.5,
+  };
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+
+</body>
+</html>
