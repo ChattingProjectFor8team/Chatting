@@ -1,7 +1,7 @@
 package com.example.infinite.domain.artistcontent.interaction.service.commentlike;
 
 import com.example.infinite.domain.artistcontent.interaction.dto.response.InteractionResponse;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.global.lock.RedisLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

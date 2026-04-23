@@ -8,7 +8,7 @@ import com.example.infinite.domain.artistcontent.interaction.entity.Reaction;
 import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.interaction.repository.InteractionRepository;
 import com.example.infinite.domain.artistcontent.interaction.service.commentlike.CommentLikeRedissonService;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.interaction.service.fanletterlike.FanLetterLikeRedissonService;
 import com.example.infinite.domain.artistcontent.interaction.service.fanpostlike.FanPostLikeRedissonService;
 import com.example.infinite.domain.artistcontent.interaction.service.artistpostlike.ArtistPostLikeRedissonV2Service;

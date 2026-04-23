@@ -12,7 +12,7 @@ import com.example.infinite.domain.artistcontent.comment.service.fanpost.FanPost
 import com.example.infinite.domain.artistcontent.comment.service.artistpoststream.ArtistPostCommentStreamV2Service;
 import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
 import com.example.infinite.domain.artistcontent.comment.support.MentionParser;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPost;
 import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;

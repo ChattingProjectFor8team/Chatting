@@ -10,7 +10,7 @@ import com.example.infinite.domain.artistcontent.comment.repository.CommentRepos
 import com.example.infinite.domain.artistcontent.comment.service.CommentMentionService;
 import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
 import com.example.infinite.domain.artistcontent.comment.support.MentionParser;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.domain.artistcontent.post.fanpost.repository.FanPostRepository;
 import com.example.infinite.domain.artistcontent.post.fanpost.support.FanPostReader;
 import com.example.infinite.domain.member.member.entity.Member;

@@ -7,7 +7,7 @@ import com.example.infinite.domain.artistcontent.interaction.repository.Interact
 import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPost;
 import com.example.infinite.domain.artistcontent.post.artistpost.service.likecount.ArtistPostLikeDeltaEvent;
 import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;

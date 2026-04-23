@@ -4,7 +4,7 @@ import com.example.infinite.domain.artistcontent.interaction.dto.response.Artist
 import com.example.infinite.domain.artistcontent.interaction.enums.ReactionType;
 import com.example.infinite.domain.artistcontent.interaction.repository.InteractionRepository;
 import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import com.example.infinite.global.lock.RedisLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -1,7 +1,7 @@
 package com.example.infinite.domain.artistcontent.media.repository;
 
 import com.example.infinite.domain.artistcontent.media.entity.Media;
-import com.example.infinite.domain.artistcontent.post.eunms.PostType;
+import com.example.infinite.domain.artistcontent.post.enums.PostType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
