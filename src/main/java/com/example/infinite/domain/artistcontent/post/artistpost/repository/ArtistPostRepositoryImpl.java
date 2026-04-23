@@ -10,6 +10,7 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -103,5 +104,35 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
                         QuerydslUtils.eq(artistPost.id, artistPostId)
                 )
                 .fetchOne());
+    }
+
+    @Override
+    public List<ArtistPostReadRow> findLatestRowsByWriterIds(Collection<Long> writerIds, int limit) {
+        QArtistPost artistPost = QArtistPost.artistPost;
+        QMember member = QMember.member;
+
+        if (writerIds == null || writerIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .select(Projections.constructor(
+                        ArtistPostReadRow.class,
+                        artistPost.id,
+                        artistPost.artist.id,
+                        member.id,
+                        member.nickname,
+                        member.profileImageUrl,
+                        Expressions.constant(Boolean.TRUE),
+                        artistPost.content,
+                        artistPost.mediaCount,
+                        artistPost.createdAt
+                ))
+                .from(artistPost)
+                .join(artistPost.writer, member)
+                .where(member.id.in(writerIds))
+                .orderBy(CursorSliceUtils.orderByIdDesc(artistPost.id))
+                .limit(limit)
+                .fetch();
     }
 }

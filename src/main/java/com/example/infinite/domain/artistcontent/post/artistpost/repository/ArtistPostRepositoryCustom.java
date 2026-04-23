@@ -2,6 +2,7 @@ package com.example.infinite.domain.artistcontent.post.artistpost.repository;
 
 import com.example.infinite.domain.artistcontent.post.artistpost.dto.response.ArtistPostReadRow;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,4 +15,7 @@ public interface ArtistPostRepositoryCustom {
 
     // 상세 1건도 목록과 같은 projection 축으로 읽어 서비스 조립 규칙을 단순화한다.
     Optional<ArtistPostReadRow> findDetailRowByArtistIdAndArtistPostId(Long artistId, Long artistPostId);
+
+    // 홈 대시보드의 "팔로우한 멤버 최신 글" 섹션은 writer 기준 전역 최신 몇 건만 필요하다.
+    List<ArtistPostReadRow> findLatestRowsByWriterIds(Collection<Long> writerIds, int limit);
 }

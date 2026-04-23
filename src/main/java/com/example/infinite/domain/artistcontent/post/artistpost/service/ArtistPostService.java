@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Collection;
 
 @Service
 @RequiredArgsConstructor
@@ -111,6 +112,20 @@ public class ArtistPostService {
         return ArtistPostResponse.from(baseResponse, hotData);
     }
 
+    public List<ArtistPostResponse> getLatestArtistPosts(Long artistId, int limit) {
+        // 메인 홈은 cursor slice 전체가 아니라 artist별 최신 몇 건만 필요하다.
+        artistReader.findArtistByIdOrThrow(artistId);
+        return mapToArtistPostResponses(artistPostBaseCacheService.loadLatestArtistPostBases(artistId, limit));
+    }
+
+    public List<ArtistPostResponse> getLatestArtistPostsByWriterIds(Collection<Long> writerIds, int limit) {
+        if (writerIds == null || writerIds.isEmpty()) {
+            return List.of();
+        }
+        // 팔로우 섹션은 여러 writer의 글을 하나의 최신순 피드로 합쳐 보여 준다.
+        return mapToArtistPostResponses(artistPostBaseCacheService.loadLatestArtistPostBasesByWriterIds(writerIds, limit));
+    }
+
     public ArtistPostDetailResponse getArtistPost(Long artistId, Long artistPostId, Long commentCursor) {
         artistReader.findArtistByIdOrThrow(artistId);
 
@@ -169,6 +184,24 @@ public class ArtistPostService {
     private ArtistPostResponse buildCurrentArtistPostResponse(Long artistId, Long artistPostId, PostHotData hotData) {
         ArtistPostBaseResponse baseResponse = artistPostBaseCacheService.loadArtistPostBaseDetail(artistId, artistPostId);
         return ArtistPostResponse.from(baseResponse, hotData);
+    }
+
+    private List<ArtistPostResponse> mapToArtistPostResponses(List<ArtistPostBaseResponse> baseResponses) {
+        if (baseResponses.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, PostHotData> hotDataByPostId = postHotDataCacheService.getPostHotDataMap(
+                PostType.ARTIST_POST,
+                baseResponses.stream().map(ArtistPostBaseResponse::artistPostId).toList()
+        );
+
+        return baseResponses.stream()
+                .map(baseResponse -> ArtistPostResponse.from(
+                        baseResponse,
+                        hotDataByPostId.getOrDefault(baseResponse.artistPostId(), PostHotData.empty())
+                ))
+                .toList();
     }
 
     private ArtistPost findOwnedArtistPost(Long memberId, Long artistId, Long artistPostId) {

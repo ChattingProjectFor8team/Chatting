@@ -17,6 +17,14 @@ public interface FanMembershipRepository extends JpaRepository<FanMembership, Lo
 
     Page<FanMembership> findByUserId(Long userId, Pageable pageable);
 
+    List<FanMembership> findByUserIdAndStatusOrderByIdDesc(Long userId, SubscriptionStatus status);
+
+    List<FanMembership> findByUserIdAndStatusAndExpiredAtAfterOrderByIdDesc(
+            Long userId,
+            SubscriptionStatus status,
+            LocalDateTime now
+    );
+
     List<FanMembership> findByStatusAndExpiredAtBefore(SubscriptionStatus status, LocalDateTime now);
 
     // 특정 아티스트에 대해 여러 유저의 팬 멤버십 상태를 한 번에 조회 (뱃지 배치 조회용, N+1 방지)

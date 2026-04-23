@@ -13,6 +13,12 @@
 
 `Connectfin-standalone.html`은 비주얼 톤 참고용이다. 실제 API, 데이터 구조, 권한, 예외, 미완성 상태는 이 문서를 기준으로 잡는 것이 안전하다.
 
+중요 메모:
+
+- 현재 백엔드 사용자는 구현을 우선 끝내는 단계라서, 최근 추가된 기능들을 아직 직접 충분히 검토하거나 공부하지 않았다
+- 따라서 이 문서는 "사용자가 이미 세부 구현을 다 숙지했다"는 전제로 읽지 말고, 실제 코드와 주석을 다시 따라가며 확인해야 한다
+- 특히 메인 홈 대시보드, Follow, YouTube, VOD는 먼저 붙여 둔 뒤 나중에 사용자가 직접 공부/리뷰할 예정인 기능들이다
+
 ## 1. 담당 범위 요약
 
 내 담당 범위는 아래다.
@@ -31,10 +37,9 @@
 지금 기준으로 상태를 한 줄로 요약하면 아래다.
 
 - 실구현 완료: 아티스트 검색, 인기 검색어, 아티스트 상세, 아티스트 홈 대시보드, ArtistMember 관리, FanPost CRUD, FanPost 좋아요, FanPost 댓글/대댓글 조회, FanPost HOT, ArtistPost CRUD, ArtistPost 좋아요, ArtistPost 댓글/대댓글 조회, FanLetter CRUD, FanLetter 좋아요, FanLetter HOT, Hashtag 추천, FanPost/ArtistPost/FanLetter 미디어 업로드 구조, 실시간 스트리밍 메타데이터/채팅 기본 구조
-- 부분 구현: Follow 엔티티
-- 필수 구현 예정: 메인 홈 대시보드
+- 실구현 완료 추가: 메인 홈 대시보드, ArtistMember 전용 Follow, YouTube 미디어 탭, 종료 라이브 VOD 목록
 - 최근 반영 완료: FanPost / ArtistPost / FanLetter base/hot 캐시 분리, 댓글 조건부 짧은 TTL 캐시, FanPost/FanLetter HOT
-- 구현 예정이지만 미구현으로 끝날 수도 있음: YouTube 미디어 탭, 종료된 스트리밍 영상 보관 조회, Follow API, 알림
+- 후속 보강 예정: 종료 라이브 replay 자동 publish, 알림
 
 ## 2. 가장 중요한 고정 정책
 
@@ -384,23 +389,46 @@ FanPost 댓글 현재 정책:
 현재 상태:
 
 - 별도 public media controller 없음
-- 게시글 작성/수정 flow 안에서 같이 처리
+- 게시글 첨부는 작성/수정 flow 안에서 같이 처리
 - 공통 `Media` 엔티티 사용
 - `ObjectStorageClient`, `S3ObjectStorageClient`, `MediaService` 구조 있음
 - FanPost는 실연동 완료
 - ArtistPost용 attach/replace/delete 메서드도 이미 `MediaService`에 준비돼 있음
+- YouTube 탭은 게시글 첨부와 별도 모델로 구현 완료
+
+실제 구현 완료 API:
+
+- `POST /api/media/v1/artists/{artistId}/youtube-videos`
+- `GET /api/media/v1/artists/{artistId}/youtube-videos`
+
+YouTube 카드 응답 필드:
+
+- `id`
+- `artistId`
+- `writerMemberId`
+- `writerDisplayName`
+- `writerProfileImageUrl`
+- `youtubeVideoId`
+- `youtubeUrl`
+- `title`
+- `thumbnailUrl`
+- `durationSeconds`
+- `publishedAt`
+- `createdAt`
+
+정책:
+
+- 등록은 아티스트 계정이면서 해당 artist 소속 `ArtistMember`만 가능
+- 요청 body는 `youtubeUrl`, `writerArtistMemberId`
+- 서버가 YouTube Data API로 메타데이터를 읽어 저장한다
+- 목록은 `CursorSliceResponse` 기반 `id DESC`
 
 중요한 운영 주의:
 
 - 로컬 기본 설정은 `media.storage.enabled: false`
 - 즉 백엔드 코드상 업로드 구조는 있지만, 환경 설정이 안 되면 실제 업로드는 `MEDIA_STORAGE_NOT_CONFIGURED`로 실패할 수 있다
 - 프론트는 업로드 UI를 먼저 만들 수 있지만, 로컬 실테스트 가능 여부는 스토리지 설정 여부에 달려 있다
-
-추가로 알아둘 상태:
-
-- 보안 설정에는 `/api/media/v1/media/import-youtube` 경로가 잡혀 있다
-- 하지만 현재 코드 기준으로는 실제 YouTube 미디어 탭용 controller/service 구현은 확인되지 않았다
-- 즉 "유튜브 영상 썸네일 + 제목 + 외부 링크" 기능은 앞으로 추가될 가능성이 높은 후속 작업이다
+- YouTube import는 별도로 `YOUTUBE_DATA_API_KEY` 환경변수가 있어야 실제 호출이 된다
 
 ## 3-8. Streaming / Live
 
@@ -409,11 +437,31 @@ FanPost 댓글 현재 정책:
 - 실시간 스트리밍 메타데이터 생성/시작/종료 구조가 있다
 - 스트리밍 채팅 조회/삭제/뮤트 등 대용량 댓글성 처리 구조가 있다
 - 실제 방송 송출은 외부 플랫폼(현재 대화 기준으로는 YouTube) 의존 전제가 강하다
+- 종료된 라이브 VOD 목록 API가 추가됐다
+
+실제 구현 완료 API:
+
+- `GET /api/v1/artists/{artistId}/lives/vods`
+- `PATCH /api/v1/admin/artists/{artistId}/lives/{liveId}/replay`
+
+VOD 카드 응답 필드:
+
+- `liveId`
+- `artistId`
+- `hostMemberId`
+- `hostDisplayName`
+- `hostProfileImageUrl`
+- `title`
+- `thumbnailUrl`
+- `replayUrl`
+- `durationSeconds`
+- `replayPublishedAt`
 
 중요한 주의:
 
-- "종료된 스트리밍 영상을 저장해서 다시 조회하는 VOD 형태"는 현재 코드에서 확인되지 않았다
-- 즉 라이브/채팅 인프라는 어느 정도 있지만, 종료 영상 아카이브 조회는 후속 구현 영역으로 보는 것이 안전하다
+- public VOD 목록에는 `REPLAY_READY` 상태만 노출된다
+- 지금은 "방송 종료 -> replay URL 준비 -> replay publish API 호출" 흐름이다
+- 즉 완전 자동 업로드 파이프라인은 아직 없고, replay URL 등록이 먼저 되어야 프론트 목록에 보인다
 
 ## 4. 부분 구현 상태
 
@@ -516,15 +564,19 @@ FanPost 댓글 현재 정책:
 
 현재 실제 코드 상태:
 
-- `Follow` 엔티티 있음
-- 컬럼 구조는 `fromMember`, `toMember` 기반 member-to-member follow다
-- `FollowController`, `FollowService`, `FollowRequest`, `FollowResponse`는 비어 있음
+- `Follow` 엔티티 / repository / service / controller 구현 완료
+- follow 대상은 `ArtistMember`로 고정
+- 토글 API 있음
+  - `POST /api/member/v1/follows/artist-members/{artistMemberId}/toggle`
 
 즉 현재 해석은 아래가 맞다.
 
-- follow 모델은 member 기반으로 굳어졌다
-- artist follow와 artist-member follow 표시를 프론트에서는 다른 UX로 분리하는 것이 맞다
-- 실제 버튼 연동 API는 아직 없다
+- 일반 SNS형 member-to-member follow가 아니다
+- `ArtistMember` 카드/프로필에서만 follow 버튼을 두는 것이 맞다
+- 응답은 아래 두 필드다
+  - `artistMemberId`
+  - `followed`
+- 자기 자신의 `ArtistMember`는 follow 불가다
 
 ## 4-4. 구독 배지
 
@@ -541,23 +593,40 @@ FanPost 댓글 현재 정책:
 - FanLetter 상세는 작성자 배지/프로필을 실제 값 기준으로 처리해도 된다
 - FanLetter 목록은 작성자 배지/프로필이 아니라 이미지/수신자/special-like만 렌더링하면 된다
 
-## 4-5. 메인 홈 대시보드 2종
+## 4-5. 메인 홈 대시보드
 
-현재 방향만 확정되어 있고 API는 없다.
+현재 실제 API가 있다.
 
-Dashboard A:
+- `GET /api/member/v1/home/dashboard`
 
-- 팔로우한 아티스트별 최신 ArtistPost 2개
+응답 섹션:
 
-Dashboard B:
+- `popularKeywords`
+- `subscribedArtistsLatestPosts`
+- `followedArtistMembersLatestPosts`
 
-- 팔로우한 아티스트 멤버 기준 최신 ArtistPost 2개
+`subscribedArtistsLatestPosts` 해석:
+
+- 활성 fan membership 기준 아티스트별 최신 ArtistPost 2개
+- 각 원소는 아래 구조다
+  - `artist`
+  - `posts`
+
+`followedArtistMembersLatestPosts` 해석:
+
+- follow한 ArtistMember들이 작성한 최신 ArtistPost 총합 6개
+- 각 원소는 아래 구조다
+  - `artistMemberId`
+  - `artist`
+  - `stageName`
+  - `profileImageUrl`
+  - `post`
 
 프론트 해석:
 
-- 둘은 한 탭 안의 변형이 아니라 별도 섹션이 맞다
-- 둘 다 ArtistPost 카드 재사용 가능
-- 지금은 mock data로 먼저 만드는 것이 맞다
+- 메인 홈 대시보드는 이제 mock 전용이 아니라 실연동 가능 영역이다
+- 검색 입력 자체는 기존 search API를 그대로 쓰고, 대시보드는 홈 진입 시 한 번 더 호출해 섹션을 채우면 된다
+- 공식글 카드(`ArtistPostResponse`)는 기존 ArtistPost 카드 컴포넌트를 재사용할 수 있다
 
 ## 5. 앞으로 내가 구현할 것
 
@@ -565,7 +634,7 @@ Dashboard B:
 
 - `5-1`은 이미 1차 반영이 끝난 상태 정리용이다
 - `5-2`가 현재 실제 1순위다
-- `5-3 ~ 5-5`는 후순위라 이번 작업 범위에서 미구현으로 끝날 수 있다
+- `5-3 ~ 5-5`는 구현은 붙었거나 후순위인 항목들이라, 지금은 실연동/운영보강 우선으로 읽는 것이 맞다
 
 ## 5-1. 상태 반영: 포스트페이지 동시성 / 캐싱
 
@@ -588,55 +657,55 @@ Dashboard B:
 - 댓글은 상세 진입 직후와 대댓글 펼침 시 재조회될 수 있으니, 로컬 상태와 서버 상태를 쉽게 동기화할 수 있게 두는 것이 좋다
 - HOT/최신 탭 전환이 생겨도 데이터 소스가 분리될 수 있게 컴포넌트를 짜두는 편이 좋다
 
-## 5-2. 필수 1순위: 메인 홈 대시보드
+## 5-2. 필수 1순위: 방금 붙은 기능 프론트 실연동
 
-백엔드 예정 작업:
+백엔드 상태:
 
-- 메인 홈 화면의 대시보드성 조회
+- 메인 홈 대시보드 / Follow / YouTube 미디어 / VOD 목록까지 1차 구현 완료
+- 아직 실환경 검증과 자동화 보강은 덜 끝났다
 
 프론트 준비 포인트:
 
-- 아티스트/아티스트멤버 대시보드를 별도 섹션으로 열어두는 편이 좋다
-- 이 구간은 mock에서 실연동으로 넘어갈 가능성이 있다
+- 메인 홈은 `popularKeywords + 구독 아티스트 최신글 + 팔로우 멤버 최신글` 3섹션 기준으로 붙이면 된다
+- ArtistMember follow 버튼은 실제 토글 API로 연결 가능하다
+- 미디어 탭은 YouTube 카드 리스트로 바로 붙일 수 있다
+- 라이브 탭은 진행 중 라이브와 별도로 VOD 목록 섹션을 붙일 수 있다
 
 ## 5-3. 후순위 기능: YouTube 미디어 탭
 
-백엔드 예정 방향:
+백엔드 현재 상태:
 
-- 해당 아티스트의 YouTube 영상 목록을 가져오고
-- 썸네일 + 제목을 내려주고
-- 클릭 시 YouTube로 이동시키는 조회성 기능
+- 구현 완료
+- 등록은 아티스트 관리성 UI에서 쓰고, 목록은 공개 탭 UI에 붙이면 된다
 
 현재 주의:
 
-- 아직 실제 구현은 확인되지 않았다
-- 프론트는 미디어 탭을 만든다면 "영상 카드 + 외부 링크" 형태를 먼저 생각하는 편이 안전하다
+- 실호출에는 `YOUTUBE_DATA_API_KEY`가 필요하다
+- UI는 `썸네일 + 제목 + 길이 + 업로드일 + 외부 링크` 기준으로 잡는 것이 맞다
 
 ## 5-4. 후순위 기능: 종료된 스트리밍 영상 조회
 
-백엔드 예정 방향:
+백엔드 현재 상태:
 
-- 스트리밍 종료 후 영상을 저장하고
-- 스트리밍 영역에서 다시 조회 가능한 구조
+- 구현 완료
+- 공개 목록은 있고, publish는 관리자/아티스트 계정이 replay URL을 넣어 주는 방식이다
 
 현재 주의:
 
-- 실시간 라이브/채팅 구조는 이미 어느 정도 있다
-- 하지만 종료 영상 저장/조회(VOD)는 아직 확인되지 않았다
-- 프론트는 라이브와 VOD를 같은 카드로 묶을지 분리할지 열어두는 편이 좋다
+- 완전 자동 업로드가 아니라 replay publish 선행이 필요하다
+- 프론트는 라이브 목록과 VOD 목록을 분리된 섹션으로 두는 편이 안전하다
 
 ## 5-5. 후순위 기능: Follow / 알림
 
 백엔드 예정 가능 작업:
 
-- member-to-member Follow API
+- 알림
 - notification feature
 
 현재 해석:
 
-- 둘 다 아직 확정 구현은 아니다
-- 특히 알림은 "할 수도 있고 안 할 수도 있는" 후순위 기능이다
-- 이 구간은 실제 구현 없이 문서/아이디어 단계로 끝날 가능성도 충분하다
+- Follow는 구현 완료다
+- 남은 후순위 기능은 사실상 알림 쪽이다
 
 ## 6. 프론트가 바로 써먹는 API 계약
 
@@ -785,17 +854,22 @@ FanLetter HOT은 아래 응답을 사용한다.
 
 - 아티스트 검색 v1/v2
 - 인기 검색어
+- 메인 홈 대시보드
 - FanPost 작성
 - FanPost 수정/삭제
 - FanPost 좋아요
 - FanPost 댓글 작성/삭제
 - FanLetter 작성/수정/삭제/좋아요
+- ArtistMember follow 토글
+- YouTube import
 
 아티스트 권한 필요:
 
 - 아티스트 생성
 - ArtistMember 관리
-- ArtistPost 작성 예정
+- ArtistPost 작성/수정/삭제
+- YouTube import
+- 라이브 replay publish
 
 중요:
 
@@ -808,22 +882,21 @@ FanLetter HOT은 아래 응답을 사용한다.
 실API 연동 우선:
 
 1. 메인 홈 검색
-2. 아티스트 상세 헤더
-3. FanPost 리스트
-4. FanPost 상세
-5. FanPost 작성/수정
-6. ArtistPost 리스트
-7. ArtistPost 상세
-8. ArtistPost 작성/수정
-9. Hashtag 자동완성
-10. FanLetter 리스트
-11. FanLetter 상세
-12. FanLetter 작성/수정
-
-mock 우선:
-
-1. 메인 홈 대시보드 2종
-2. Follow 버튼 / 팔로우 섹션
+2. 메인 홈 대시보드
+3. 아티스트 상세 헤더
+4. FanPost 리스트
+5. FanPost 상세
+6. FanPost 작성/수정
+7. ArtistPost 리스트
+8. ArtistPost 상세
+9. ArtistPost 작성/수정
+10. Hashtag 자동완성
+11. FanLetter 리스트
+12. FanLetter 상세
+13. FanLetter 작성/수정
+14. YouTube 미디어 탭
+15. VOD 목록
+16. Follow 버튼 / 팔로우 섹션
 
 ## 9. 프론트가 특히 조심해야 할 것
 
@@ -845,12 +918,15 @@ mock 우선:
 - FanPost HOT은 `scoreCursor + idCursor`
 - FanLetter HOT은 `offset + size`
 - 로컬 환경에서는 media storage가 기본 비활성화라 업로드 테스트가 실패할 수 있다
+- YouTube import는 `multipart`가 아니라 JSON body다
+- YouTube 목록은 외부 재생이 아니라 `youtubeUrl` 링크 이동형으로 해석하는 편이 안전하다
+- VOD 목록은 replay publish가 끝난 것만 내려오므로, 종료 직후 바로 안 보일 수 있다
 
 ## 10. 프론트 AI에 넘기기 좋은 설명
 
 아래 문장을 그대로 써도 된다.
 
-> `Connectfin-standalone.html`은 비주얼 레퍼런스로만 참고하고, 실제 기능 범위와 데이터 구조는 `FRONTEND_TEAM_VIBE_HANDOFF.md`를 기준으로 작업해줘. 실연동 가능한 것은 메인 홈 검색, 아티스트 상세 헤더, FanPost 리스트/상세/작성/수정/좋아요/댓글, ArtistPost 리스트/상세/작성/수정/좋아요/댓글, FanLetter 리스트/상세/작성/수정/좋아요다. 대시보드/Follow는 아직 mock 우선으로 설계해줘. FanPost/ArtistPost/FanLetter는 반드시 multipart 작성/수정, cursor infinite scroll, 댓글 depth 2 정책, FanLetter 댓글 없음 구조를 반영해줘.
+> `Connectfin-standalone.html`은 비주얼 레퍼런스로만 참고하고, 실제 기능 범위와 데이터 구조는 `FRONTEND_TEAM_VIBE_HANDOFF.md`를 기준으로 작업해줘. 실연동 가능한 것은 메인 홈 검색/대시보드, 아티스트 상세 헤더, FanPost 리스트/상세/작성/수정/좋아요/댓글, ArtistPost 리스트/상세/작성/수정/좋아요/댓글, FanLetter 리스트/상세/작성/수정/좋아요, ArtistMember follow 버튼, YouTube 미디어 탭, VOD 목록이다. FanPost/ArtistPost/FanLetter는 반드시 multipart 작성/수정, cursor infinite scroll, 댓글 depth 2 정책, FanLetter 댓글 없음 구조를 반영해줘.
 
 ## 11. 최종 요약
 
@@ -864,14 +940,16 @@ mock 우선:
 
 앞으로 내가 구현할 핵심은 아래다.
 
-필수 구현 예정:
+실연동 추가 가능:
 
 - 메인 홈 대시보드
+- ArtistMember Follow
+- YouTube 미디어 탭
+- 종료된 스트리밍 VOD 목록
 
 후순위 기능:
 
-- YouTube 미디어 탭
-- 종료된 스트리밍 영상 조회
-- Follow / 알림
+- 알림
+- replay 자동 publish 같은 운영 보강
 
-즉 프론트는 지금 당장은 `FanPost + ArtistPost + FanLetter 실연동`과 `HOT 탭 계약 반영`을 안정적으로 붙이고, 그다음은 `동시성/캐싱 대비 구조`, `dashboard 실연동 대비`, `YouTube/스트리밍 후속 기능 대비 UI` 순서로 가는 것이 가장 안전하다.
+즉 프론트는 지금 `FanPost + ArtistPost + FanLetter 실연동` 위에 `메인 홈 대시보드`, `Follow`, `YouTube`, `VOD`를 바로 붙일 수 있다. 이후에는 `동시성/캐싱 대비 구조`와 `운영 보강 대응 UI`를 챙기면 된다.

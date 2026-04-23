@@ -122,6 +122,35 @@ public class ArtistPostBaseCacheService {
         return ArtistPostBaseResponse.from(row, media, hashtags);
     }
 
+    public List<ArtistPostBaseResponse> loadLatestArtistPostBases(Long artistId, int limit) {
+        // 구독 섹션은 artist별 최신 2건 정도만 필요하므로 고정 slice 캐시를 재사용하지 않고 즉시 조회한다.
+        return buildBaseResponses(artistPostRepository.findSliceRowsByArtistId(artistId, null, limit));
+    }
+
+    public List<ArtistPostBaseResponse> loadLatestArtistPostBasesByWriterIds(Collection<Long> writerIds, int limit) {
+        return buildBaseResponses(artistPostRepository.findLatestRowsByWriterIds(writerIds, limit));
+    }
+
+    private List<ArtistPostBaseResponse> buildBaseResponses(List<ArtistPostReadRow> rows) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> postIds = rows.stream()
+                .map(ArtistPostReadRow::artistPostId)
+                .toList();
+        Map<Long, List<ArtistPostMediaResponse>> mediaMap = loadPreviewMediaMap(postIds);
+        Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.ARTIST_POST, postIds);
+
+        return rows.stream()
+                .map(row -> ArtistPostBaseResponse.from(
+                        row,
+                        mediaMap.getOrDefault(row.artistPostId(), List.of()),
+                        hashtagMap.getOrDefault(row.artistPostId(), List.of())
+                ))
+                .toList();
+    }
+
     private Map<Long, List<ArtistPostMediaResponse>> loadMediaMap(Collection<Long> artistPostIds) {
         if (artistPostIds.isEmpty()) {
             return Map.of();
