@@ -10,6 +10,8 @@ import com.example.infinite.domain.artistcontent.comment.error.CommentException;
 import com.example.infinite.domain.artistcontent.comment.repository.CommentRepository;
 import com.example.infinite.domain.artistcontent.comment.service.fanpost.FanPostCommentRedissonService;
 import com.example.infinite.domain.artistcontent.comment.service.artistpoststream.ArtistPostCommentStreamV2Service;
+import com.example.infinite.domain.artistcontent.comment.service.cache.CommentCacheInvalidationEvent;
+import com.example.infinite.domain.artistcontent.comment.service.cache.CommentQueryCacheService;
 import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
 import com.example.infinite.domain.artistcontent.comment.support.MentionParser;
 import com.example.infinite.domain.artistcontent.post.enums.PostType;
@@ -25,6 +27,7 @@ import com.example.infinite.domain.subscriptionmembership.service.SubscriptionMe
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +56,8 @@ public class CommentService {
     private final SubscriptionMembershipService subscriptionMembershipService;
     private final FanPostCommentRedissonService fanPostCommentRedissonService;
     private final ArtistPostCommentStreamV2Service artistPostCommentStreamV2Service;
+    private final CommentQueryCacheService commentQueryCacheService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public CommentResponse createFanPostComment(
@@ -171,6 +176,7 @@ public class CommentService {
         changeCommentCount(targetType, artistId, targetId, 1);
         CommentMentionResponse mentionedMember = commentMentionService.syncMention(comment, mentionNickname);
         WriterSubscriptionBadge writerBadge = loadSingleWriterBadge(artistId, member.getId());
+        publishCommentCacheInvalidation(targetType, targetId, parentComment == null ? null : parentComment.getId());
 
         return CommentResponse.from(
                 comment,
@@ -181,46 +187,14 @@ public class CommentService {
     }
 
     private CursorSliceResponse<CommentResponse> getComments(PostType targetType, Long artistId, Long targetId, Long cursor) {
-        // 댓글 기본 조회는 부모 댓글 slice만 내리고, 대댓글은 별도 endpoint에서 온디맨드로 조회한다.
-        List<Comment> rootComments = commentRepository.findRootSliceByTargetTypeAndTargetId(
+        // root comment는 "댓글 수도 충분히 많고 조회도 반복되는 post"에서만 admission을 통과한다.
+        return commentQueryCacheService.getRootSlice(
                 targetType,
+                artistId,
                 targetId,
                 cursor,
-                COMMENT_SLICE_SIZE + 1
+                () -> loadRootComments(targetType, artistId, targetId, cursor)
         );
-        boolean hasNext = rootComments.size() > COMMENT_SLICE_SIZE;
-        List<Comment> visibleRootComments = hasNext ? rootComments.subList(0, COMMENT_SLICE_SIZE) : rootComments;
-
-        List<Long> rootCommentIds = visibleRootComments.stream()
-                .map(Comment::getId)
-                .toList();
-        Map<Long, Integer> replyCountsByParentId = commentRepository.findReplyCountsByParentIds(rootCommentIds);
-        Map<Long, WriterSubscriptionBadge> badgeByWriterId = loadWriterBadges(
-                artistId,
-                visibleRootComments.stream().map(comment -> comment.getWriter().getId()).toList()
-        );
-
-        List<CommentResponse> content = visibleRootComments.stream()
-                .map(rootComment -> {
-                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
-                            rootComment.getWriter().getId(),
-                            WriterSubscriptionBadge.empty(rootComment.getWriter().getId())
-                    );
-                    return CommentResponse.from(
-                            rootComment,
-                            writerBadge.fanMembershipSubscribed(),
-                            writerBadge.dmSubscribed(),
-                            replyCountsByParentId.getOrDefault(rootComment.getId(), 0),
-                            null
-                    );
-                })
-                .toList();
-
-        Long nextCursor = hasNext && !visibleRootComments.isEmpty()
-                ? visibleRootComments.get(visibleRootComments.size() - 1).getId()
-                : null;
-
-        return new CursorSliceResponse<>(content, nextCursor, hasNext, COMMENT_SLICE_SIZE);
     }
 
     // 대댓글조회
@@ -230,26 +204,16 @@ public class CommentService {
             throw new CommentException(CommentErrorCode.INVALID_PARENT_COMMENT);
         }
 
-        List<Comment> replies = commentRepository.findRepliesByParentId(parentCommentId, COMMENT_REPLY_LIMIT);
-        Map<Long, CommentMentionResponse> mentionByCommentId = loadMentionByCommentId(replies);
-        Map<Long, WriterSubscriptionBadge> badgeByWriterId = loadWriterBadges(
+        long replyCount = commentRepository.countByParentId(parentCommentId);
+        // replies는 "개수가 많거나, 조회 heat가 높으면" 캐시 admission을 통과한다.
+        return commentQueryCacheService.getReplies(
+                targetType,
                 artistId,
-                replies.stream().map(reply -> reply.getWriter().getId()).toList()
+                targetId,
+                parentCommentId,
+                replyCount,
+                () -> loadReplies(artistId, parentCommentId)
         );
-        return replies.stream()
-                .map(reply -> {
-                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
-                            reply.getWriter().getId(),
-                            WriterSubscriptionBadge.empty(reply.getWriter().getId())
-                    );
-                    return CommentResponse.from(
-                            reply,
-                            writerBadge.fanMembershipSubscribed(),
-                            writerBadge.dmSubscribed(),
-                            mentionByCommentId.get(reply.getId())
-                    );
-                })
-                .toList();
     }
 
     private void deleteComment(
@@ -283,6 +247,7 @@ public class CommentService {
                 comment.markDeletedPlaceholder();
             }
             changeCommentCount(targetType, artistId, targetId, -1);
+            publishCommentCacheInvalidation(targetType, targetId, comment.getId());
             return;
         }
 
@@ -296,6 +261,7 @@ public class CommentService {
                 parentComment.delete();
             }
         }
+        publishCommentCacheInvalidation(targetType, targetId, parentComment == null ? null : parentComment.getId());
     }
 
     private Comment resolveParentComment(PostType targetType, Long parentId, Long targetId) {
@@ -370,6 +336,77 @@ public class CommentService {
         }
     }
 
+    private CursorSliceResponse<CommentResponse> loadRootComments(
+            PostType targetType,
+            Long artistId,
+            Long targetId,
+            Long cursor
+    ) {
+        // 댓글 기본 조회는 부모 댓글 slice만 내리고, 대댓글은 별도 endpoint에서 온디맨드로 조회한다.
+        List<Comment> rootComments = commentRepository.findRootSliceByTargetTypeAndTargetId(
+                targetType,
+                targetId,
+                cursor,
+                COMMENT_SLICE_SIZE + 1
+        );
+        boolean hasNext = rootComments.size() > COMMENT_SLICE_SIZE;
+        List<Comment> visibleRootComments = hasNext ? rootComments.subList(0, COMMENT_SLICE_SIZE) : rootComments;
+
+        List<Long> rootCommentIds = visibleRootComments.stream()
+                .map(Comment::getId)
+                .toList();
+        Map<Long, Integer> replyCountsByParentId = commentRepository.findReplyCountsByParentIds(rootCommentIds);
+        Map<Long, WriterSubscriptionBadge> badgeByWriterId = loadWriterBadges(
+                artistId,
+                visibleRootComments.stream().map(comment -> comment.getWriter().getId()).toList()
+        );
+
+        List<CommentResponse> content = visibleRootComments.stream()
+                .map(rootComment -> {
+                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
+                            rootComment.getWriter().getId(),
+                            WriterSubscriptionBadge.empty(rootComment.getWriter().getId())
+                    );
+                    return CommentResponse.from(
+                            rootComment,
+                            writerBadge.fanMembershipSubscribed(),
+                            writerBadge.dmSubscribed(),
+                            replyCountsByParentId.getOrDefault(rootComment.getId(), 0),
+                            null
+                    );
+                })
+                .toList();
+
+        Long nextCursor = hasNext && !visibleRootComments.isEmpty()
+                ? visibleRootComments.get(visibleRootComments.size() - 1).getId()
+                : null;
+
+        return new CursorSliceResponse<>(content, nextCursor, hasNext, COMMENT_SLICE_SIZE);
+    }
+
+    private List<CommentResponse> loadReplies(Long artistId, Long parentCommentId) {
+        List<Comment> replies = commentRepository.findRepliesByParentId(parentCommentId, COMMENT_REPLY_LIMIT);
+        Map<Long, CommentMentionResponse> mentionByCommentId = loadMentionByCommentId(replies);
+        Map<Long, WriterSubscriptionBadge> badgeByWriterId = loadWriterBadges(
+                artistId,
+                replies.stream().map(reply -> reply.getWriter().getId()).toList()
+        );
+        return replies.stream()
+                .map(reply -> {
+                    WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
+                            reply.getWriter().getId(),
+                            WriterSubscriptionBadge.empty(reply.getWriter().getId())
+                    );
+                    return CommentResponse.from(
+                            reply,
+                            writerBadge.fanMembershipSubscribed(),
+                            writerBadge.dmSubscribed(),
+                            mentionByCommentId.get(reply.getId())
+                    );
+                })
+                .toList();
+    }
+
     private Map<Long, CommentMentionResponse> loadMentionByCommentId(List<Comment> comments) {
         List<Long> commentIds = comments.stream()
                 .map(Comment::getId)
@@ -387,5 +424,9 @@ public class CommentService {
     private WriterSubscriptionBadge loadSingleWriterBadge(Long artistId, Long writerId) {
         return subscriptionMembershipService.getWriterBadges(artistId, List.of(writerId))
                 .getOrDefault(writerId, WriterSubscriptionBadge.empty(writerId));
+    }
+
+    private void publishCommentCacheInvalidation(PostType targetType, Long targetId, Long rootCommentId) {
+        applicationEventPublisher.publishEvent(new CommentCacheInvalidationEvent(targetType, targetId, rootCommentId));
     }
 }

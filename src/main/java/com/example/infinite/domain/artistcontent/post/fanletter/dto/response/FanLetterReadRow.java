@@ -18,7 +18,6 @@ public record FanLetterReadRow(
         String recipientProfileImageUrl,
         String artistDisplayName,
         String artistProfileImageUrl,
-        Long likeCount,
         LocalDateTime createdAt
 ) {
 }

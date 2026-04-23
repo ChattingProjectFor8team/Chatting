@@ -3,6 +3,7 @@ package com.example.infinite.domain.artistcontent.comment.service.artistpoststre
 import com.example.infinite.domain.artistcontent.comment.entity.Comment;
 import com.example.infinite.domain.artistcontent.comment.repository.CommentRepository;
 import com.example.infinite.domain.artistcontent.comment.service.CommentMentionService;
+import com.example.infinite.domain.artistcontent.comment.service.cache.CommentCacheInvalidationEvent;
 import com.example.infinite.domain.artistcontent.comment.support.CommentReader;
 import com.example.infinite.domain.artistcontent.comment.support.MentionParser;
 import com.example.infinite.domain.artistcontent.post.artistpost.support.ArtistPostReader;
@@ -60,6 +61,7 @@ public class ArtistPostCommentCoreService {
         ));
         commentMentionService.syncMention(comment, null);
         publishDelta(command.artistPostId(), 1L);
+        publishCommentCacheInvalidation(command.artistPostId(), null);
     }
 
     @Transactional
@@ -91,6 +93,7 @@ public class ArtistPostCommentCoreService {
         ));
         commentMentionService.syncMention(comment, mentionNickname);
         publishDelta(command.artistPostId(), 1L);
+        publishCommentCacheInvalidation(command.artistPostId(), parentComment.getId());
     }
 
     @Transactional
@@ -125,6 +128,7 @@ public class ArtistPostCommentCoreService {
                 comment.markDeletedPlaceholder();
             }
             publishDelta(command.artistPostId(), -1L);
+            publishCommentCacheInvalidation(command.artistPostId(), comment.getId());
             return;
         }
 
@@ -135,6 +139,7 @@ public class ArtistPostCommentCoreService {
         if (parentComment != null && parentComment.isDeletedPlaceholder() && !commentRepository.existsByParentId(parentComment.getId())) {
             parentComment.delete();
         }
+        publishCommentCacheInvalidation(command.artistPostId(), parentComment == null ? null : parentComment.getId());
     }
 
     public Long resolveRootCommentIdForDelete(Long artistPostId, Long commentId) {
@@ -149,6 +154,12 @@ public class ArtistPostCommentCoreService {
 
     private void publishDelta(Long artistPostId, long delta) {
         applicationEventPublisher.publishEvent(new ArtistPostCommentDeltaEvent(artistPostId, delta));
+    }
+
+    private void publishCommentCacheInvalidation(Long artistPostId, Long rootCommentId) {
+        applicationEventPublisher.publishEvent(
+                new CommentCacheInvalidationEvent(PostType.ARTIST_POST, artistPostId, rootCommentId)
+        );
     }
 
     private String resolveMentionNickname(String content, Long targetId, Comment parentComment) {

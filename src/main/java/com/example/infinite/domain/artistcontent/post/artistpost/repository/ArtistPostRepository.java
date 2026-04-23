@@ -1,11 +1,14 @@
 package com.example.infinite.domain.artistcontent.post.artistpost.repository;
 
+import com.example.infinite.domain.artistcontent.post.cache.PostHotRow;
 import com.example.infinite.domain.artistcontent.post.artistpost.entity.ArtistPost;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long>, ArtistPostRepositoryCustom {
@@ -85,4 +88,15 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long>, A
              where artist_post.deleted_at is null
             """, nativeQuery = true)
     int reconcileAllCommentCounts();
+
+    @Query("""
+            select new com.example.infinite.domain.artistcontent.post.cache.PostHotRow(
+                artistPost.id,
+                artistPost.likeCount,
+                artistPost.commentCount
+            )
+              from ArtistPost artistPost
+             where artistPost.id in :artistPostIds
+            """)
+    List<PostHotRow> findHotRowsByIds(@Param("artistPostIds") Collection<Long> artistPostIds);
 }

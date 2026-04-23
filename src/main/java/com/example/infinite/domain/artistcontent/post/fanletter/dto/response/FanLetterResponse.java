@@ -1,7 +1,7 @@
 package com.example.infinite.domain.artistcontent.post.fanletter.dto.response;
 
+import com.example.infinite.domain.artistcontent.post.cache.PostHotData;
 import com.example.infinite.domain.artistcontent.post.fanletter.enums.FanLetterRecipientType;
-import com.example.infinite.domain.subscriptionmembership.dto.response.WriterSubscriptionBadge;
 
 import java.time.LocalDateTime;
 
@@ -27,32 +27,25 @@ public record FanLetterResponse(
         String artistLikeProfileImageUrl,
         LocalDateTime createdAt
 ) {
-    public static FanLetterResponse from(
-            FanLetterReadRow row,
-            FanLetterImageResponse image,
-            WriterSubscriptionBadge writerBadge,
-            boolean artistLiked,
-            String artistLikeDisplayName,
-            String artistLikeProfileImageUrl
-    ) {
+    public static FanLetterResponse from(FanLetterBaseResponse baseResponse, PostHotData hotData) {
         return new FanLetterResponse(
-                row.fanLetterId(),
-                row.artistId(),
-                row.writerId(),
-                row.writerNickname(),
-                row.writerProfileImageUrl(),
-                writerBadge.fanMembershipSubscribed(),
-                writerBadge.dmSubscribed(),
-                row.recipientType(),
-                row.recipientArtistMemberId(),
-                row.recipientDisplayName(),
-                row.recipientProfileImageUrl(),
-                image,
-                row.likeCount() == null ? 0L : row.likeCount(),
-                artistLiked,
-                artistLikeDisplayName,
-                artistLikeProfileImageUrl,
-                row.createdAt()
+                baseResponse.fanLetterId(),
+                baseResponse.artistId(),
+                baseResponse.writerId(),
+                baseResponse.writerNickname(),
+                baseResponse.writerProfileImageUrl(),
+                baseResponse.fanMembershipSubscribed(),
+                baseResponse.dmSubscribed(),
+                baseResponse.recipientType(),
+                baseResponse.recipientArtistMemberId(),
+                baseResponse.recipientDisplayName(),
+                baseResponse.recipientProfileImageUrl(),
+                baseResponse.image(),
+                hotData.likeCount(),
+                baseResponse.artistLiked(),
+                baseResponse.artistLikeDisplayName(),
+                baseResponse.artistLikeProfileImageUrl(),
+                baseResponse.createdAt()
         );
     }
 }

@@ -27,6 +27,10 @@ public class ArtistPostLikeCountFlushScheduler {
      * 핵심 의도:
      * - 요청 경로에서 DB count row hotspot을 제거
      * - 대신 짧은 주기의 배치로 화면 count를 따라가게 만들기
+     *
+     * 캐시와의 관계:
+     * - post hot cache TTL도 현재 3초라서
+     * - flush 주기와 읽기 캐시 수명이 거의 같은 eventual consistency 리듬을 만든다
      */
     @Scheduled(fixedDelayString = "${artist-post.like-count.flush-delay-ms:3000}")
     @Transactional
@@ -55,6 +59,8 @@ public class ArtistPostLikeCountFlushScheduler {
      * flush와 reconcile의 차이:
      * - flush: 최근에 변한 글만
      * - reconcile: 전체 활성 ArtistPost를 다시 계산
+     *
+     * 즉 flush는 "실시간에 가까운 추적", reconcile은 "하루 1회 원본 기준 정산"이다.
      */
     @Scheduled(cron = "${artist-post.like-count.reconcile-cron:0 0 4 * * *}")
     @Transactional

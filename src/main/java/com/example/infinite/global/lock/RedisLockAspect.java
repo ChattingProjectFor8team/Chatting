@@ -19,6 +19,16 @@ import org.springframework.stereotype.Component;
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class RedisLockAspect {
 
+    /**
+     * @RedisLock 메서드 주위를 감싸 분산 락을 자동 적용하는 AOP 계층이다.
+     *
+     * 학습 포인트:
+     * - 서비스 메서드는 비즈니스 로직만 유지하고
+     * - 락 획득/해제는 aspect가 공통으로 처리한다.
+     *
+     * 즉 "락 기술 코드"와 "도메인 코드"를 분리하는 장치다.
+     */
+
     private final LockService lockService;
     private final ExpressionParser parser = new SpelExpressionParser();
 
@@ -30,12 +40,15 @@ public class RedisLockAspect {
 
     @Around("@annotation(redisLock)")
     public Object around(ProceedingJoinPoint joinPoint, RedisLock redisLock) throws Throwable {
+        // SpEL로 메서드 인자에서 실제 락 키를 계산한다.
+        // 예: "'artist-post:like:' + #artistPostId + ':member:' + #memberId"
         String key = resolveKey(joinPoint, redisLock.key());
 
         lockService.lock(key, redisLock.waitTime(), redisLock.leaseTime(), redisLock.timeUnit());
         try {
             return joinPoint.proceed();
         } finally {
+            // 비즈니스 예외가 나도 finally에서 해제해 락 누수를 막는다.
             lockService.unlock(key);
         }
     }
@@ -50,6 +63,7 @@ public class RedisLockAspect {
             context.setVariable(paramNames[i], args[i]);
         }
 
+        // 메서드 파라미터 이름을 SpEL 변수로 바인딩해 annotation 문자열을 실제 키로 바꾼다.
         return parser.parseExpression(keyExpression).getValue(context, String.class);
     }
 }
