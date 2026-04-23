@@ -17,6 +17,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class RedisStreamGroupHelper {
 
+    /**
+     * Redis Stream과 consumer group 초기화를 안전하게 보장하는 헬퍼다.
+     *
+     * 학습 포인트:
+     * - Stream consumer는 group이 없으면 XREADGROUP에서 NOGROUP 에러가 난다.
+     * - 그래서 producer/initializer가 "stream 존재 + group 존재"를 먼저 맞춰 줘야 한다.
+     */
+
     private final StringRedisTemplate stringRedisTemplate;
     private final Set<String> initializedGroups = ConcurrentHashMap.newKeySet();
 
@@ -31,6 +39,7 @@ public class RedisStreamGroupHelper {
         }
 
         synchronized (this) {
+            // 여러 스레드가 동시에 첫 초기화를 시도할 수 있어 JVM 내부에서는 한 번만 통과시킨다.
             if (initializedGroups.contains(cacheKey)) {
                 return;
             }

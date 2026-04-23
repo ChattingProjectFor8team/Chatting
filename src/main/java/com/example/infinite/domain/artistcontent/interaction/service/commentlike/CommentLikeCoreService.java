@@ -34,9 +34,13 @@ public class CommentLikeCoreService {
      */
     @Transactional
     public InteractionResponse toggle(Long memberId, Long artistId, Long targetId, Long commentId, PostType targetType) {
+        // 댓글 좋아요는 "댓글이 속한 원글"이 유효한지와 "댓글 자체"가 유효한지를 둘 다 확인해야 한다.
+        // targetType/targetId 검증은 댓글이 올바른 게시글 문맥 안에 있는지 확인하는 단계다.
         validateTarget(targetType, artistId, targetId);
         Comment comment = commentReader.findByIdAndTargetTypeAndTargetIdOrThrow(commentId, targetType, targetId);
 
+        // Reaction의 실제 타깃은 FAN_POST / ARTIST_POST가 아니라 COMMENT다.
+        // 즉 "어느 글의 댓글인지"는 검증용 문맥이고, 좋아요 row는 commentId 기준으로 저장된다.
         return interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
                         PostType.COMMENT,
                         comment.getId(),
@@ -69,6 +73,8 @@ public class CommentLikeCoreService {
     }
 
     private void validateTarget(PostType targetType, Long artistId, Long targetId) {
+        // 댓글 좋아요 API는 현재 FanPost, ArtistPost의 댓글만 지원한다.
+        // 원글을 먼저 검증해 두면 다른 글에 속한 commentId를 잘못 주는 요청도 초기에 걸러진다.
         switch (targetType) {
             case FAN_POST -> fanPostReader.findByIdAndArtistIdOrThrow(targetId, artistId);
             case ARTIST_POST -> artistPostReader.findByIdAndArtistIdOrThrow(targetId, artistId);

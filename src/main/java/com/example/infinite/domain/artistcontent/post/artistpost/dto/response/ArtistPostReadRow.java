@@ -12,8 +12,6 @@ public record ArtistPostReadRow(
         String writerProfileImageUrl,
         Boolean artistBadge,
         String content,
-        Long likeCount,
-        Long commentCount,
         Integer mediaCount,
         LocalDateTime createdAt
 ) {

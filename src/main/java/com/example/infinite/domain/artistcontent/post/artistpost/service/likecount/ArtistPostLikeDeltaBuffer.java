@@ -79,6 +79,22 @@ public class ArtistPostLikeDeltaBuffer {
         return drainedDeltas;
     }
 
+    /**
+     * flush 실패 시 이번 배치가 들고 있던 delta를 Redis로 복구한다.
+     *
+     * Redis drain과 DB update는 하나의 원자 트랜잭션이 아니므로,
+     * DB 쪽이 실패하면 Redis에서 뺀 값을 직접 다시 적재해야 유실을 막을 수 있다.
+     */
+    public void restoreAll(List<ArtistPostLikeDelta> deltas) {
+        if (deltas == null || deltas.isEmpty()) {
+            return;
+        }
+
+        for (ArtistPostLikeDelta delta : deltas) {
+            accumulate(delta.artistPostId(), delta.delta());
+        }
+    }
+
     private long drainOne(Long artistPostId) {
         // "읽고 삭제"를 한 번에 수행해야 flush와 동시 쓰기가 겹칠 때 값이 꼬이지 않는다.
         Long delta = stringRedisTemplate.execute(

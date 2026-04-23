@@ -33,8 +33,6 @@ public class FanPostRepositoryImpl implements FanPostRepositoryCustom {
                         Expressions.constant(Boolean.FALSE),
                         Expressions.constant(Boolean.FALSE),
                         fanPost.content,
-                        fanPost.likeCount,
-                        fanPost.commentCount,
                         fanPost.mediaCount,
                         fanPost.createdAt
                 ))
@@ -69,8 +67,6 @@ public class FanPostRepositoryImpl implements FanPostRepositoryCustom {
                         Expressions.constant(Boolean.FALSE),
                         Expressions.constant(Boolean.FALSE),
                         fanPost.content,
-                        fanPost.likeCount,
-                        fanPost.commentCount,
                         fanPost.mediaCount,
                         fanPost.createdAt
                 ))
