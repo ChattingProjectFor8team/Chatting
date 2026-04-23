@@ -1,8 +1,4 @@
 spring:
-  config:
-    import: "aws-parameterstore:/config/demo/"
-    activate:
-      on-profile: prod
   datasource:
     url: jdbc:mysql://${RDS_HOST}:3306/infinite?useSSL=false&serverTimezone=Asia/Seoul
     username: ${RDS_USERNAME}
