@@ -13,6 +13,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -46,15 +48,16 @@ public class ArtistPostLikeStreamProcessor {
             return;
         }
 
-        // desired state 명령은 재시도돼도 "이미 원하는 상태인지"를 다시 검사하면 중복 delta를 막을 수 있다.
-        boolean alreadyReacted = interactionRepository.existsByTargetTypeAndTargetIdAndMemberIdAndReactionType(
+        // desired state 명령은 재시도돼도 "현재 DB 상태와 다른 경우에만" side effect를 일으켜야 한다.
+        // 조회를 한 번만 수행해 실제 insert/delete가 일어날 때만 delta를 발행한다.
+        Optional<Reaction> existingReaction = interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
                 PostType.ARTIST_POST,
                 command.artistPostId(),
                 command.memberId(),
                 ReactionType.LIKE
         );
 
-        if (command.desiredReacted() && !alreadyReacted) {
+        if (command.desiredReacted() && existingReaction.isEmpty()) {
             interactionRepository.save(Reaction.create(
                     PostType.ARTIST_POST,
                     command.artistPostId(),
@@ -62,14 +65,8 @@ public class ArtistPostLikeStreamProcessor {
                     ReactionType.LIKE
             ));
             applicationEventPublisher.publishEvent(new ArtistPostLikeDeltaEvent(command.artistPostId(), 1L));
-        } else if (!command.desiredReacted() && alreadyReacted) {
-            interactionRepository.findByTargetTypeAndTargetIdAndMemberIdAndReactionType(
-                            PostType.ARTIST_POST,
-                            command.artistPostId(),
-                            command.memberId(),
-                            ReactionType.LIKE
-                    )
-                    .ifPresent(interactionRepository::delete);
+        } else if (!command.desiredReacted() && existingReaction.isPresent()) {
+            interactionRepository.delete(existingReaction.get());
             applicationEventPublisher.publishEvent(new ArtistPostLikeDeltaEvent(command.artistPostId(), -1L));
         } else {
             // 재처리나 중복 명령이 와도 desired state와 현재 DB 상태가 같으면 조용히 no-op 처리한다.

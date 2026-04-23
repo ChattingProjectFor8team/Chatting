@@ -76,6 +76,26 @@ public class ArtistPostCommentDeltaBuffer {
         return deltas;
     }
 
+    /**
+     * flush 중 DB 반영이 실패했을 때, 이번 배치가 책임지려던 delta를 다시 Redis 버퍼로 되돌린다.
+     *
+     * 이유:
+     * - drainAll()은 값을 읽으면서 Redis에서 제거한다
+     * - 그런데 DB update가 중간에 실패하면 트랜잭션은 롤백되지만
+     * - 이미 Redis에서 빠진 delta는 그대로 유실될 수 있다
+     *
+     * 따라서 flush 실패 시에는 drained delta 전체를 다시 누적해 다음 주기에 재처리하게 한다.
+     */
+    public void restoreAll(List<ArtistPostCommentDelta> deltas) {
+        if (deltas == null || deltas.isEmpty()) {
+            return;
+        }
+
+        for (ArtistPostCommentDelta delta : deltas) {
+            accumulate(delta.artistPostId(), delta.delta());
+        }
+    }
+
     private long drainOne(Long artistPostId) {
         // HGET 후 HDEL 을 따로 하면 중간 경쟁에서 중복 반영 위험이 생길 수 있으므로
         // Lua script 로 "읽고 바로 삭제"를 원자적으로 처리한다.
