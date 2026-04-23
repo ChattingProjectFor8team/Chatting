@@ -13,14 +13,17 @@ import com.example.infinite.domain.subscriptionmembership.dto.response.WriterSub
 import com.example.infinite.domain.subscriptionmembership.service.SubscriptionMembershipService;
 import com.example.infinite.global.common.constant.CacheNames;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
+import com.example.infinite.global.common.dto.OffsetSliceResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -76,20 +79,64 @@ public class FanLetterBaseCacheService {
             return new CursorSliceResponse<>(List.of(), null, false, FAN_LETTER_SLICE_SIZE);
         }
 
-        List<Long> fanLetterIds = visibleRows.stream()
+        List<FanLetterListResponse> content = buildListResponses(artistId, visibleRows);
+
+        Long nextCursor = hasNext
+                ? visibleRows.get(visibleRows.size() - 1).fanLetterId()
+                : null;
+        return new CursorSliceResponse<>(content, nextCursor, hasNext, FAN_LETTER_SLICE_SIZE);
+    }
+
+    public OffsetSliceResponse<FanLetterListResponse> loadHotFanLetterListBase(
+            Long artistId,
+            LocalDateTime since,
+            int offset,
+            int size,
+            Long minLikeCount
+    ) {
+        // FanLetter HOT은 복합커서까지 들고 갈 만큼 후보군이 크지 않다고 보고,
+        // offset + size 기반 slice 로 비교 구현한다.
+        // 결과가 비어 있으면 content = [] 로 그대로 반환한다.
+        // 프론트는 이 빈 목록을 보고 "Hot콘텐츠가 없습니다 더많은 최신글을 확인해 보세요" 문구를 노출하면 된다.
+        List<FanLetterListRow> rows = fanLetterRepository.findHotRowsByArtistId(
+                artistId,
+                since,
+                offset,
+                size + 1,
+                minLikeCount
+        );
+        boolean hasNext = rows.size() > size;
+        List<FanLetterListRow> visibleRows = hasNext ? rows.subList(0, size) : rows;
+        List<FanLetterListResponse> content = buildListResponses(artistId, visibleRows);
+
+        return new OffsetSliceResponse<>(
+                content,
+                hasNext ? offset + size : null,
+                hasNext,
+                size
+        );
+    }
+
+    private List<FanLetterListResponse> buildListResponses(Long artistId, List<FanLetterListRow> rows) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> fanLetterIds = rows.stream()
                 .map(FanLetterListRow::fanLetterId)
                 .toList();
         Map<Long, FanLetterImageResponse> imageByLetterId = loadImageMap(fanLetterIds);
         // special-like는 persisted field가 아니라 Reaction 원본을 바탕으로 읽기 시점에 조립한다.
+        // HOT 목록도 이 정책을 그대로 따라야 해서 별도 분기 없이 공통 메서드로 묶는다.
         Map<Long, SpecialLikeInfo> specialLikeInfoByLetterId = loadSpecialLikeInfo(
                 artistId,
-                visibleRows,
+                rows,
                 FanLetterListRow::fanLetterId,
                 FanLetterListRow::artistDisplayName,
                 FanLetterListRow::artistProfileImageUrl
         );
 
-        List<FanLetterListResponse> content = visibleRows.stream()
+        return rows.stream()
                 .map(row -> FanLetterListResponse.from(
                         row,
                         imageByLetterId.get(row.fanLetterId()),
@@ -98,11 +145,6 @@ public class FanLetterBaseCacheService {
                         specialLikeInfoByLetterId.getOrDefault(row.fanLetterId(), SpecialLikeInfo.empty()).artistLikeProfileImageUrl()
                 ))
                 .toList();
-
-        Long nextCursor = hasNext
-                ? visibleRows.get(visibleRows.size() - 1).fanLetterId()
-                : null;
-        return new CursorSliceResponse<>(content, nextCursor, hasNext, FAN_LETTER_SLICE_SIZE);
     }
 
     public FanLetterBaseResponse loadFanLetterBaseDetail(Long artistId, Long fanLetterId) {
@@ -166,7 +208,7 @@ public class FanLetterBaseCacheService {
         }
 
         // "그 아티스트 소속 멤버 중 한 명이라도 좋아요했는가"를 한 번에 조회한다.
-        var likedFanLetterIds = interactionRepository.findTargetIdsReactedByArtistMembers(
+        Set<Long> likedFanLetterIds = interactionRepository.findTargetIdsReactedByArtistMembers(
                 artistId,
                 PostType.FAN_LETTER,
                 rows.stream().map(fanLetterIdExtractor).toList(),

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -104,6 +105,74 @@ public class ArtistPostBaseCacheService {
         List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.ARTIST_POST, List.of(artistPostId))
                 .getOrDefault(artistPostId, List.of());
         return ArtistPostBaseResponse.from(row, media, hashtags);
+    }
+
+    public ArtistPostBaseResponse loadLatestArtistPostBase(Long artistId) {
+        // 대시보드는 "최신 1건"만 보여 주는 요약 블록이므로
+        // 목록 slice 전체를 만들지 않고 최신 row 하나만 골라 조립한다.
+        ArtistPostReadRow row = artistPostRepository.findLatestRowByArtistId(artistId)
+                .orElse(null);
+        if (row == null) {
+            return null;
+        }
+
+        List<ArtistPostMediaResponse> media = loadPreviewMediaMap(List.of(row.artistPostId()))
+                .getOrDefault(row.artistPostId(), List.of());
+        List<String> hashtags = hashtagService.findHashtagNamesByTargetIds(PostType.ARTIST_POST, List.of(row.artistPostId()))
+                .getOrDefault(row.artistPostId(), List.of());
+        return ArtistPostBaseResponse.from(row, media, hashtags);
+    }
+
+    public List<ArtistPostBaseResponse> loadLatestArtistPostBases(Long artistId, int limit) {
+        // 구독 섹션은 artist별 최신 2건 정도만 필요하므로 고정 slice 캐시를 재사용하지 않고 즉시 조회한다.
+        return buildBaseResponses(artistPostRepository.findSliceRowsByArtistId(artistId, null, limit));
+    }
+
+    public List<ArtistPostBaseResponse> loadLatestArtistPostBasesByWriterIds(Collection<Long> writerIds, int limit) {
+        return buildBaseResponses(artistPostRepository.findLatestRowsByWriterIds(writerIds, limit));
+    }
+
+    public Map<Long, List<ArtistPostBaseResponse>> loadLatestArtistPostBaseMapByArtistIds(
+            Collection<Long> artistIds,
+            int perArtistLimit
+    ) {
+        if (artistIds == null || artistIds.isEmpty() || perArtistLimit < 1) {
+            return Map.of();
+        }
+
+        List<ArtistPostBaseResponse> baseResponses = buildBaseResponses(
+                artistPostRepository.findLatestRowsByArtistIds(artistIds, perArtistLimit)
+        );
+        if (baseResponses.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<ArtistPostBaseResponse>> baseResponseMap = new LinkedHashMap<>();
+        for (ArtistPostBaseResponse baseResponse : baseResponses) {
+            baseResponseMap.computeIfAbsent(baseResponse.artistId(), ignored -> new java.util.ArrayList<>())
+                    .add(baseResponse);
+        }
+        return baseResponseMap;
+    }
+
+    private List<ArtistPostBaseResponse> buildBaseResponses(List<ArtistPostReadRow> rows) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> postIds = rows.stream()
+                .map(ArtistPostReadRow::artistPostId)
+                .toList();
+        Map<Long, List<ArtistPostMediaResponse>> mediaMap = loadPreviewMediaMap(postIds);
+        Map<Long, List<String>> hashtagMap = hashtagService.findHashtagNamesByTargetIds(PostType.ARTIST_POST, postIds);
+
+        return rows.stream()
+                .map(row -> ArtistPostBaseResponse.from(
+                        row,
+                        mediaMap.getOrDefault(row.artistPostId(), List.of()),
+                        hashtagMap.getOrDefault(row.artistPostId(), List.of())
+                ))
+                .toList();
     }
 
     private Map<Long, List<ArtistPostMediaResponse>> loadMediaMap(Collection<Long> artistPostIds) {

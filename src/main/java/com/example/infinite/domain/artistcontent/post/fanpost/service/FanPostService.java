@@ -13,6 +13,7 @@ import com.example.infinite.domain.artistcontent.post.fanpost.dto.request.FanPos
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostBaseResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostCreateResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostDetailResponse;
+import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostHotBaseSlice;
 import com.example.infinite.domain.artistcontent.post.fanpost.dto.response.FanPostResponse;
 import com.example.infinite.domain.artistcontent.post.fanpost.entity.FanPost;
 import com.example.infinite.domain.artistcontent.post.fanpost.repository.FanPostRepository;
@@ -25,12 +26,15 @@ import com.example.infinite.domain.member.member.support.MemberReader;
 import com.example.infinite.global.auth.MemberDetailsImpl;
 import com.example.infinite.global.common.constant.CacheNames;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
+import com.example.infinite.global.common.dto.ScoreCursorSliceResponse;
+import com.example.infinite.global.common.util.querydsl.CursorSliceUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +44,12 @@ import java.util.Map;
 // FanPost는 읽기 경로에서 base/hot을 분리한다.
 // 본문/미디어/해시태그/작성자 정보는 base 캐시, like/comment count는 hot 캐시로 나눠 수명을 다르게 둔다.
 public class FanPostService {
+
+    private static final int HOT_FAN_POST_DEFAULT_SIZE = 10;
+    private static final int HOT_FAN_POST_MAX_SIZE = 30;
+    private static final long HOT_LOOKBACK_HOURS = 24L;
+    private static final long HOT_MIN_LIKE_COUNT = 5L;
+    private static final long HOT_MIN_COMMENT_COUNT = 5L;
 
     private final FanPostRepository fanPostRepository;
     private final MemberReader memberReader;
@@ -89,6 +99,49 @@ public class FanPostService {
                 ))
                 .toList();
         return new CursorSliceResponse<>(content, baseSlice.nextCursor(), baseSlice.hasNext(), baseSlice.size());
+    }
+
+    public ScoreCursorSliceResponse<FanPostResponse> getHotFanPosts(
+            Long artistId,
+            Long scoreCursor,
+            Long idCursor,
+            Integer size
+    ) {
+        artistReader.findArtistByIdOrThrow(artistId);
+        int resolvedSize = CursorSliceUtils.resolveLimit(size, HOT_FAN_POST_DEFAULT_SIZE, HOT_FAN_POST_MAX_SIZE);
+
+        // FanPost HOT은 좋아요/댓글 반응이 활발하고 점수 변동도 크다.
+        // 그래서 offset 대신 (score, id) 복합커서를 써서 정렬 기준과 페이지 기준을 일치시킨다.
+        FanPostHotBaseSlice baseSlice = fanPostBaseCacheService.loadHotFanPostBaseSlice(
+                artistId,
+                LocalDateTime.now().minusHours(HOT_LOOKBACK_HOURS),
+                scoreCursor,
+                idCursor,
+                resolvedSize,
+                HOT_MIN_LIKE_COUNT,
+                HOT_MIN_COMMENT_COUNT
+        );
+        Map<Long, PostHotData> hotDataByPostId = postHotDataCacheService.getPostHotDataMap(
+                PostType.FAN_POST,
+                baseSlice.content().stream().map(FanPostBaseResponse::fanPostId).toList()
+        );
+
+        // repository가 score/id 순서를 확정하고,
+        // service는 그 순서를 보존한 채 hot count만 합쳐 최종 카드 응답을 만든다.
+        List<FanPostResponse> content = baseSlice.content().stream()
+                .map(baseResponse -> FanPostResponse.from(
+                        baseResponse,
+                        hotDataByPostId.getOrDefault(baseResponse.fanPostId(), PostHotData.empty())
+                ))
+                .toList();
+
+        return new ScoreCursorSliceResponse<>(
+                content,
+                baseSlice.nextScoreCursor(),
+                baseSlice.nextIdCursor(),
+                baseSlice.hasNext(),
+                baseSlice.size()
+        );
     }
 
     public FanPostDetailResponse getFanPost(Long artistId, Long fanPostId, Long commentCursor) {

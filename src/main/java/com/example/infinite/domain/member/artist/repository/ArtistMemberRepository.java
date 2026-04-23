@@ -3,6 +3,7 @@ package com.example.infinite.domain.member.artist.repository;
 import com.example.infinite.domain.member.artist.entity.ArtistMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,4 +19,6 @@ public interface ArtistMemberRepository extends JpaRepository<ArtistMember, Long
     long countByArtistId(Long artistId);
 
     List<ArtistMember> findAllByArtistId(Long artistId);
+
+    List<ArtistMember> findAllByMemberIdIn(Collection<Long> memberIds);
 }
