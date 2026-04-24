@@ -145,30 +145,21 @@ jobs:
 
       # Step 2-1: .env 파일 생성 및 S3 업로드 (리뷰어 피드백 반영!)
       - name: Create and Upload .env to S3
-        env:
-          # 시크릿 변수 불러오기
-          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
-          RDS_HOST: ${{ vars.RDS_HOST }}
-          RDS_USERNAME: ${{ vars.RDS_USERNAME }}
-          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
-          REDIS_HOST: ${{ vars.REDIS_HOST }}
-          REDIS_PORT: ${{ vars.REDIS_PORT }}
-          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          # 1. 깃허브 액션 러너 내부에 .env 파일 임시 생성
+          # 💡 env: 섹션 없이 직접 ${{ }} 문법을 사용하여 파일 생성
           cat <<EOF > .env
           SPRING_PROFILES_ACTIVE=prod
-          RDS_HOST=${RDS_HOST}
-          RDS_USERNAME=${RDS_USERNAME}
-          RDS_PASSWORD=${RDS_PASSWORD}
-          REDIS_HOST=${REDIS_HOST}
-          REDIS_PORT=${REDIS_PORT}
-          S3_BUCKET_NAME=${S3_BUCKET_NAME}
-          JWT_SECRET_KEY=${JWT_SECRET_KEY}
+          RDS_HOST=${{ vars.RDS_HOST }}
+          RDS_USERNAME=${{ vars.RDS_USERNAME }}
+          RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
+          REDIS_HOST=${{ vars.REDIS_HOST }}
+          REDIS_PORT=${{ vars.REDIS_PORT }}
+          S3_BUCKET_NAME=${{ vars.S3_BUCKET_NAME }}
+          JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           EOF
           
-          # 2. 생성된 .env 파일을 S3 버킷의 deploy 폴더로 업로드 (노출 방지)
-          aws s3 cp .env s3://${S3_BUCKET_NAME}/deploy/.env
+          # 업로드 시에도 직접 변수 참조
+          aws s3 cp .env s3://${{ vars.S3_BUCKET_NAME }}/deploy/.env
 
       # Step 2-2: Launch Template 새 버전 생성
       - name: Update Launch Template

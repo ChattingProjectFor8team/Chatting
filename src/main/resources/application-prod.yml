@@ -5,7 +5,7 @@ spring:
     password: ${RDS_PASSWORD}
   jpa:
     hibernate:
-      ddl-auto: update # 운영은 스키마 보호를 위해 validate가 필수!!!!
+      ddl-auto: validate # 운영은 스키마 보호를 위해 validate가 필수!!!!
   cloud:
     aws:
       s3:
