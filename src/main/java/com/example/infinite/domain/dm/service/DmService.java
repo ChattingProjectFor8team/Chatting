@@ -9,6 +9,7 @@ import com.example.infinite.domain.dm.error.DmErrorCode;
 import com.example.infinite.domain.dm.error.DmException;
 import com.example.infinite.domain.dm.repository.DmMessageRepository;
 import com.example.infinite.domain.dm.repository.DmRoomRepository;
+import com.example.infinite.domain.member.artist.repository.ArtistMemberRepository;
 import com.example.infinite.domain.subscriptionmembership.enums.SubscriptionStatus;
 import com.example.infinite.domain.subscriptionmembership.repository.DmSubscriptionRepository;
 import com.example.infinite.global.common.dto.CursorSliceResponse;
@@ -33,6 +34,7 @@ public class DmService {
     private final DmMessageRepository dmMessageRepository;
     private final DmSubscriptionRepository dmSubscriptionRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ArtistMemberRepository artistMemberRepository;
 
     public List<DmRoomResponse> getMyRooms(Long userId) {
         return dmRoomRepository.findByUserId(userId).stream()
@@ -68,7 +70,11 @@ public class DmService {
      * 해당 아티스트의 모든 DM 룸에 메시지 생성 + 각 룸 구독자에게 STOMP 전송.
      */
     @Transactional
-    public void broadcast(Long artistId, String content) {
+    public void broadcast(Long artistId, Long senderId, String content) {
+        if (!artistMemberRepository.existsByArtistIdAndMemberId(artistId, senderId)) {
+            throw new DmException(DmErrorCode.DM_BROADCAST_UNAUTHORIZED);
+        }
+
         List<DmRoom> rooms = dmRoomRepository.findByArtistId(artistId);
 
         for (DmRoom room : rooms) {
@@ -85,7 +91,8 @@ public class DmService {
             );
         }
 
-        log.info("아티스트 DM 일괄 발송 완료: artistId={}, rooms={}", artistId, rooms.size());
+        log.info("아티스트 DM 일괄 발송 완료: artistId={}, senderId={}, rooms={}",
+                artistId, senderId, rooms.size());
     }
 
     /**
@@ -97,7 +104,7 @@ public class DmService {
         DmRoom room = findRoomOrThrow(roomId);
 
         SenderType senderType;
-        if (room.getArtistId().equals(senderId)) {
+        if (artistMemberRepository.existsByArtistIdAndMemberId(room.getArtistId(), senderId)) {
             senderType = SenderType.ARTIST;
         } else if (room.getUserId().equals(senderId)) {
             senderType = SenderType.USER;
@@ -139,7 +146,10 @@ public class DmService {
     }
 
     private void validateRoomAccess(DmRoom room, Long userId) {
-        if (!room.getUserId().equals(userId) && !room.getArtistId().equals(userId)) {
+        boolean isUser = room.getUserId().equals(userId);
+        boolean isArtistMember = artistMemberRepository.existsByArtistIdAndMemberId(
+                room.getArtistId(), userId);
+        if (!isUser && !isArtistMember) {
             throw new DmException(DmErrorCode.DM_NOT_ROOM_MEMBER);
         }
     }
