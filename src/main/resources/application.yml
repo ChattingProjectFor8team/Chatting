@@ -12,7 +12,6 @@ spring:
   cloud:
     aws:
       credentials:
-        # [수정] 팀원들 로컬 부팅 안 깨지게 dummy 기본값 추가
         access-key: ${AWS_ACCESS_KEY_ID:dummy}
         secret-key: ${AWS_SECRET_ACCESS_KEY:dummy}
       region:
@@ -26,25 +25,9 @@ spring:
       secretsmanager:
         enabled: false
 
-  datasource:
-    # [수정 1] 팀원들을 위해 :localhost 등 기본값(Fallback) 추가
-    # [수정 2] 로컬 개발용이므로 useSSL=false 유지 (접속 편의성)
-    url: jdbc:mysql://${RDS_HOST:localhost}:3306/infinite?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${RDS_USERNAME:root}
-    password: ${RDS_PASSWORD:1234} # 팀 로컬 DB 비번에 맞춰 수정하세요 (ex: root, 1234 등)
-    driver-class-name: com.mysql.cj.jdbc.Driver
+# 🚨 datasource, jpa 설정은 여기서 완전히 제거되었습니다! 🚨
 
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    # 로컬에서는 디버깅을 위해 SQL 보이게 설정
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
-
-# --- 이하 설정은 기존과 동일 (JWT, portone 등 변수 뒤에 :기본값 붙은 것 유지) ---
+# --- 이하 설정은 기존과 동일 ---
 jwt:
   secret: ${JWT_SECRET_KEY:aW5maW5pdGVMb2NhbERldlNlY3JldEtleU1pbmltdW0zMkJ5dGVz}
   expiration: 3600000
