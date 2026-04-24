@@ -113,6 +113,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      # Step 2-1: .env 파일 생성 및 S3 업로드 (printf 보안 강화)
       - name: Create and Upload .env to S3
         env:
           RDS_HOST: ${{ vars.RDS_HOST }}
@@ -123,20 +124,13 @@ jobs:
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          # 작은따옴표 없는 EOF 유지 (변수 치환 성공)
-          cat <<EOF > .env
-          SPRING_PROFILES_ACTIVE=prod
-          RDS_HOST=${RDS_HOST}
-          RDS_USERNAME=${RDS_USERNAME}
-          RDS_PASSWORD=${RDS_PASSWORD}
-          REDIS_HOST=${REDIS_HOST}
-          REDIS_PORT=${REDIS_PORT}
-          S3_BUCKET_NAME=${S3_BUCKET_NAME}
-          JWT_SECRET_KEY=${JWT_SECRET_KEY}
-          EOF
+          # [수정] 쉘 변수 치환 취약점 방어를 위해 printf %s 포맷 사용
+          printf 'SPRING_PROFILES_ACTIVE=prod\nRDS_HOST=%s\nRDS_USERNAME=%s\nRDS_PASSWORD=%s\nREDIS_HOST=%s\nREDIS_PORT=%s\nS3_BUCKET_NAME=%s\nJWT_SECRET_KEY=%s\n' \
+            "$RDS_HOST" "$RDS_USERNAME" "$RDS_PASSWORD" "$REDIS_HOST" "$REDIS_PORT" "$S3_BUCKET_NAME" "$JWT_SECRET_KEY" > .env
           
           aws s3 cp .env s3://${S3_BUCKET_NAME}/deploy/.env
 
+      # Step 2-2: Launch Template 새 버전 생성 (trap EXIT 보안 강화)
       - name: Update Launch Template
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
@@ -155,6 +149,9 @@ jobs:
           #!/bin/bash
           set -e
           
+          # 🌟 [수정] 스크립트 최상단에 trap 선언! 중간에 에러로 종료되더라도 무조건 삭제됨
+          trap 'rm -f /tmp/.env' EXIT
+          
           dnf update -y
           dnf install -y docker
           systemctl enable docker
@@ -170,7 +167,7 @@ jobs:
             --env-file /tmp/.env \
             __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          rm -f /tmp/.env
+          # (하단의 rm -f /tmp/.env 는 이제 trap이 알아서 해주므로 삭제했습니다)
           USERDATA
           )
 
