@@ -23,7 +23,7 @@ function DesktopDMScreen({ t, theme, onExit }) {
           setActiveId(mapped[0].id);
         }
       })
-      .catch(() => { /* mock 유지 */ });
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
   }, []);
 
   const activeThread = rooms.find(x => x.id === activeId) || rooms[0];
@@ -200,7 +200,7 @@ function DMConversationPanel({ thread, artist, t, theme }) {
           })));
         }
       })
-      .catch(() => { /* mock 유지 */ });
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
   }, [thread?.id]);
 
   // STOMP DM 실시간 수신
@@ -210,16 +210,25 @@ function DMConversationPanel({ thread, artist, t, theme }) {
     window.ConnectfinAPI.connectStomp(
       () => {
         window.ConnectfinAPI.subscribeDm(thread.id, (msg) => {
-          setMessages(prev => [...prev, {
-            from: msg.senderType === 'USER' ? 'me' : (artist?.name || 'Artist'),
-            m: msg.content,
-            time: window.ConnectfinAPI.formatTime(msg.sentAt),
-            mine: msg.senderType === 'USER',
-            id: msg.id,
-          }]);
+          setMessages(prev => {
+            // 1차: 같은 id의 메시지가 이미 있으면 (optimistic 추가분) 스킵
+            if (msg.id && prev.some(m => m.id === msg.id)) return prev;
+            // 2차: 내가 보낸 optimistic 추가분의 에코 (id 매칭 실패 시 content + '방금' 체크)
+            if (msg.senderType === 'USER') {
+              const recentLocal = prev.filter(m => m.mine && m.time === '방금');
+              if (recentLocal.some(m => m.m === msg.content)) return prev;
+            }
+            return [...prev, {
+              from: msg.senderType === 'USER' ? 'me' : (artist?.name || 'Artist'),
+              m: msg.content,
+              time: window.ConnectfinAPI.formatTime(msg.sentAt),
+              mine: msg.senderType === 'USER',
+              id: msg.id,
+            }];
+          });
         });
       },
-      () => {} // 연결 실패 시 무시 — REST fallback으로 이미 히스토리 로드됨
+      (err) => { console.warn('STOMP connect fallback:', err?.message || err); }
     );
 
     return () => {

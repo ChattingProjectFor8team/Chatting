@@ -97,7 +97,7 @@ function RaffleListScreen({ t, onBack, onOpenRaffle }) {
       ARTISTS.map(a =>
         window.ConnectfinAPI.api(`/api/v1/artists/${a.id}/raffles`)
           .then(data => (data || []).map(r => ({ ...mapRaffle(r), artistId: a.id })))
-          .catch(() => [])
+          .catch(err => { console.warn('API batch item failed:', err?.message || err); return []; })
       )
     ).then(results => {
       const all = results.flat();
@@ -252,12 +252,12 @@ function RaffleDetailScreen({ t, theme, raffleId, onBack, onEnter }) {
     // 래플 상세
     window.ConnectfinAPI.api(`/api/v1/artists/${r.artistId}/raffles/${raffleId}`)
       .then(data => setR(prev => ({ ...prev, ...mapRaffle(data), entered: data.entered })))
-      .catch(() => {});
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); });
     // 내 응모 결과
     if (window.ConnectfinAPI.getToken()) {
       window.ConnectfinAPI.api(`/api/v1/artists/${r.artistId}/raffles/${raffleId}/entries/me`)
         .then(data => setMyEntry(data))
-        .catch(() => {});
+        .catch(err => { console.warn('API error suppressed:', err?.message || err); });
     }
   }, [raffleId]);
 

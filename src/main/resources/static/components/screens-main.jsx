@@ -17,7 +17,7 @@ function HomeScreen({ t, theme, speed, liveOn, onNav, onOpenLive, onOpenArtist }
     if (!window.ConnectfinAPI.getToken()) return;
     window.ConnectfinAPI.api('/api/member/v1/home/dashboard')
       .then(data => setDashboard(data))
-      .catch(() => {});
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); });
   }, []);
 
   return (

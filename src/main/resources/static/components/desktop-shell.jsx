@@ -290,7 +290,7 @@ function ArtistSearchSection({ t, theme, onArtistOpen }) {
   React.useEffect(() => {
     window.ConnectfinAPI.api('/api/member/v1/artists/search/popular?limit=5')
       .then(data => setPopular(data || []))
-      .catch(() => {});
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); });
   }, []);
 
   // 검색 (debounce 300ms)
@@ -305,7 +305,7 @@ function ArtistSearchSection({ t, theme, onArtistOpen }) {
     debounceRef.current = setTimeout(() => {
       window.ConnectfinAPI.api(`/api/member/v2/artists/search?keyword=${encodeURIComponent(query)}`)
         .then(data => setResults(data.content || []))
-        .catch(() => setResults([]));
+        .catch(err => { console.warn('Search failed:', err?.message || err); setResults([]); });
     }, 300);
     return () => clearTimeout(debounceRef.current);
   }, [query]);
