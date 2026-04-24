@@ -133,7 +133,6 @@ jobs:
   deploy:
     needs: build
     if: contains(fromJson('["refs/heads/main", "refs/heads/develop", "refs/heads/hotfix/env/var"]'), github.ref)
-#    if: github.ref == 'refs/heads/main'   # main push에서만 배포 (PR에서는 CI만 실행)
     runs-on: ubuntu-latest
 
     steps:
