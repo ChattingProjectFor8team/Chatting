@@ -3,6 +3,7 @@
 function HomeScreen({ t, theme, speed, liveOn, onNav, onOpenLive, onOpenArtist }) {
   const liveArtists = ARTISTS.filter(a => a.live && liveOn);
   const [viewers, setViewers] = React.useState(liveArtists.map(a => a.viewers));
+  const [dashboard, setDashboard] = React.useState(null);
 
   React.useEffect(() => {
     if (!liveOn) return;
@@ -11,6 +12,13 @@ function HomeScreen({ t, theme, speed, liveOn, onNav, onOpenLive, onOpenArtist }
     }, 900 / speed);
     return () => clearInterval(id);
   }, [speed, liveOn]);
+
+  React.useEffect(() => {
+    if (!window.ConnectfinAPI.getToken()) return;
+    window.ConnectfinAPI.api('/api/member/v1/home/dashboard')
+      .then(data => setDashboard(data))
+      .catch(() => {});
+  }, []);
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', paddingTop: 54, paddingBottom: 96 }}>
@@ -91,7 +99,87 @@ function HomeScreen({ t, theme, speed, liveOn, onNav, onOpenLive, onOpenArtist }
         <div style={{ fontFamily: t.fontDisplay, fontWeight: 800, fontSize: 18, letterSpacing: -0.4, marginBottom: 10 }}>
           Today's Feed
         </div>
-        {FEED_POSTS.map(post => {
+
+        {/* 대시보드 API 로드 시 — 구독 아티스트 최신 글 */}
+        {dashboard?.subscribedArtistsLatestPosts?.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            {dashboard.subscribedArtistsLatestPosts.map(item => (
+              <div key={item.artist.artistId} style={{ marginBottom: 14 }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                  fontSize: 12, fontWeight: 700, color: t.textDim,
+                }}>
+                  <span style={{ fontSize: 14 }}>⭐</span>
+                  {item.artist.name}의 최신 소식
+                </div>
+                {item.posts.map(post => {
+                  const a = ARTISTS.find(x => x.id === item.artist.artistId) || { name: item.artist.name, id: item.artist.artistId, color1: t.accent, color2: t.accent2 };
+                  return (
+                    <div key={post.artistPostId} onClick={() => onOpenArtist(item.artist.artistId)} style={{
+                      background: t.surface, borderRadius: 20, padding: 16, marginBottom: 10,
+                      border: `1px solid ${t.accent}40`, cursor: 'pointer',
+                    }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                        <ArtistAvatar artist={a} size={40} t={t}/>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700, fontSize: 14 }}>{post.writerNickname}</span>
+                            {post.artistBadge && (
+                              <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: t.gradient, color: '#fff' }}>ARTIST ✓</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: t.textDim, fontFamily: t.fontMono }}>
+                            {window.ConnectfinAPI.formatTime(post.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 14, lineHeight: 1.55, color: t.text }}>{post.content}</div>
+                      <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 12, color: t.textDim }}>
+                        <span>♡ {window.ConnectfinAPI.formatCount(post.likeCount)}</span>
+                        <span>💬 {post.commentCount}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 대시보드 API 로드 시 — 팔로우 멤버 최신 글 */}
+        {dashboard?.followedArtistMembersLatestPosts?.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.textDim, marginBottom: 10 }}>팔로우 멤버 소식</div>
+            {dashboard.followedArtistMembersLatestPosts.map(item => {
+              if (!item.post) return null;
+              const a = ARTISTS.find(x => x.id === item.artist.artistId) || { name: item.artist.name, id: item.artist.artistId, color1: t.accent, color2: t.accent2 };
+              return (
+                <div key={item.artistMemberId} onClick={() => onOpenArtist(item.artist.artistId)} style={{
+                  background: t.surface, borderRadius: 20, padding: 16, marginBottom: 10,
+                  border: `1px solid ${t.line}`, cursor: 'pointer',
+                }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                    <ArtistAvatar artist={a} size={40} t={t}/>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{item.post?.writerNickname || item.stageName}</span>
+                      <div style={{ fontSize: 11, color: t.textDim, fontFamily: t.fontMono }}>
+                        {item.stageName} · {item.artist.name} · {window.ConnectfinAPI.formatTime(item.post.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 14, lineHeight: 1.55, color: t.text }}>{item.post.content}</div>
+                  <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 12, color: t.textDim }}>
+                    <span>♡ {window.ConnectfinAPI.formatCount(item.post.likeCount)}</span>
+                    <span>💬 {item.post.commentCount}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 기존 mock 피드 (대시보드가 없거나 비로그인) */}
+        {!dashboard && FEED_POSTS.map(post => {
           const a = ARTISTS.find(x => x.id === post.artistId);
           const isArtist = post.type === 'artist';
           return (
@@ -141,7 +229,7 @@ function HomeScreen({ t, theme, speed, liveOn, onNav, onOpenLive, onOpenArtist }
           );
         })}
         <div style={{ textAlign: 'center', padding: 20, color: t.textMuted, fontFamily: t.fontMono, fontSize: 11 }}>
-          — Cursor: id &lt; 101 —
+          — {dashboard ? 'Dashboard loaded' : 'Cursor: id < 101'} —
         </div>
       </div>
     </div>
