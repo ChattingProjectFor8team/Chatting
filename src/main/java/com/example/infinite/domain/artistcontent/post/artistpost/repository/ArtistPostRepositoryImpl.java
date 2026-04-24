@@ -116,6 +116,17 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
             return List.of();
         }
 
+        /*
+         * 이 쿼리는 메인 홈 follow 섹션용 "전역 최신 목록"이다.
+         *
+         * 중요 포인트:
+         * - writerIds 중 누가 썼는지만 본다
+         * - 결과는 artist별로 자르지 않고 한 줄의 최신순 피드처럼 정렬한다
+         * - 따라서 정렬 기준은 단순 id DESC + limit 이다
+         *
+         * 반대로 "artist별 최신 n건" 같은 요구에는 이 쿼리를 쓰면 안 되고,
+         * 아래 findLatestRowsByArtistIds 처럼 artist 단위 top-N 쿼리가 필요하다.
+         */
         return queryFactory
                 .select(Projections.constructor(
                         ArtistPostReadRow.class,
@@ -147,6 +158,21 @@ public class ArtistPostRepositoryImpl implements ArtistPostRepositoryCustom {
             return List.of();
         }
 
+        /*
+         * 이 쿼리는 "artist 여러 개에 대해 각 artist의 최신 n건"을 한 번에 읽기 위한 패턴이다.
+         *
+         * 어떻게 동작하나?
+         * - 바깥 row 를 artistPost 라고 두고
+         * - 같은 artist 안에서 자기보다 id 가 더 큰 newerArtistPost 개수를 센다
+         * - 그 개수가 perArtistLimit 미만인 row 만 남긴다
+         *
+         * 예를 들어 perArtistLimit = 2 이면
+         * 같은 artist 안에서 "나보다 최신 글이 0개 또는 1개뿐인 row"만 통과한다.
+         * 결과적으로 각 artist마다 최신 2건이 남는다.
+         *
+         * 즉 SQL window function 없이도 Querydsl/JPA 안에서
+         * per-group top N 을 표현한 쿼리라고 이해하면 된다.
+         */
         return queryFactory
                 .select(Projections.constructor(
                         ArtistPostReadRow.class,

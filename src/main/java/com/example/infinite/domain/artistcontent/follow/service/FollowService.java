@@ -48,11 +48,29 @@ public class FollowService {
                 })
                 .orElseGet(() -> {
                     try {
-                        // 같은 사용자가 같은 대상을 거의 동시에 follow 하면 둘 다 "미존재"를 보고 insert를 시도할 수 있다.
-                        // 이 경우 unique 제약이 최종 방어선이 되므로, saveAndFlush로 여기서 바로 감지하고 현재 상태를 다시 해석한다.
+                        /*
+                         * 여기서도 "조회 후 insert" 사이의 경쟁 조건을 의식해야 한다.
+                         *
+                         * 두 요청이 거의 동시에 들어오면 둘 다 기존 row 가 없다고 판단하고
+                         * insert 를 시도할 수 있다.
+                         * 애플리케이션 코드만으로는 이 틈을 완전히 없애기 어렵기 때문에
+                         * 최종 정합성은 DB unique 제약에 맡긴다.
+                         *
+                         * saveAndFlush 를 쓰는 이유는
+                         * commit 시점까지 예외를 미루지 않고 지금 여기서 충돌을 감지해
+                         * "결과적으로는 follow 상태가 true 인가?"를 바로 다시 해석하기 위해서다.
+                         */
                         followRepository.saveAndFlush(Follow.create(follower, targetArtistMember));
                         return FollowResponse.of(artistMemberId, true);
                     } catch (DataIntegrityViolationException exception) {
+                        /*
+                         * unique 충돌이 났다는 것은 대개 "다른 동시 요청이 먼저 insert 했다"는 뜻이다.
+                         * 이 경우 사용자 입장에서는 이미 follow 된 상태가 최종 결과이므로
+                         * 예외를 그대로 500 으로 올리기보다 현재 상태를 다시 읽어 true 로 돌려준다.
+                         *
+                         * 반대로 재조회해도 row 가 없다면 예상한 경쟁 상황이 아니므로
+                         * 다른 무결성 오류로 보고 원래 예외를 다시 던진다.
+                         */
                         boolean followed = followRepository.findByFollowerMemberIdAndTargetArtistMemberId(
                                 follower.getId(),
                                 artistMemberId
@@ -66,7 +84,12 @@ public class FollowService {
     }
 
     public List<ArtistMember> getFollowedArtistMembers(Long followerMemberId) {
-        // 홈 대시보드는 follow 엔티티를 직접 다루지 않고 아티스트 멤버 목록만 받는다.
+        /*
+         * 홈 대시보드가 필요한 것은 "follow row 자체"가 아니라
+         * 그 row 가 가리키는 ArtistMember 들이다.
+         * 그래서 서비스 경계에서 Follow 엔티티를 한 번 벗겨
+         * 상위 계층은 ArtistMember 목록만 다루게 만든다.
+         */
         return followRepository.findAllByFollowerMemberIdOrderByIdDesc(followerMemberId).stream()
                 .map(Follow::getTargetArtistMember)
                 .toList();
