@@ -11,7 +11,8 @@ import java.time.LocalDateTime;
 @Getter
 @Entity
 @Table(name = "raffle_entries", indexes = {
-        @Index(name = "uk_raffle_entry_user", columnList = "raffle_id, user_id", unique = true)
+        @Index(name = "uk_raffle_entry_user", columnList = "raffle_id, user_id", unique = true),
+        @Index(name = "idx_raffle_entry_user_entered", columnList = "user_id, entered_at")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RaffleEntry {
