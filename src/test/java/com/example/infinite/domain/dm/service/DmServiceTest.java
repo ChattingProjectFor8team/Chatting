@@ -18,11 +18,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -47,13 +48,7 @@ class DmServiceTest {
                 .userId(userId)
                 .artistId(artistId)
                 .build();
-        try {
-            var idField = DmRoom.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(room, roomId);
-        } catch (Exception e) {
-            throw new RuntimeException("테스트 DmRoom ID 설정 실패", e);
-        }
+        ReflectionTestUtils.setField(room, "id", roomId);
         return room;
     }
 
@@ -70,12 +65,10 @@ class DmServiceTest {
             when(artistMemberRepository.existsByArtistIdAndMemberId(artistId, nonMemberId))
                     .thenReturn(false);
 
-            assertThatThrownBy(() -> dmService.broadcast(artistId, nonMemberId, "전체 공지"))
-                    .isInstanceOf(DmException.class)
-                    .satisfies(ex -> {
-                        DmException dmEx = (DmException) ex;
-                        assertThat(dmEx.getErrorCode()).isEqualTo(DmErrorCode.DM_BROADCAST_UNAUTHORIZED);
-                    });
+            DmException ex = catchThrowableOfType(
+                    () -> dmService.broadcast(artistId, nonMemberId, "전체 공지"),
+                    DmException.class);
+            assertThat(ex.getErrorCode()).isEqualTo(DmErrorCode.DM_BROADCAST_UNAUTHORIZED);
 
             verify(dmMessageRepository, never()).save(any());
             verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));

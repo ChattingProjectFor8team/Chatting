@@ -75,9 +75,10 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.awaitility:awaitility:4.2.2'
 
-    // Testcontainers (Redis 통합 테스트용)
-    testImplementation 'org.testcontainers:testcontainers:1.20.4'
-    testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+    // Testcontainers (통합 테스트용)
+    testImplementation 'org.testcontainers:testcontainers:1.21.0'
+    testImplementation 'org.testcontainers:junit-jupiter:1.21.0'
+    testImplementation 'org.testcontainers:mysql:1.21.0'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     // 프로메테우스
