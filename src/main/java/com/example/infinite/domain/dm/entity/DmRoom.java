@@ -12,7 +12,8 @@ import org.hibernate.annotations.SQLRestriction;
 @Getter
 @Entity
 @Table(name = "dm_rooms", indexes = {
-        @Index(name = "uk_dm_room_user_artist", columnList = "user_id, artist_id", unique = true)
+        @Index(name = "uk_dm_room_user_artist", columnList = "user_id, artist_id", unique = true),
+        @Index(name = "idx_dm_room_artist", columnList = "artist_id")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE dm_rooms SET deleted_at = current_timestamp WHERE id = ?")
