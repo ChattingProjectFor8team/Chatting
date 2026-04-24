@@ -154,6 +154,51 @@ function formatDuration(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function ArtistMemberChip({ member, artist, t }) {
+  const [followed, setFollowed] = React.useState(false);
+  const [toggling, setToggling] = React.useState(false);
+
+  const toggleFollow = async (e) => {
+    e.stopPropagation();
+    if (toggling || !window.ConnectfinAPI.getToken()) return;
+    setToggling(true);
+    try {
+      const res = await window.ConnectfinAPI.api(
+        `/api/member/v1/follows/artist-members/${member.artistMemberId}/toggle`,
+        { method: 'POST' }
+      );
+      setFollowed(res.followed);
+    } catch (err) {
+      // 무시
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  return (
+    <div style={{
+      flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+      padding: '4px 10px 4px 4px', borderRadius: 20,
+      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)',
+      color: '#fff', fontSize: 11, fontWeight: 600,
+    }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: '50%',
+        background: `linear-gradient(135deg, ${artist.color1}, ${artist.color2})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 9, fontWeight: 800, color: '#fff',
+      }}>{member.stageName?.slice(0, 1)}</div>
+      <span>{member.stageName}</span>
+      <button onClick={toggleFollow} disabled={toggling} style={{
+        marginLeft: 2, padding: '2px 8px', borderRadius: 10, border: 'none',
+        background: followed ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)',
+        color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+        opacity: toggling ? 0.5 : 1,
+      }}>{followed ? '팔로잉' : '팔로우'}</button>
+    </div>
+  );
+}
+
 // Artist cover hero (top banner with gradient)
 function ArtistCoverBanner({ artist, t, theme }) {
   return (
@@ -179,6 +224,18 @@ function ArtistCoverBanner({ artist, t, theme }) {
         padding: '8px 16px', borderRadius: 10, border: 'none',
         background: '#fff', color: '#111', fontWeight: 800, fontSize: 13, cursor: 'pointer',
       }}>가입하기</button>
+
+      {/* Artist Members */}
+      {artist.artistMembers && artist.artistMembers.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 12, left: 24, right: 24,
+          display: 'flex', gap: 8, overflowX: 'auto',
+        }}>
+          {artist.artistMembers.slice().sort((a, b) => a.sortOrder - b.sortOrder).map(m => (
+            <ArtistMemberChip key={m.artistMemberId} member={m} artist={artist} t={t}/>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -226,8 +283,28 @@ function DesktopArtistProfile({ t, theme, artist, tab, onNavProfile, onOpenLive,
 // ────────── HIGHLIGHT (summary) ──────────
 function TabHighlight({ t, theme, artist, onNavProfile }) {
   const notices = NOTICES.filter(n => n.artistId === artist.id).slice(0, 5);
-  const artistPost = ARTIST_POSTS.find(p => p.artistId === artist.id);
-  const fanPosts = FAN_POSTS.filter(p => p.artistId === artist.id).slice(2, 8);
+  const mockArtistPost = ARTIST_POSTS.find(p => p.artistId === artist.id);
+  const mockFanPosts = FAN_POSTS.filter(p => p.artistId === artist.id).slice(2, 8);
+
+  const [artistPost, setArtistPost] = React.useState(mockArtistPost);
+  const [fanPosts, setFanPosts] = React.useState(mockFanPosts);
+  const [hotLetters, setHotLetters] = React.useState([]);
+
+  React.useEffect(() => {
+    window.ConnectfinAPI.api(`/api/member/v1/artists/${artist.id}/dashboard`)
+      .then(data => {
+        if (data.latestArtistPost) {
+          setArtistPost(mapArtistPost(data.latestArtistPost));
+        }
+        if (data.hotFanPosts && data.hotFanPosts.length > 0) {
+          setFanPosts(data.hotFanPosts.map(mapFanPost));
+        }
+        if (data.hotFanLetters && data.hotFanLetters.length > 0) {
+          setHotLetters(data.hotFanLetters);
+        }
+      })
+      .catch(() => { /* mock 유지 */ });
+  }, [artist.id]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -267,6 +344,44 @@ function TabHighlight({ t, theme, artist, onNavProfile }) {
           {fanPosts.map(p => <FanPostMiniCard key={p.id} post={p} artist={artist} t={t}/>)}
         </div>
       </Section>
+
+      {/* Hot Fan Letters */}
+      {hotLetters.length > 0 && (
+        <Section t={t} theme={theme}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>🔥 Hot Fan Letters</div>
+            <button onClick={() => onNavProfile('fanletter')} style={linkBtn(t)}>더 보기 →</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
+            {hotLetters.slice(0, 4).map(fl => (
+              <div key={fl.fanLetterId} style={{
+                borderRadius: 10, overflow: 'hidden', aspectRatio: '3/4',
+                background: fl.image?.imageUrl ? 'transparent' : `linear-gradient(135deg, ${artist.color1}, ${artist.color2})`,
+                position: 'relative',
+              }}>
+                {fl.image?.imageUrl ? (
+                  <img src={fl.image.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#fff', fontSize: 24 }}>✉</div>
+                )}
+                {fl.artistLiked && (
+                  <div style={{
+                    position: 'absolute', bottom: 6, right: 6,
+                    width: 22, height: 22, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.9)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', fontSize: 11,
+                  }}>💜</div>
+                )}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  padding: '4px 8px', fontSize: 10, color: '#fff',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.5))',
+                }}>♡ {window.ConnectfinAPI.formatCount(fl.likeCount)}</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
     </div>
   );
 }
