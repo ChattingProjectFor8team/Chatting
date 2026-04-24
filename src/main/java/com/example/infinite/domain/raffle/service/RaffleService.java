@@ -45,6 +45,7 @@ public class RaffleService {
     private final RaffleSchedulerService schedulerService;
     private final StringRedisTemplate stringRedisTemplate;
     private final RaffleNotificationService raffleNotificationService;
+    private final RaffleAuditConsumer raffleAuditConsumer;
 
     private static final String META_KEY_FORMAT = "raffle:%d:meta";
     private static final Duration META_TTL_AFTER_COMPLETE = Duration.ofMinutes(5);
@@ -198,6 +199,13 @@ public class RaffleService {
         log.info("래플 완료: id={}", raffle.getId());
 
         raffleNotificationService.notifyLosers(raffle);
+
+        // 감사 로그: Redis Streams → DB 일괄 저장 후 스트림 삭제
+        String auditStreamKey = String.format("raffle:%d:audit-log", raffle.getId());
+        raffleAuditConsumer.createConsumerGroupIfNotExists(auditStreamKey);
+        int consumed = raffleAuditConsumer.consume(auditStreamKey);
+        log.info("감사 로그 {} 건 소비 완료: raffleId={}", consumed, raffle.getId());
+        raffleAuditConsumer.deleteStream(raffle.getId());
     }
 
     // ─── Redis 메타 초기화 ───
