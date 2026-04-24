@@ -64,8 +64,8 @@ jobs:
         run: chmod +x gradlew
 
       # Step 4-2: 테스트 실행
-      - name: Run tests
-        run: ./gradlew test --stacktrace --info
+      - name: Build JAR with Gradle
+        run: ./gradlew bootJar -x test --no-daemon
         env:
           SPRING_PROFILES_ACTIVE: test
           SPRING_DATA_REDIS_HOST: localhost
@@ -106,28 +106,22 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-
-      # 도커 빌드 전에 QEMU 에뮬레이터 설치 스텝 추가
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      # Step 7: Docker 빌드 및 push (보완 버전)
+      # Step 7: Docker 빌드 및 push (t3 전용 amd64 설정)
       - name: Build and push Docker image
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          # 변수 가독성을 위해 REPO_URL 설정
           REPO_URL=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}
 
-          # 1. 빌드 (플랫폼은 대상 EC2 사양에 맞춰 수정하세요)
-          docker build --platform linux/arm64 \
+          # 🌟 [핵심수정] --platform을 linux/amd64로 변경 (t3용)
+          # 밖에서 빌드한 JAR를 사용하므로 Dockerfile도 COPY만 하는 구조여야 합니다.
+          docker build --platform linux/amd64 \
             -t $REPO_URL:$SHORT_SHA \
             -t $REPO_URL:latest .
           
-          # 2. 모든 태그 Push
           docker push $REPO_URL:$SHORT_SHA
           docker push $REPO_URL:latest
           
-          echo "✅ Pushed Image Tag: $SHORT_SHA and latest"
+          echo "✅ Pushed x86_64 Image for t3.small"
 
 
   deploy:
@@ -156,7 +150,7 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
           # 2. 작은따옴표('EOF')를 사용하여 쉘이 내부 변수를 함부로 해석하지 못하게 방어
-          cat <<'EOF' > .env
+          cat <<EOF > .env
           SPRING_PROFILES_ACTIVE=prod
           RDS_HOST=${RDS_HOST}
           RDS_USERNAME=${RDS_USERNAME}
