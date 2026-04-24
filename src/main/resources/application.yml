@@ -1,44 +1,41 @@
 spring:
   application:
     name: demo
-  # 로컬 전용 설정 파일이 있으면 기본 설정 위에 덮어쓴다.
   config:
     import: optional:classpath:application-local.yml
+
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
   cloud:
     aws:
       credentials:
-        access-key: ${AWS_ACCESS_KEY_ID}
-        secret-key: ${AWS_SECRET_ACCESS_KEY}
+        # [수정] 기본값 dummy 제거. 환경 변수가 없으면 빈 문자열이 주입되거나 에러가 발생하게 함.
+        access-key: ${AWS_ACCESS_KEY_ID:}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:}
       region:
         static: ${AWS_REGION:ap-northeast-2}
       s3:
         enabled: true
-        bucket: ${AWS_S3_BUCKET}
-        domain: ${CLOUDFRONT_DOMAIN:http://localhost:8080}
+        bucket: ${AWS_S3_BUCKET:}
       parameterstore:
         enabled: false
       secretsmanager:
         enabled: false
 
+# 🚨 datasource, jpa 설정은 여기서 완전히 제거되었습니다! 🚨
 
-
-# JWT
+# --- 이하 설정은 기존과 동일 ---
 jwt:
   secret: ${JWT_SECRET_KEY:aW5maW5pdGVMb2NhbERldlNlY3JldEtleU1pbmltdW0zMkJ5dGVz}
   expiration: 3600000
 
-# PortOne
 portone:
   api-secret: ${PORTONE_API_SECRET:test_dummy_secret_for_local}
-  # 웹훅 서명 검증용 시크릿 — PortOne 콘솔에서 발급, 운영 환경에서는 반드시 환경변수로 주입
   webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_dummy_webhook_secret_for_local}
 
-# Jelly
 jelly:
   price-per-unit: 300
   fan-membership-cost: 9
@@ -46,9 +43,7 @@ jelly:
 
 artist-post:
   like-count:
-    # flush는 Redis delta가 쌓인 글만 반영한다.
     flush-delay-ms: 3000
-    # full reconcile은 하루 1회 Reaction 원본을 다시 세어 DB count를 최종 보정한다.
     reconcile-cron: 0 0 4 * * *
   like-v3:
     consumer-delay-ms: 300
@@ -60,7 +55,6 @@ artist-post:
 
 media:
   storage:
-    # 기본은 비활성화로 두고, S3 설정이 준비된 환경에서만 활성화한다.
     enabled: ${MEDIA_STORAGE_ENABLED:false}
     bucket: ${MEDIA_STORAGE_BUCKET:}
     region: ${MEDIA_STORAGE_REGION:ap-northeast-2}
@@ -77,32 +71,15 @@ media:
     allowed-image-extensions: jpg,jpeg,png,gif,webp
     allowed-video-extensions: mp4,mov,webm
   youtube:
-    # 아티스트 미디어 탭에서 유튜브 링크 import 시 metadata 조회에 사용한다.
     api-key: ${YOUTUBE_DATA_API_KEY:}
 
-
-#for prometheus
 management:
   endpoints:
     web:
       exposure:
-        include: prometheus, health, info  # 프로메테우스 엔드포인트 개방
+        include: prometheus, health, info
   endpoint:
     prometheus:
       enabled: true
     health:
       show-details: always
-
-# DockerCompose for prometheus, grafana
-services:
-  prometheus:
-    image: prom/prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
-
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"

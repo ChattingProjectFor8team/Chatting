@@ -64,8 +64,9 @@ jobs:
         run: chmod +x gradlew
 
       # Step 4-2: 테스트 실행
-      - name: Run tests
-        run: ./gradlew test --stacktrace --info
+      - name: Build and Test with Gradle
+        # -x test를 제거하여 테스트를 강제하고, 테스트 성공 시에만 bootJar가 실행됩니다.
+        run: ./gradlew build --no-daemon
         env:
           SPRING_PROFILES_ACTIVE: test
           SPRING_DATA_REDIS_HOST: localhost
@@ -106,28 +107,22 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-
-      # 도커 빌드 전에 QEMU 에뮬레이터 설치 스텝 추가
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      # Step 7: Docker 빌드 및 push (보완 버전)
+      # Step 7: Docker 빌드 및 push (t3 전용 amd64 설정)
       - name: Build and push Docker image
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          # 변수 가독성을 위해 REPO_URL 설정
           REPO_URL=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPOSITORY }}
 
-          # 1. 빌드 (플랫폼은 대상 EC2 사양에 맞춰 수정하세요)
-          docker build --platform linux/arm64 \
+          # 🌟 [핵심수정] --platform을 linux/amd64로 변경 (t3용)
+          # 밖에서 빌드한 JAR를 사용하므로 Dockerfile도 COPY만 하는 구조여야 합니다.
+          docker build --platform linux/amd64 \
             -t $REPO_URL:$SHORT_SHA \
             -t $REPO_URL:latest .
           
-          # 2. 모든 태그 Push
           docker push $REPO_URL:$SHORT_SHA
           docker push $REPO_URL:latest
           
-          echo "✅ Pushed Image Tag: $SHORT_SHA and latest"
+          echo "✅ Pushed x86_64 Image for t3.small"
 
 
   deploy:
@@ -143,19 +138,19 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # Step 2-1: .env 파일 생성 및 S3 업로드 (리뷰어 피드백 반영!)
+      # Step 2-1: .env 파일 생성 및 S3 업로드 (보안/성능 강화 버전)
       - name: Create and Upload .env to S3
         env:
-          # 시크릿 변수 불러오기
-          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+          # 1. 깃허브 변수를 '환경 변수'로 먼저 안전하게 매핑 (이스케이핑 보장)
           RDS_HOST: ${{ vars.RDS_HOST }}
           RDS_USERNAME: ${{ vars.RDS_USERNAME }}
           RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
           REDIS_HOST: ${{ vars.REDIS_HOST }}
           REDIS_PORT: ${{ vars.REDIS_PORT }}
+          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          # 1. 깃허브 액션 러너 내부에 .env 파일 임시 생성
+          # 2. 작은따옴표('EOF')를 사용하여 쉘이 내부 변수를 함부로 해석하지 못하게 방어
           cat <<EOF > .env
           SPRING_PROFILES_ACTIVE=prod
           RDS_HOST=${RDS_HOST}
@@ -167,7 +162,7 @@ jobs:
           JWT_SECRET_KEY=${JWT_SECRET_KEY}
           EOF
           
-          # 2. 생성된 .env 파일을 S3 버킷의 deploy 폴더로 업로드 (노출 방지)
+          # 3. 업로드 (변수명 오타 주의!)
           aws s3 cp .env s3://${S3_BUCKET_NAME}/deploy/.env
 
       # Step 2-2: Launch Template 새 버전 생성

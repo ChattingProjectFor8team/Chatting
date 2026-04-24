@@ -6,6 +6,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate # 운영은 스키마 보호를 위해 validate가 필수!!!!
+      show-sql: false
   cloud:
     aws:
       s3:
