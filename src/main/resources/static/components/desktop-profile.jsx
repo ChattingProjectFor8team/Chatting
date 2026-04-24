@@ -126,6 +126,34 @@ function LikeButton({ t, postType, artistId, postId, initialCount }) {
   );
 }
 
+function mapLiveReplay(live) {
+  return {
+    id: live.id || live.liveId,
+    artistId: live.artistId,
+    title: live.title,
+    duration: live.durationSeconds ? formatDuration(live.durationSeconds) : (live.duration || ''),
+    date: window.ConnectfinAPI.formatTime(live.replayPublishedAt || live.createdAt),
+    plays: '',
+    likes: '',
+    comments: 0,
+    voiceOnly: false,
+    membership: false,
+    liveStatus: live.liveStatus || 'ENDED',
+    thumbnailUrl: live.thumbnailUrl,
+    replayUrl: live.replayUrl,
+    hostDisplayName: live.hostDisplayName,
+  };
+}
+
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '0:00';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 // Artist cover hero (top banner with gradient)
 function ArtistCoverBanner({ artist, t, theme }) {
   return (
@@ -251,6 +279,12 @@ function TabFan({ t, theme, artist }) {
   const [hasNext, setHasNext] = React.useState(false);
   const [nextCursor, setNextCursor] = React.useState(null);
 
+  const [activeTab, setActiveTab] = React.useState('latest'); // 'latest' | 'hot'
+  const [hotPosts, setHotPosts] = React.useState([]);
+  const [hotHasNext, setHotHasNext] = React.useState(false);
+  const [hotNextScoreCursor, setHotNextScoreCursor] = React.useState(null);
+  const [hotNextIdCursor, setHotNextIdCursor] = React.useState(null);
+
   React.useEffect(() => {
     setLoading(true);
     window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-posts`)
@@ -276,17 +310,46 @@ function TabFan({ t, theme, artist }) {
       .finally(() => setLoading(false));
   };
 
+  const loadHot = (append = false) => {
+    setLoading(true);
+    let path = `/api/post/v1/artists/${artist.id}/fan-posts/hot`;
+    if (append && hotNextScoreCursor != null) {
+      path += `?scoreCursor=${hotNextScoreCursor}&idCursor=${hotNextIdCursor}`;
+    }
+    window.ConnectfinAPI.api(path)
+      .then(data => {
+        const mapped = data.content.map(mapFanPost);
+        if (append) {
+          setHotPosts(prev => [...prev, ...mapped]);
+        } else {
+          setHotPosts(mapped);
+        }
+        setHotHasNext(data.hasNext);
+        setHotNextScoreCursor(data.nextScoreCursor);
+        setHotNextIdCursor(data.nextIdCursor);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        <Chip t={t} active>전체</Chip>
-        <Chip t={t}><span>🔥</span> Hot</Chip>
+        <Chip t={t} active={activeTab === 'latest'} onClick={() => setActiveTab('latest')}>전체</Chip>
+        <Chip t={t} active={activeTab === 'hot'} onClick={() => { setActiveTab('hot'); if (hotPosts.length === 0) loadHot(); }}><span>🔥</span> Hot</Chip>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {posts.map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
+        {(activeTab === 'latest' ? posts : hotPosts).map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
       </div>
-      {hasNext && (
+      {activeTab === 'latest' && hasNext && (
         <button onClick={loadMore} disabled={loading} style={{
+          width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
+          border: `1px solid ${t.line}`, background: 'transparent',
+          color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
+        }}>{loading ? '로딩 중...' : '더 보기'}</button>
+      )}
+      {activeTab === 'hot' && hotHasNext && (
+        <button onClick={() => loadHot(true)} disabled={loading} style={{
           width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
           border: `1px solid ${t.line}`, background: 'transparent',
           color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
@@ -373,6 +436,47 @@ function TabFanLetter({ t, theme, artist }) {
   const [hasNext, setHasNext] = React.useState(false);
   const [nextCursor, setNextCursor] = React.useState(null);
 
+  const [activeTab, setActiveTab] = React.useState('latest');
+  const [hotLetters, setHotLetters] = React.useState([]);
+  const [hotHasNext, setHotHasNext] = React.useState(false);
+  const [hotNextOffset, setHotNextOffset] = React.useState(null);
+
+  const loadHotLetters = (append = false) => {
+    setLoading(true);
+    let path = `/api/post/v1/artists/${artist.id}/fan-letters/hot`;
+    if (append && hotNextOffset != null) {
+      path += `?offset=${hotNextOffset}`;
+    }
+    window.ConnectfinAPI.api(path)
+      .then(data => {
+        const mapped = data.content.map(item => ({
+          id: item.fanLetterId,
+          recipientType: item.recipientType,
+          recipientDisplayName: item.recipientDisplayName,
+          recipientProfileImageUrl: item.recipientProfileImageUrl,
+          imageUrl: item.image?.imageUrl || null,
+          thumbnailUrl: item.image?.thumbnailUrl || null,
+          artistLiked: item.artistLiked,
+          artistLikeDisplayName: item.artistLikeDisplayName,
+          artistLikeProfileImageUrl: item.artistLikeProfileImageUrl,
+          createdAt: item.createdAt,
+          likeCount: item.likeCount,
+          author: item.recipientDisplayName,
+          body: null,
+          texture: null,
+        }));
+        if (append) {
+          setHotLetters(prev => [...prev, ...mapped]);
+        } else {
+          setHotLetters(mapped);
+        }
+        setHotHasNext(data.hasNext);
+        setHotNextOffset(data.nextOffset);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
   React.useEffect(() => {
     if (!window.ConnectfinAPI.getToken()) return; // FanLetter 목록은 로그인 필수
     setLoading(true);
@@ -404,15 +508,15 @@ function TabFanLetter({ t, theme, artist }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        <Chip t={t} active>전체</Chip>
-        <Chip t={t}><span>🔥</span> Hot</Chip>
+        <Chip t={t} active={activeTab === 'latest'} onClick={() => setActiveTab('latest')}>전체</Chip>
+        <Chip t={t} active={activeTab === 'hot'} onClick={() => { setActiveTab('hot'); if (hotLetters.length === 0) loadHotLetters(); }}><span>🔥</span> Hot</Chip>
         <div style={{ flex: 1 }}/>
         <Chip t={t}>🌐 한국어</Chip>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {letters.map(l => <FanLetterCard key={l.id} letter={l} artist={artist} t={t} theme={theme} onClick={() => openDetail(l)}/>)}
+        {(activeTab === 'latest' ? letters : hotLetters).map(l => <FanLetterCard key={l.id} letter={l} artist={artist} t={t} theme={theme} onClick={() => openDetail(l)}/>)}
       </div>
-      {hasNext && (
+      {activeTab === 'latest' && hasNext && (
         <button onClick={() => {
           if (!hasNext || !nextCursor || loading) return;
           setLoading(true);
@@ -425,6 +529,13 @@ function TabFanLetter({ t, theme, artist }) {
             .catch(() => {})
             .finally(() => setLoading(false));
         }} disabled={loading} style={{
+          width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
+          border: `1px solid ${t.line}`, background: 'transparent',
+          color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
+        }}>{loading ? '로딩 중...' : '더 보기'}</button>
+      )}
+      {activeTab === 'hot' && hotHasNext && (
+        <button onClick={() => loadHotLetters(true)} disabled={loading} style={{
           width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
           border: `1px solid ${t.line}`, background: 'transparent',
           color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
@@ -640,7 +751,19 @@ function MediaCard({ media, artist, t, small }) {
 
 // ────────── LIVE (리플레이 그리드) ──────────
 function TabLive({ t, theme, artist, onOpenLive }) {
-  const replays = LIVE_REPLAYS.filter(r => r.artistId === artist.id);
+  const mockReplays = LIVE_REPLAYS.filter(r => r.artistId === artist.id);
+  const [replays, setReplays] = React.useState(mockReplays);
+
+  React.useEffect(() => {
+    window.ConnectfinAPI.api(`/api/v1/artists/${artist.id}/lives/vods`)
+      .then(data => {
+        if (data.content && data.content.length > 0) {
+          setReplays(data.content.map(mapLiveReplay));
+        }
+      })
+      .catch(() => { /* mock 유지 */ });
+  }, [artist.id]);
+
   return (
     <div>
       <Section t={t} theme={theme}>
@@ -749,9 +872,9 @@ function Section({ t, theme, children, style }) {
   );
 }
 
-function Chip({ t, active, children }) {
+function Chip({ t, active, children, onClick }) {
   return (
-    <button style={{
+    <button onClick={onClick} style={{
       padding: '6px 14px', borderRadius: 16, border: active ? 'none' : `1px solid ${t.line}`,
       background: active ? (t.name === 'Y2K Pop' ? t.hot : t.hot) : 'transparent',
       color: active ? '#fff' : t.text, fontSize: 12, fontWeight: 700, cursor: 'pointer',

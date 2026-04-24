@@ -2,13 +2,34 @@
 // Layout: Thread list (left) · Active conversation (right)
 
 function DesktopDMScreen({ t, theme, onExit }) {
+  const [rooms, setRooms] = React.useState(DM_THREADS);
   const [activeId, setActiveId] = React.useState(DM_THREADS[0]?.id || 1);
   const [filter, setFilter] = React.useState('all'); // all | unread | subscribed
 
-  const activeThread = DM_THREADS.find(x => x.id === activeId) || DM_THREADS[0];
-  const activeArtist = ARTISTS.find(a => a.id === activeThread.artistId);
+  React.useEffect(() => {
+    if (!window.ConnectfinAPI.getToken()) return;
+    window.ConnectfinAPI.api('/api/v1/dm/rooms')
+      .then(data => {
+        if (data && data.length > 0) {
+          const mapped = data.map(room => ({
+            id: room.id,
+            artistId: room.artistId,
+            name: ARTISTS.find(a => a.id === room.artistId)?.name || `Artist ${room.artistId}`,
+            last: '',
+            unread: 0,
+            subscribed: true,
+          }));
+          setRooms(mapped);
+          setActiveId(mapped[0].id);
+        }
+      })
+      .catch(() => { /* mock 유지 */ });
+  }, []);
 
-  const filtered = DM_THREADS.filter(th => {
+  const activeThread = rooms.find(x => x.id === activeId) || rooms[0];
+  const activeArtist = ARTISTS.find(a => a.id === activeThread?.artistId);
+
+  const filtered = rooms.filter(th => {
     if (filter === 'unread') return (th.unread || 0) > 0;
     if (filter === 'subscribed') return th.subscribed;
     return true;
@@ -143,7 +164,7 @@ function DesktopDMScreen({ t, theme, onExit }) {
           padding: '12px 18px', borderTop: `1px solid ${t.line}`,
           fontSize: 10, color: t.textDim, fontFamily: t.fontMono, letterSpacing: 0.3,
         }}>
-          GET /dm/threads?cursor= · {DM_THREADS.length} threads cached
+          GET /dm/threads?cursor= · {rooms.length} threads cached
         </div>
       </div>
 
@@ -165,6 +186,22 @@ function DMConversationPanel({ thread, artist, t, theme }) {
   const [showInfo, setShowInfo] = React.useState(false);
   const nextId = React.useRef(100);
   const listRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!window.ConnectfinAPI.getToken() || !thread?.id) return;
+    window.ConnectfinAPI.api(`/api/v1/dm/rooms/${thread.id}/messages`)
+      .then(data => {
+        if (data.content && data.content.length > 0) {
+          setMessages(data.content.map(msg => ({
+            from: msg.senderType === 'USER' ? 'me' : (artist?.name || 'Artist'),
+            m: msg.content,
+            time: window.ConnectfinAPI.formatTime(msg.sentAt),
+            mine: msg.senderType === 'USER',
+          })));
+        }
+      })
+      .catch(() => { /* mock 유지 */ });
+  }, [thread?.id]);
 
   React.useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
