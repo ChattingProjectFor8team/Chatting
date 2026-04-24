@@ -1,6 +1,6 @@
 # Frontend Team Vibe Handoff
 
-작성일: 2026-04-23
+작성일: 2026-04-24
 
 이 문서는 같은 팀 프론트엔드 담당자가 AI 바이브 코딩에 바로 넣을 수 있게, 현재 백엔드 코드와 `HANDOFF_revised.md`를 기준으로 내 담당 범위의 구현 상태와 앞으로 구현할 것을 꼼꼼하게 정리한 문서다.
 
@@ -423,6 +423,7 @@ YouTube 카드 응답 필드:
 - 작성자 정보는 로그인 사용자와 `artistId` 소속 `ArtistMember`를 서버가 확인해 추론한다
 - 서버가 YouTube Data API로 메타데이터를 읽어 저장한다
 - 목록은 `CursorSliceResponse` 기반 `id DESC`
+- YouTube 카드 엔티티는 현재 hard delete 전제로 관리한다
 
 중요한 운영 주의:
 
@@ -630,6 +631,10 @@ VOD 카드 응답 필드:
 - 비로그인 메인 홈은 아직 별도 API가 없으므로, 지금은 랜딩 화면 + 검색/인기검색어 중심으로 잡는 것이 안전하다
 - 검색 입력 자체는 기존 search API를 그대로 쓰고, 대시보드는 홈 진입 시 한 번 더 호출해 섹션을 채우면 된다
 - 공식글 카드(`ArtistPostResponse`)는 기존 ArtistPost 카드 컴포넌트를 재사용할 수 있다
+- 구독 아티스트 섹션은 현재 artist별 최신 2건을 전용 batch query로 조립하는 구조라, artist 수만큼 개별 API를 다시 호출하는 방식은 아니다
+- `followedArtistMembersLatestPosts`에서 카드 작성자 이름은 `stageName`이 아니라 `post.writerNickname`을 우선 노출하는 것이 맞다
+- `stageName`은 현재 팔로우 중인 ArtistMember 메타데이터로만 보고, 필요하면 보조 라벨/서브텍스트로만 쓰는 편이 안전하다
+- 즉 메인 홈 팔로우 섹션도 작성자 표기 기준은 `writerNickname + artistBadge` 쪽에 맞추는 것이 맞다
 
 ## 5. 앞으로 내가 구현할 것
 
@@ -687,6 +692,8 @@ VOD 카드 응답 필드:
 
 - 실호출에는 `YOUTUBE_DATA_API_KEY`가 필요하다
 - UI는 `썸네일 + 제목 + 길이 + 업로드일 + 외부 링크` 기준으로 잡는 것이 맞다
+- 최근 보강으로 중복 등록 경쟁은 500이 아니라 `MEDIA_YOUTUBE_VIDEO_DUPLICATED` 도메인 에러로 내려오게 맞췄다
+- `www.youtube.com/...`, `youtu.be/...`처럼 스킴 없이 붙여 넣은 링크도 현재는 허용 방향으로 보강됐다
 
 ## 5-4. 후순위 기능: 종료된 스트리밍 영상 조회
 
@@ -915,6 +922,7 @@ FanLetter HOT은 아래 응답을 사용한다.
 - replies는 상세 응답에 전부 들어오는 구조가 아니다
 - FanPost/댓글/FanLetter 상세의 subscription badge 필드는 지금 실제 값 기준으로 처리해도 된다
 - ArtistPost는 FanPost와 비슷하지만 작성자 표기는 `writerNickname + artistBadge` 기준이다
+- 메인 홈 대시보드의 `followedArtistMembersLatestPosts`도 작성자 이름은 `stageName` 대신 `post.writerNickname`을 우선 사용해야 한다
 - FanPost / ArtistPost / FanLetter multipart 검증 실패는 이제 공통 400 에러 포맷으로 내려온다
 - FanLetter는 텍스트 피드처럼 만들면 정책과 어긋난다
 - FanLetter 목록은 작성자 프로필/배지가 기본 노출 대상이 아니다

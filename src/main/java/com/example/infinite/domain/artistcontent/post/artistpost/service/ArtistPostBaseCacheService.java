@@ -129,6 +129,14 @@ public class ArtistPostBaseCacheService {
     }
 
     public List<ArtistPostBaseResponse> loadLatestArtistPostBasesByWriterIds(Collection<Long> writerIds, int limit) {
+        /*
+         * 메인 홈 follow 섹션은 "artist별 묶음"이 아니라
+         * "여러 writer의 글을 하나의 최신순 흐름으로 합친 목록" 이 필요하다.
+         *
+         * 그래서 여기서는 artistId 별 캐시 slice 를 재사용하지 않고
+         * writer 집합을 기준으로 최신 row 를 한 번에 읽은 뒤
+         * 공통 조립기(buildBaseResponses)로 base 응답을 만든다.
+         */
         return buildBaseResponses(artistPostRepository.findLatestRowsByWriterIds(writerIds, limit));
     }
 
@@ -136,6 +144,16 @@ public class ArtistPostBaseCacheService {
             Collection<Long> artistIds,
             int perArtistLimit
     ) {
+        /*
+         * 이 메서드의 반환 타입이 List 가 아니라 Map 인 이유:
+         *
+         * 구독 섹션은 최종 응답이 "artist 하나 + 그 artist의 글들" 구조라서
+         * 서비스 상위 계층에서 artistId 로 바로 꺼내 쓸 수 있는 모양이 더 편하다.
+         *
+         * 저장소는 artist 여러 개를 한 번에 읽어 오지만,
+         * 여기서 다시 artistId 기준으로 묶어 Map 으로 바꿔 주면
+         * MemberHomeDashboardService 쪽 조립 코드가 단순해진다.
+         */
         if (artistIds == null || artistIds.isEmpty() || perArtistLimit < 1) {
             return Map.of();
         }
@@ -160,6 +178,8 @@ public class ArtistPostBaseCacheService {
             return List.of();
         }
 
+        // row 조회와 media/hashtag 조회를 분리해 둔 구조라서
+        // 여기서 postId 배치 수집 -> 부가 데이터 일괄 조회 -> 최종 DTO 조립 순서가 반복된다.
         List<Long> postIds = rows.stream()
                 .map(ArtistPostReadRow::artistPostId)
                 .toList();
