@@ -11,7 +11,11 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "jelly_transactions")
+@Table(name = "jelly_transactions",
+        indexes = {
+                @Index(name = "idx_jelly_transactions_user_id", columnList = "user_id"),
+                @Index(name = "idx_jelly_transactions_user_type_created", columnList = "user_id, type, created_at")
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class JellyTransaction extends BaseEntity {
 
