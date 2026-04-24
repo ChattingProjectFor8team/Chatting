@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -59,13 +60,7 @@ class RaffleServiceTest {
                     .durationMinutes(60)
                     .build();
 
-            try {
-                var idField = Raffle.class.getDeclaredField("id");
-                idField.setAccessible(true);
-                idField.set(raffle, raffleId);
-            } catch (Exception e) {
-                throw new RuntimeException("테스트 Raffle ID 설정 실패", e);
-            }
+            ReflectionTestUtils.setField(raffle, "id", raffleId);
 
             when(raffleRepository.findById(raffleId)).thenReturn(Optional.of(raffle));
 
