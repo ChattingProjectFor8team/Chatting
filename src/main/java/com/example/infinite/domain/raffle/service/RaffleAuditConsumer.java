@@ -4,9 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +19,7 @@ import java.util.Map;
 public class RaffleAuditConsumer {
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final JdbcTemplate jdbcTemplate;
 
     private static final String CONSUMER_GROUP = "raffle-audit-group";
     private static final String CONSUMER_NAME = "consumer-1"; // Scale-out 시 서버 ID로 변경
@@ -52,20 +56,8 @@ public class RaffleAuditConsumer {
             return 0;
         }
 
-        // ──────────────────────────────────────────
-        // TODO [Phase 1]: 여기에 DB Batch INSERT 구현
-        // JPA 엔티티 확정 후 JdbcTemplate.batchUpdate()로 교체
-        // ──────────────────────────────────────────
-
-        for (MapRecord<String, Object, Object> record : records) {
-            Map<Object, Object> fields = record.getValue();
-            log.info("감사 로그 소비: raffleId={}, userId={}, slotIndex={}, order={}, replaced={}",
-                    fields.get("raffleId"),
-                    fields.get("userId"),
-                    fields.get("slotIndex"),
-                    fields.get("entryOrder"),
-                    fields.get("replaced"));
-        }
+        // DB Batch INSERT
+        batchInsert(records);
 
         records.forEach(record ->
                 stringRedisTemplate.opsForStream().acknowledge(streamKey, CONSUMER_GROUP, record.getId()));
@@ -78,5 +70,27 @@ public class RaffleAuditConsumer {
         String streamKey = String.format("raffle:%d:audit-log", raffleId);
         stringRedisTemplate.delete(streamKey);
         log.info("감사 로그 스트림 삭제: raffleId={}", raffleId);
+    }
+
+    private void batchInsert(List<MapRecord<String, Object, Object>> records) {
+        String sql = "INSERT INTO raffle_audit_logs (raffle_id, user_id, slot_index, entry_order, replaced, event_timestamp) "
+                   + "VALUES (?, ?, ?, ?, ?, ?)";
+
+        try {
+            jdbcTemplate.batchUpdate(sql, records, BATCH_SIZE, (ps, record) -> {
+                Map<Object, Object> fields = record.getValue();
+                ps.setLong(1, Long.parseLong((String) fields.get("raffleId")));
+                ps.setLong(2, Long.parseLong((String) fields.get("userId")));
+                ps.setInt(3, Integer.parseInt((String) fields.get("slotIndex")));
+                ps.setInt(4, Integer.parseInt((String) fields.get("entryOrder")));
+                ps.setBoolean(5, Boolean.parseBoolean((String) fields.get("replaced")));
+                ps.setTimestamp(6, Timestamp.from(Instant.parse((String) fields.get("timestamp"))));
+            });
+            log.info("감사 로그 {} 건 DB 저장 완료", records.size());
+        } catch (Exception e) {
+            log.error("감사 로그 DB 저장 실패: {} 건 손실 가능, error={}", records.size(), e.getMessage());
+            // ACK는 이미 진행되므로, 실패 시 로그로 남긴다.
+            // 운영 환경에서는 DLQ(Dead Letter Queue) 또는 재시도 로직 필요.
+        }
     }
 }
