@@ -17,7 +17,7 @@ function DesktopHome({ t, theme, onArtistOpen, onOpenLive, onNavGlobal }) {
           .then(data => (data || []).filter(l => l.liveStatus === 'LIVE').map(l => ({
             ...l, artistId: a.id, artistName: a.name, artistColor1: a.color1, artistColor2: a.color2,
           })))
-          .catch(() => [])
+          .catch(err => { console.warn('API batch item failed:', err?.message || err); return []; })
       )
     ).then(results => {
       const allLive = results.flat();

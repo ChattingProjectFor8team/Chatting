@@ -247,7 +247,7 @@ function DesktopArtistProfile({ t, theme, artist, tab, onNavProfile, onOpenLive,
   React.useEffect(() => {
     window.ConnectfinAPI.api(`/api/member/v2/artists/${artist.id}`)
       .then(data => setArtistDetail(data))
-      .catch(() => { /* mock 유지 */ });
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
   }, [artist.id]);
 
   const displayArtist = artistDetail ? {
@@ -303,7 +303,7 @@ function TabHighlight({ t, theme, artist, onNavProfile }) {
           setHotLetters(data.hotFanLetters);
         }
       })
-      .catch(() => { /* mock 유지 */ });
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
   }, [artist.id]);
 
   return (
@@ -408,7 +408,7 @@ function TabFan({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => { /* mock 유지 */ })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); })
       .finally(() => setLoading(false));
   }, [artist.id]);
 
@@ -421,7 +421,7 @@ function TabFan({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => {})
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
       .finally(() => setLoading(false));
   };
 
@@ -443,7 +443,7 @@ function TabFan({ t, theme, artist }) {
         setHotNextScoreCursor(data.nextScoreCursor);
         setHotNextIdCursor(data.nextIdCursor);
       })
-      .catch(() => {})
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
       .finally(() => setLoading(false));
   };
 
@@ -490,7 +490,7 @@ function TabArtistPosts({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => { /* mock 유지 */ })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); })
       .finally(() => setLoading(false));
   }, [artist.id]);
 
@@ -503,7 +503,7 @@ function TabArtistPosts({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => {})
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
       .finally(() => setLoading(false));
   };
 
@@ -588,7 +588,7 @@ function TabFanLetter({ t, theme, artist }) {
         setHotHasNext(data.hasNext);
         setHotNextOffset(data.nextOffset);
       })
-      .catch(() => {})
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
       .finally(() => setLoading(false));
   };
 
@@ -601,7 +601,7 @@ function TabFanLetter({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => { /* mock 유지 */ })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); })
       .finally(() => setLoading(false));
   }, [artist.id]);
 
@@ -611,7 +611,7 @@ function TabFanLetter({ t, theme, artist }) {
     if (window.ConnectfinAPI.getToken() && letter.id) {
       window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-letters/${letter.id}`)
         .then(data => setSelectedDetail(data))
-        .catch(() => setSelectedDetail(null));
+        .catch(err => { console.warn('Fan letter detail load failed:', err?.message || err); setSelectedDetail(null); });
     }
   };
 
@@ -641,7 +641,7 @@ function TabFanLetter({ t, theme, artist }) {
               setHasNext(data.hasNext);
               setNextCursor(data.nextCursor);
             })
-            .catch(() => {})
+            .catch(err => { console.warn('API error suppressed:', err?.message || err); })
             .finally(() => setLoading(false));
         }} disabled={loading} style={{
           width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
@@ -876,7 +876,7 @@ function TabLive({ t, theme, artist, onOpenLive }) {
           setReplays(data.content.map(mapLiveReplay));
         }
       })
-      .catch(() => { /* mock 유지 */ });
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
   }, [artist.id]);
 
   return (

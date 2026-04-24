@@ -33,13 +33,21 @@ function LiveScreen({ t, theme, artistId, speed, liveOn, onBack, onNav }) {
       () => {
         setStompConnected(true);
         window.ConnectfinAPI.subscribeLive(a.id, (batch) => {
-          const mapped = batch.map(msg => ({
-            id: msg.id || nextId.current++,
-            u: msg.senderUserId === 'me' ? 'me' : `user_${msg.senderUserId}`,
-            m: msg.message,
-            t: 'fan',
-          }));
-          setMessages(prev => [...prev.slice(-40), ...mapped]);
+          setMessages(prev => {
+            // 서버 에코에서 이미 로컬에 추가한 내 메시지를 필터링
+            const localTexts = new Set(prev.filter(m => m._local).map(m => m.m));
+            const mapped = batch
+              .filter(msg => !localTexts.has(msg.message))
+              .map(msg => ({
+                id: msg.id || nextId.current++,
+                u: `user_${msg.senderUserId}`,
+                m: msg.message,
+                t: 'fan',
+              }));
+            // 에코 필터 후 로컬 플래그 제거 (1회성)
+            const cleaned = prev.map(m => m._local ? { ...m, _local: false } : m);
+            return [...cleaned.slice(-40), ...mapped];
+          });
         });
       },
       (err) => {
@@ -62,8 +70,8 @@ function LiveScreen({ t, theme, artistId, speed, liveOn, onBack, onNav }) {
       // STOMP로 전송 — 서버가 브로드캐스트하면 subscribeLive에서 수신
       window.ConnectfinAPI.sendLiveChat(a.id, input);
     }
-    // 로컬에도 즉시 추가 (optimistic)
-    setMessages(m => [...m, { id: nextId.current++, u: 'me', m: input, t: 'me' }]);
+    // 로컬에도 즉시 추가 (optimistic) — _local 플래그로 서버 에코 1회 필터링
+    setMessages(m => [...m, { id: nextId.current++, u: 'me', m: input, t: 'me', _local: true }]);
     setInput('');
   };
 

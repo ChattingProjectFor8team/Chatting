@@ -201,6 +201,8 @@ const ConnectfinAPI = (() => {
   // 라이브 채팅 구독 — 서버가 300ms마다 배치(List) 전송
   function subscribeLive(liveId, onBatch) {
     if (!stompClient || !stompClient.connected) return null;
+    const subKey = `live:${liveId}`;
+    if (stompSubscriptions[subKey]) stompSubscriptions[subKey].unsubscribe();
     const sub = stompClient.subscribe(`/sub/live/${liveId}`, (message) => {
       try {
         const batch = JSON.parse(message.body);
@@ -209,7 +211,7 @@ const ConnectfinAPI = (() => {
         console.error('Live chat parse error:', e);
       }
     });
-    stompSubscriptions[`live:${liveId}`] = sub;
+    stompSubscriptions[subKey] = sub;
     return sub;
   }
 
@@ -225,6 +227,8 @@ const ConnectfinAPI = (() => {
   // DM 구독 — 단건 메시지 수신
   function subscribeDm(roomId, onMessage) {
     if (!stompClient || !stompClient.connected) return null;
+    const subKey = `dm:${roomId}`;
+    if (stompSubscriptions[subKey]) stompSubscriptions[subKey].unsubscribe();
     const sub = stompClient.subscribe(`/sub/dm/${roomId}`, (message) => {
       try {
         const msg = JSON.parse(message.body);
@@ -233,7 +237,7 @@ const ConnectfinAPI = (() => {
         console.error('DM parse error:', e);
       }
     });
-    stompSubscriptions[`dm:${roomId}`] = sub;
+    stompSubscriptions[subKey] = sub;
     return sub;
   }
 
