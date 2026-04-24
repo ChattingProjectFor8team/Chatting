@@ -12,14 +12,14 @@ spring:
   cloud:
     aws:
       credentials:
-        access-key: ${AWS_ACCESS_KEY_ID:dummy}
-        secret-key: ${AWS_SECRET_ACCESS_KEY:dummy}
+        # [수정] 기본값 dummy 제거. 환경 변수가 없으면 빈 문자열이 주입되거나 에러가 발생하게 함.
+        access-key: ${AWS_ACCESS_KEY_ID:}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:}
       region:
         static: ${AWS_REGION:ap-northeast-2}
       s3:
         enabled: true
-        bucket: ${AWS_S3_BUCKET:dummy-bucket}
-        domain: ${CLOUDFRONT_DOMAIN:http://localhost:8080}
+        bucket: ${AWS_S3_BUCKET:}
       parameterstore:
         enabled: false
       secretsmanager:

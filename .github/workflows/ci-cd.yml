@@ -64,8 +64,9 @@ jobs:
         run: chmod +x gradlew
 
       # Step 4-2: 테스트 실행
-      - name: Build JAR with Gradle
-        run: ./gradlew bootJar -x test --no-daemon
+      - name: Build and Test with Gradle
+        # -x test를 제거하여 테스트를 강제하고, 테스트 성공 시에만 bootJar가 실행됩니다.
+        run: ./gradlew build --no-daemon
         env:
           SPRING_PROFILES_ACTIVE: test
           SPRING_DATA_REDIS_HOST: localhost
