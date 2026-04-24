@@ -17,6 +17,9 @@ spring:
     username: root
     password: test
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 110          # 100 스레드 동시성 테스트 + 여유분
+      connection-timeout: 120000      # 비관적 락 대기 120초
   jpa:
     hibernate:
       ddl-auto: create-drop

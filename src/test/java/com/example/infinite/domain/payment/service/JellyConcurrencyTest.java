@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.concurrent.*;
@@ -21,16 +19,6 @@ import static org.assertj.core.api.Assertions.*;
 @ActiveProfiles("test")
 @DisplayName("젤리 동시 차감 — 3종 락 비교")
 class JellyConcurrencyTest {
-
-    // application-test.yml 의 datasource password 는 "test" 이지만
-    // 로컬 MySQL 비밀번호가 "12345678" 이므로 이 값만 override 한다.
-    // 더불어 100 스레드 동시성 테스트를 위해 HikariCP 풀 크기/타임아웃을 확장한다.
-    @DynamicPropertySource
-    static void overridePassword(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.password", () -> "12345678");
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "110");
-        registry.add("spring.datasource.hikari.connection-timeout", () -> "120000");
-    }
 
     // ── 의존성 주입 ──
 
@@ -109,6 +97,22 @@ class JellyConcurrencyTest {
         assertThat(finalBalance)
                 .as("락 없음: Lost Update로 잔액이 기대(%d)보다 크다", expectedBalance)
                 .isGreaterThan(expectedBalance);
+
+        // ── 결과 출력 (README 수치 수집용) ──
+        int lostUpdates = THREAD_COUNT - ((INITIAL_BALANCE - finalBalance) / DEDUCT_AMOUNT);
+        System.out.println();
+        System.out.println("══════════════════════════════════════");
+        System.out.println(" [락 없음] 테스트 결과");
+        System.out.println("──────────────────────────────────────");
+        System.out.printf(" 초기 잔액:      %,d%n", INITIAL_BALANCE);
+        System.out.printf(" 차감 시도:      %d회 × %d%n", THREAD_COUNT, DEDUCT_AMOUNT);
+        System.out.printf(" 성공 횟수:      %d%n", successCount.get());
+        System.out.printf(" 최종 잔액:      %,d  ← 0이어야 정상%n", finalBalance);
+        System.out.printf(" 기대 잔액:      %,d%n", expectedBalance);
+        System.out.printf(" Lost Update:   %d건 손실%n", lostUpdates);
+        System.out.println(" 정합성:        ❌ 깨짐");
+        System.out.println("══════════════════════════════════════");
+        System.out.println();
     }
 
     // ══════════════════════════════════════════
@@ -146,6 +150,20 @@ class JellyConcurrencyTest {
         // 비관적 락: 100개 요청이 순차 처리 → 전부 성공 → 잔액 0
         assertThat(successCount.get()).isEqualTo(THREAD_COUNT);
         assertThat(finalBalance).isEqualTo(0);
+
+        // ── 결과 출력 (README 수치 수집용) ──
+        System.out.println();
+        System.out.println("══════════════════════════════════════");
+        System.out.println(" [비관적 락] 테스트 결과");
+        System.out.println("──────────────────────────────────────");
+        System.out.printf(" 초기 잔액:      %,d%n", INITIAL_BALANCE);
+        System.out.printf(" 차감 시도:      %d회 × %d%n", THREAD_COUNT, DEDUCT_AMOUNT);
+        System.out.printf(" 성공 횟수:      %d%n", successCount.get());
+        System.out.printf(" 실패 횟수:      %d%n", failCount.get());
+        System.out.printf(" 최종 잔액:      %,d%n", finalBalance);
+        System.out.println(" 정합성:        ✅ 유지");
+        System.out.println("══════════════════════════════════════");
+        System.out.println();
     }
 
     // ══════════════════════════════════════════
@@ -201,5 +219,21 @@ class JellyConcurrencyTest {
 
         // 전체 = 성공 + 실패
         assertThat(successCount.get() + failCount.get()).isEqualTo(THREAD_COUNT);
+
+        // ── 결과 출력 (README 수치 수집용) ──
+        System.out.println();
+        System.out.println("══════════════════════════════════════");
+        System.out.println(" [낙관적 락] 테스트 결과");
+        System.out.println("──────────────────────────────────────");
+        System.out.printf(" 초기 잔액:      %,d%n", INITIAL_BALANCE);
+        System.out.printf(" 차감 시도:      %d회 × %d%n", THREAD_COUNT, DEDUCT_AMOUNT);
+        System.out.printf(" 성공 횟수:      %d%n", successCount.get());
+        System.out.printf(" 실패 횟수:      %d (ObjectOptimisticLockingFailureException)%n", failCount.get());
+        System.out.printf(" 최종 잔액:      %,d%n", finalBalance);
+        System.out.printf(" 기대 잔액:      %,d (성공 %d건 × %d)%n",
+                expectedBalance, successCount.get(), DEDUCT_AMOUNT);
+        System.out.println(" 정합성:        ✅ 유지 (성공한 건수만큼 정확히 차감)");
+        System.out.println("══════════════════════════════════════");
+        System.out.println();
     }
 }
