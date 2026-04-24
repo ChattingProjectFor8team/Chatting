@@ -203,13 +203,42 @@ function DMConversationPanel({ thread, artist, t, theme }) {
       .catch(() => { /* mock 유지 */ });
   }, [thread?.id]);
 
+  // STOMP DM 실시간 수신
+  React.useEffect(() => {
+    if (!window.ConnectfinAPI.getToken() || !thread?.id) return;
+
+    window.ConnectfinAPI.connectStomp(
+      () => {
+        window.ConnectfinAPI.subscribeDm(thread.id, (msg) => {
+          setMessages(prev => [...prev, {
+            from: msg.senderType === 'USER' ? 'me' : (artist?.name || 'Artist'),
+            m: msg.content,
+            time: window.ConnectfinAPI.formatTime(msg.sentAt),
+            mine: msg.senderType === 'USER',
+            id: msg.id,
+          }]);
+        });
+      },
+      () => {} // 연결 실패 시 무시 — REST fallback으로 이미 히스토리 로드됨
+    );
+
+    return () => {
+      window.ConnectfinAPI.unsubscribe(`dm:${thread.id}`);
+    };
+  }, [thread?.id]);
+
   React.useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
   const send = () => {
     if (!input.trim() || remaining <= 0) return;
-    setMessages(m => [...m, { id: nextId.current++, from: 'me', m: input, time: '방금' }]);
+    // STOMP로 전송 (연결돼 있을 때만)
+    if (window.ConnectfinAPI.getToken() && thread?.id) {
+      window.ConnectfinAPI.sendDm(thread.id, input);
+    }
+    // 로컬에도 즉시 추가 (optimistic)
+    setMessages(m => [...m, { id: nextId.current++, from: 'me', m: input, time: '방금', mine: true }]);
     setInput('');
     setRemaining(r => r - 1);
   };
