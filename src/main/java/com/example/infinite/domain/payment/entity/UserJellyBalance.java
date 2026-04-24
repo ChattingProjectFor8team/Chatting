@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,6 +23,9 @@ public class UserJellyBalance {
 
     @Column(nullable = false)
     private Integer currentBalance;
+
+    @Version
+    private Integer version;
 
     public UserJellyBalance(Long userId) {
         this.userId = userId;
