@@ -161,9 +161,9 @@ function HomeScreen({ t, theme, speed, liveOn, onNav, onOpenLive, onOpenArtist }
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                     <ArtistAvatar artist={a} size={40} t={t}/>
                     <div style={{ flex: 1 }}>
-                      <span style={{ fontWeight: 700, fontSize: 14 }}>{item.stageName}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{item.post?.writerNickname || item.stageName}</span>
                       <div style={{ fontSize: 11, color: t.textDim, fontFamily: t.fontMono }}>
-                        {item.artist.name} · {window.ConnectfinAPI.formatTime(item.post.createdAt)}
+                        {item.stageName} · {item.artist.name} · {window.ConnectfinAPI.formatTime(item.post.createdAt)}
                       </div>
                     </div>
                   </div>
