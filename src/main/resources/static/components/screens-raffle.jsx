@@ -51,11 +51,63 @@ const RAFFLES = [
   },
 ];
 
+function mapRaffle(r) {
+  const endTime = r.startedAt && r.durationMinutes
+    ? new Date(new Date(r.startedAt).getTime() + r.durationMinutes * 60000)
+    : null;
+  const now = new Date();
+  const ended = r.status === 'COMPLETED' || r.status === 'CANCELLED';
+  const remaining = endTime && !ended ? endTime - now : 0;
+
+  let endsAt = '종료됨';
+  if (!ended && remaining > 0) {
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    if (h >= 24) endsAt = `${Math.floor(h / 24)}d ${h % 24}h`;
+    else endsAt = `${h}h ${m}m`;
+  }
+
+  return {
+    id: r.id,
+    artistId: r.artistId,
+    title: r.title,
+    category: r.rewardType || 'GENERAL',
+    prize: r.title,
+    winners: r.totalWinners,
+    cost: 0, // API에 cost 필드 없음
+    endsAt,
+    entries: 0,
+    maxWeight: 1,
+    hot: false,
+    ended,
+    desc: '',
+    rules: [],
+    entryCondition: r.entryCondition,
+    status: r.status,
+  };
+}
+
 function RaffleListScreen({ t, onBack, onOpenRaffle }) {
   const [filter, setFilter] = React.useState('all');
-  const filtered = filter === 'all' ? RAFFLES.filter(r => !r.ended)
-    : filter === 'ended' ? RAFFLES.filter(r => r.ended)
-    : RAFFLES.filter(r => r.category === filter);
+  const [raffles, setRaffles] = React.useState(RAFFLES);
+
+  React.useEffect(() => {
+    // 모든 아티스트의 래플을 한번에 로드
+    Promise.all(
+      ARTISTS.map(a =>
+        window.ConnectfinAPI.api(`/api/v1/artists/${a.id}/raffles`)
+          .then(data => (data || []).map(r => ({ ...mapRaffle(r), artistId: a.id })))
+          .catch(err => { console.warn('API batch item failed:', err?.message || err); return []; })
+      )
+    ).then(results => {
+      const all = results.flat();
+      if (all.length > 0) setRaffles(all);
+    });
+  }, []);
+
+  const filtered = filter === 'all' ? raffles.filter(r => !r.ended)
+    : filter === 'ended' ? raffles.filter(r => r.ended)
+    : raffles.filter(r => r.category === filter);
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', paddingTop: 60, paddingBottom: 96 }}>
@@ -184,22 +236,43 @@ function RaffleListScreen({ t, onBack, onOpenRaffle }) {
 }
 
 function RaffleDetailScreen({ t, theme, raffleId, onBack, onEnter }) {
-  const r = RAFFLES.find(x => x.id === raffleId) || RAFFLES[0];
+  const mockR = RAFFLES.find(x => x.id === raffleId) || RAFFLES[0];
+  const [r, setR] = React.useState(mockR);
+  const [myEntry, setMyEntry] = React.useState(null);
   const a = ARTISTS.find(x => x.id === r.artistId);
   const [weight, setWeight] = React.useState(1);
   const [agreed, setAgreed] = React.useState(false);
   const [entering, setEntering] = React.useState(false);
-  const [result, setResult] = React.useState(null); // 'submitted'
+  const [result, setResult] = React.useState(null); // 'submitted' | 'error'
   const totalCost = r.cost * weight;
   const myBalance = 142;
 
-  const submit = () => {
-    if (r.ended || !agreed || totalCost > myBalance || entering) return;
+  React.useEffect(() => {
+    if (!r.artistId) return;
+    // 래플 상세
+    window.ConnectfinAPI.api(`/api/v1/artists/${r.artistId}/raffles/${raffleId}`)
+      .then(data => setR(prev => ({ ...prev, ...mapRaffle(data), entered: data.entered })))
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); });
+    // 내 응모 결과
+    if (window.ConnectfinAPI.getToken()) {
+      window.ConnectfinAPI.api(`/api/v1/artists/${r.artistId}/raffles/${raffleId}/entries/me`)
+        .then(data => setMyEntry(data))
+        .catch(err => { console.warn('API error suppressed:', err?.message || err); });
+    }
+  }, [raffleId]);
+
+  const submit = async () => {
+    if (r.ended || !agreed || entering) return;
+    if (!window.ConnectfinAPI.getToken()) return;
     setEntering(true);
-    setTimeout(() => {
-      setEntering(false);
+    try {
+      await window.ConnectfinAPI.api(`/api/v1/artists/${r.artistId}/raffles/${raffleId}/entries`, { method: 'POST' });
       setResult('submitted');
-    }, 1400);
+    } catch (err) {
+      setResult('error');
+    } finally {
+      setEntering(false);
+    }
   };
 
   return (

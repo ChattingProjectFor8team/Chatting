@@ -126,6 +126,79 @@ function LikeButton({ t, postType, artistId, postId, initialCount }) {
   );
 }
 
+function mapLiveReplay(live) {
+  return {
+    id: live.id || live.liveId,
+    artistId: live.artistId,
+    title: live.title,
+    duration: live.durationSeconds ? formatDuration(live.durationSeconds) : (live.duration || ''),
+    date: window.ConnectfinAPI.formatTime(live.replayPublishedAt || live.createdAt),
+    plays: '',
+    likes: '',
+    comments: 0,
+    voiceOnly: false,
+    membership: false,
+    liveStatus: live.liveStatus || 'ENDED',
+    thumbnailUrl: live.thumbnailUrl,
+    replayUrl: live.replayUrl,
+    hostDisplayName: live.hostDisplayName,
+  };
+}
+
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '0:00';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function ArtistMemberChip({ member, artist, t }) {
+  const [followed, setFollowed] = React.useState(false);
+  const [toggling, setToggling] = React.useState(false);
+
+  const toggleFollow = async (e) => {
+    e.stopPropagation();
+    if (toggling || !window.ConnectfinAPI.getToken()) return;
+    setToggling(true);
+    try {
+      const res = await window.ConnectfinAPI.api(
+        `/api/member/v1/follows/artist-members/${member.artistMemberId}/toggle`,
+        { method: 'POST' }
+      );
+      setFollowed(res.followed);
+    } catch (err) {
+      // 무시
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  return (
+    <div style={{
+      flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+      padding: '4px 10px 4px 4px', borderRadius: 20,
+      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)',
+      color: '#fff', fontSize: 11, fontWeight: 600,
+    }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: '50%',
+        background: `linear-gradient(135deg, ${artist.color1}, ${artist.color2})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 9, fontWeight: 800, color: '#fff',
+      }}>{member.stageName?.slice(0, 1)}</div>
+      <span>{member.stageName}</span>
+      <button onClick={toggleFollow} disabled={toggling} style={{
+        marginLeft: 2, padding: '2px 8px', borderRadius: 10, border: 'none',
+        background: followed ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)',
+        color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+        opacity: toggling ? 0.5 : 1,
+      }}>{followed ? '팔로잉' : '팔로우'}</button>
+    </div>
+  );
+}
+
 // Artist cover hero (top banner with gradient)
 function ArtistCoverBanner({ artist, t, theme }) {
   return (
@@ -151,6 +224,18 @@ function ArtistCoverBanner({ artist, t, theme }) {
         padding: '8px 16px', borderRadius: 10, border: 'none',
         background: '#fff', color: '#111', fontWeight: 800, fontSize: 13, cursor: 'pointer',
       }}>가입하기</button>
+
+      {/* Artist Members */}
+      {artist.artistMembers && artist.artistMembers.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 12, left: 24, right: 24,
+          display: 'flex', gap: 8, overflowX: 'auto',
+        }}>
+          {artist.artistMembers.slice().sort((a, b) => a.sortOrder - b.sortOrder).map(m => (
+            <ArtistMemberChip key={m.artistMemberId} member={m} artist={artist} t={t}/>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -162,7 +247,7 @@ function DesktopArtistProfile({ t, theme, artist, tab, onNavProfile, onOpenLive,
   React.useEffect(() => {
     window.ConnectfinAPI.api(`/api/member/v2/artists/${artist.id}`)
       .then(data => setArtistDetail(data))
-      .catch(() => { /* mock 유지 */ });
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
   }, [artist.id]);
 
   const displayArtist = artistDetail ? {
@@ -198,8 +283,28 @@ function DesktopArtistProfile({ t, theme, artist, tab, onNavProfile, onOpenLive,
 // ────────── HIGHLIGHT (summary) ──────────
 function TabHighlight({ t, theme, artist, onNavProfile }) {
   const notices = NOTICES.filter(n => n.artistId === artist.id).slice(0, 5);
-  const artistPost = ARTIST_POSTS.find(p => p.artistId === artist.id);
-  const fanPosts = FAN_POSTS.filter(p => p.artistId === artist.id).slice(2, 8);
+  const mockArtistPost = ARTIST_POSTS.find(p => p.artistId === artist.id);
+  const mockFanPosts = FAN_POSTS.filter(p => p.artistId === artist.id).slice(2, 8);
+
+  const [artistPost, setArtistPost] = React.useState(mockArtistPost);
+  const [fanPosts, setFanPosts] = React.useState(mockFanPosts);
+  const [hotLetters, setHotLetters] = React.useState([]);
+
+  React.useEffect(() => {
+    window.ConnectfinAPI.api(`/api/member/v1/artists/${artist.id}/dashboard`)
+      .then(data => {
+        if (data.latestArtistPost) {
+          setArtistPost(mapArtistPost(data.latestArtistPost));
+        }
+        if (data.hotFanPosts && data.hotFanPosts.length > 0) {
+          setFanPosts(data.hotFanPosts.map(mapFanPost));
+        }
+        if (data.hotFanLetters && data.hotFanLetters.length > 0) {
+          setHotLetters(data.hotFanLetters);
+        }
+      })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
+  }, [artist.id]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -239,6 +344,44 @@ function TabHighlight({ t, theme, artist, onNavProfile }) {
           {fanPosts.map(p => <FanPostMiniCard key={p.id} post={p} artist={artist} t={t}/>)}
         </div>
       </Section>
+
+      {/* Hot Fan Letters */}
+      {hotLetters.length > 0 && (
+        <Section t={t} theme={theme}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>🔥 Hot Fan Letters</div>
+            <button onClick={() => onNavProfile('fanletter')} style={linkBtn(t)}>더 보기 →</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
+            {hotLetters.slice(0, 4).map(fl => (
+              <div key={fl.fanLetterId} style={{
+                borderRadius: 10, overflow: 'hidden', aspectRatio: '3/4',
+                background: fl.image?.imageUrl ? 'transparent' : `linear-gradient(135deg, ${artist.color1}, ${artist.color2})`,
+                position: 'relative',
+              }}>
+                {fl.image?.imageUrl ? (
+                  <img src={fl.image.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#fff', fontSize: 24 }}>✉</div>
+                )}
+                {fl.artistLiked && (
+                  <div style={{
+                    position: 'absolute', bottom: 6, right: 6,
+                    width: 22, height: 22, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.9)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', fontSize: 11,
+                  }}>💜</div>
+                )}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  padding: '4px 8px', fontSize: 10, color: '#fff',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.5))',
+                }}>♡ {window.ConnectfinAPI.formatCount(fl.likeCount)}</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
     </div>
   );
 }
@@ -251,6 +394,12 @@ function TabFan({ t, theme, artist }) {
   const [hasNext, setHasNext] = React.useState(false);
   const [nextCursor, setNextCursor] = React.useState(null);
 
+  const [activeTab, setActiveTab] = React.useState('latest'); // 'latest' | 'hot'
+  const [hotPosts, setHotPosts] = React.useState([]);
+  const [hotHasNext, setHotHasNext] = React.useState(false);
+  const [hotNextScoreCursor, setHotNextScoreCursor] = React.useState(null);
+  const [hotNextIdCursor, setHotNextIdCursor] = React.useState(null);
+
   React.useEffect(() => {
     setLoading(true);
     window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-posts`)
@@ -259,7 +408,7 @@ function TabFan({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => { /* mock 유지 */ })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); })
       .finally(() => setLoading(false));
   }, [artist.id]);
 
@@ -272,21 +421,50 @@ function TabFan({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => {})
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
+      .finally(() => setLoading(false));
+  };
+
+  const loadHot = (append = false) => {
+    setLoading(true);
+    let path = `/api/post/v1/artists/${artist.id}/fan-posts/hot`;
+    if (append && hotNextScoreCursor != null) {
+      path += `?scoreCursor=${hotNextScoreCursor}&idCursor=${hotNextIdCursor}`;
+    }
+    window.ConnectfinAPI.api(path)
+      .then(data => {
+        const mapped = data.content.map(mapFanPost);
+        if (append) {
+          setHotPosts(prev => [...prev, ...mapped]);
+        } else {
+          setHotPosts(mapped);
+        }
+        setHotHasNext(data.hasNext);
+        setHotNextScoreCursor(data.nextScoreCursor);
+        setHotNextIdCursor(data.nextIdCursor);
+      })
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
       .finally(() => setLoading(false));
   };
 
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        <Chip t={t} active>전체</Chip>
-        <Chip t={t}><span>🔥</span> Hot</Chip>
+        <Chip t={t} active={activeTab === 'latest'} onClick={() => setActiveTab('latest')}>전체</Chip>
+        <Chip t={t} active={activeTab === 'hot'} onClick={() => { setActiveTab('hot'); if (hotPosts.length === 0) loadHot(); }}><span>🔥</span> Hot</Chip>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {posts.map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
+        {(activeTab === 'latest' ? posts : hotPosts).map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
       </div>
-      {hasNext && (
+      {activeTab === 'latest' && hasNext && (
         <button onClick={loadMore} disabled={loading} style={{
+          width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
+          border: `1px solid ${t.line}`, background: 'transparent',
+          color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
+        }}>{loading ? '로딩 중...' : '더 보기'}</button>
+      )}
+      {activeTab === 'hot' && hotHasNext && (
+        <button onClick={() => loadHot(true)} disabled={loading} style={{
           width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
           border: `1px solid ${t.line}`, background: 'transparent',
           color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
@@ -312,7 +490,7 @@ function TabArtistPosts({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => { /* mock 유지 */ })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); })
       .finally(() => setLoading(false));
   }, [artist.id]);
 
@@ -325,7 +503,7 @@ function TabArtistPosts({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => {})
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
       .finally(() => setLoading(false));
   };
 
@@ -373,6 +551,47 @@ function TabFanLetter({ t, theme, artist }) {
   const [hasNext, setHasNext] = React.useState(false);
   const [nextCursor, setNextCursor] = React.useState(null);
 
+  const [activeTab, setActiveTab] = React.useState('latest');
+  const [hotLetters, setHotLetters] = React.useState([]);
+  const [hotHasNext, setHotHasNext] = React.useState(false);
+  const [hotNextOffset, setHotNextOffset] = React.useState(null);
+
+  const loadHotLetters = (append = false) => {
+    setLoading(true);
+    let path = `/api/post/v1/artists/${artist.id}/fan-letters/hot`;
+    if (append && hotNextOffset != null) {
+      path += `?offset=${hotNextOffset}`;
+    }
+    window.ConnectfinAPI.api(path)
+      .then(data => {
+        const mapped = data.content.map(item => ({
+          id: item.fanLetterId,
+          recipientType: item.recipientType,
+          recipientDisplayName: item.recipientDisplayName,
+          recipientProfileImageUrl: item.recipientProfileImageUrl,
+          imageUrl: item.image?.imageUrl || null,
+          thumbnailUrl: item.image?.thumbnailUrl || null,
+          artistLiked: item.artistLiked,
+          artistLikeDisplayName: item.artistLikeDisplayName,
+          artistLikeProfileImageUrl: item.artistLikeProfileImageUrl,
+          createdAt: item.createdAt,
+          likeCount: item.likeCount,
+          author: item.recipientDisplayName,
+          body: null,
+          texture: null,
+        }));
+        if (append) {
+          setHotLetters(prev => [...prev, ...mapped]);
+        } else {
+          setHotLetters(mapped);
+        }
+        setHotHasNext(data.hasNext);
+        setHotNextOffset(data.nextOffset);
+      })
+      .catch(err => { console.warn('API error suppressed:', err?.message || err); })
+      .finally(() => setLoading(false));
+  };
+
   React.useEffect(() => {
     if (!window.ConnectfinAPI.getToken()) return; // FanLetter 목록은 로그인 필수
     setLoading(true);
@@ -382,7 +601,7 @@ function TabFanLetter({ t, theme, artist }) {
         setHasNext(data.hasNext);
         setNextCursor(data.nextCursor);
       })
-      .catch(() => { /* mock 유지 */ })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); })
       .finally(() => setLoading(false));
   }, [artist.id]);
 
@@ -392,7 +611,7 @@ function TabFanLetter({ t, theme, artist }) {
     if (window.ConnectfinAPI.getToken() && letter.id) {
       window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-letters/${letter.id}`)
         .then(data => setSelectedDetail(data))
-        .catch(() => setSelectedDetail(null));
+        .catch(err => { console.warn('Fan letter detail load failed:', err?.message || err); setSelectedDetail(null); });
     }
   };
 
@@ -404,15 +623,15 @@ function TabFanLetter({ t, theme, artist }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        <Chip t={t} active>전체</Chip>
-        <Chip t={t}><span>🔥</span> Hot</Chip>
+        <Chip t={t} active={activeTab === 'latest'} onClick={() => setActiveTab('latest')}>전체</Chip>
+        <Chip t={t} active={activeTab === 'hot'} onClick={() => { setActiveTab('hot'); if (hotLetters.length === 0) loadHotLetters(); }}><span>🔥</span> Hot</Chip>
         <div style={{ flex: 1 }}/>
         <Chip t={t}>🌐 한국어</Chip>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {letters.map(l => <FanLetterCard key={l.id} letter={l} artist={artist} t={t} theme={theme} onClick={() => openDetail(l)}/>)}
+        {(activeTab === 'latest' ? letters : hotLetters).map(l => <FanLetterCard key={l.id} letter={l} artist={artist} t={t} theme={theme} onClick={() => openDetail(l)}/>)}
       </div>
-      {hasNext && (
+      {activeTab === 'latest' && hasNext && (
         <button onClick={() => {
           if (!hasNext || !nextCursor || loading) return;
           setLoading(true);
@@ -422,9 +641,16 @@ function TabFanLetter({ t, theme, artist }) {
               setHasNext(data.hasNext);
               setNextCursor(data.nextCursor);
             })
-            .catch(() => {})
+            .catch(err => { console.warn('API error suppressed:', err?.message || err); })
             .finally(() => setLoading(false));
         }} disabled={loading} style={{
+          width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
+          border: `1px solid ${t.line}`, background: 'transparent',
+          color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
+        }}>{loading ? '로딩 중...' : '더 보기'}</button>
+      )}
+      {activeTab === 'hot' && hotHasNext && (
+        <button onClick={() => loadHotLetters(true)} disabled={loading} style={{
           width: '100%', padding: '12px 0', marginTop: 12, borderRadius: 10,
           border: `1px solid ${t.line}`, background: 'transparent',
           color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
@@ -640,7 +866,19 @@ function MediaCard({ media, artist, t, small }) {
 
 // ────────── LIVE (리플레이 그리드) ──────────
 function TabLive({ t, theme, artist, onOpenLive }) {
-  const replays = LIVE_REPLAYS.filter(r => r.artistId === artist.id);
+  const mockReplays = LIVE_REPLAYS.filter(r => r.artistId === artist.id);
+  const [replays, setReplays] = React.useState(mockReplays);
+
+  React.useEffect(() => {
+    window.ConnectfinAPI.api(`/api/v1/artists/${artist.id}/lives/vods`)
+      .then(data => {
+        if (data.content && data.content.length > 0) {
+          setReplays(data.content.map(mapLiveReplay));
+        }
+      })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
+  }, [artist.id]);
+
   return (
     <div>
       <Section t={t} theme={theme}>
@@ -749,9 +987,9 @@ function Section({ t, theme, children, style }) {
   );
 }
 
-function Chip({ t, active, children }) {
+function Chip({ t, active, children, onClick }) {
   return (
-    <button style={{
+    <button onClick={onClick} style={{
       padding: '6px 14px', borderRadius: 16, border: active ? 'none' : `1px solid ${t.line}`,
       background: active ? (t.name === 'Y2K Pop' ? t.hot : t.hot) : 'transparent',
       color: active ? '#fff' : t.text, fontSize: 12, fontWeight: 700, cursor: 'pointer',

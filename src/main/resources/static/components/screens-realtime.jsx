@@ -8,11 +8,12 @@ function LiveScreen({ t, theme, artistId, speed, liveOn, onBack, onNav }) {
   const [viewers, setViewers] = React.useState(a.viewers || 58_000);
   const [hearts, setHearts] = React.useState([]);
   const [input, setInput] = React.useState('');
+  const [stompConnected, setStompConnected] = React.useState(false);
   const listRef = React.useRef(null);
   const nextId = React.useRef(100);
 
   React.useEffect(() => {
-    if (!liveOn) return;
+    if (!liveOn || stompConnected) return; // STOMP 연결 시 mock 비활성화
     const id = setInterval(() => {
       const seed = LIVE_SEEDS[Math.floor(Math.random() * LIVE_SEEDS.length)];
       setMessages(m => [...m.slice(-40), { ...seed, id: nextId.current++, t: seed.t || 'fan' }]);
@@ -22,7 +23,42 @@ function LiveScreen({ t, theme, artistId, speed, liveOn, onBack, onNav }) {
       }
     }, 700 / speed);
     return () => clearInterval(id);
-  }, [speed, liveOn]);
+  }, [speed, liveOn, stompConnected]);
+
+  // STOMP 라이브 채팅 연결
+  React.useEffect(() => {
+    if (!liveOn || !window.ConnectfinAPI.getToken()) return;
+
+    window.ConnectfinAPI.connectStomp(
+      () => {
+        setStompConnected(true);
+        window.ConnectfinAPI.subscribeLive(a.id, (batch) => {
+          setMessages(prev => {
+            // 서버 에코에서 이미 로컬에 추가한 내 메시지를 필터링
+            const localTexts = new Set(prev.filter(m => m._local).map(m => m.m));
+            const mapped = batch
+              .filter(msg => !localTexts.has(msg.message))
+              .map(msg => ({
+                id: msg.id || nextId.current++,
+                u: `user_${msg.senderUserId}`,
+                m: msg.message,
+                t: 'fan',
+              }));
+            // 에코 필터 후 로컬 플래그 제거 (1회성)
+            const cleaned = prev.map(m => m._local ? { ...m, _local: false } : m);
+            return [...cleaned.slice(-40), ...mapped];
+          });
+        });
+      },
+      (err) => {
+        console.warn('STOMP connection failed, using mock:', err);
+      }
+    );
+
+    return () => {
+      window.ConnectfinAPI.unsubscribe(`live:${a.id}`);
+    };
+  }, [liveOn, a.id]);
 
   React.useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -30,7 +66,12 @@ function LiveScreen({ t, theme, artistId, speed, liveOn, onBack, onNav }) {
 
   const send = () => {
     if (!input.trim()) return;
-    setMessages(m => [...m, { id: nextId.current++, u: 'me', m: input, t: 'me' }]);
+    if (stompConnected) {
+      // STOMP로 전송 — 서버가 브로드캐스트하면 subscribeLive에서 수신
+      window.ConnectfinAPI.sendLiveChat(a.id, input);
+    }
+    // 로컬에도 즉시 추가 (optimistic) — _local 플래그로 서버 에코 1회 필터링
+    setMessages(m => [...m, { id: nextId.current++, u: 'me', m: input, t: 'me', _local: true }]);
     setInput('');
   };
 

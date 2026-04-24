@@ -152,6 +152,122 @@ const ConnectfinAPI = (() => {
     return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
   }
 
+  // ── STOMP ──
+  let stompClient = null;
+  let stompSubscriptions = {};
+
+  function connectStomp(onConnected, onError) {
+    // 이미 연결돼 있으면 바로 콜백 (중복 연결 방지)
+    if (stompClient && stompClient.connected) {
+      if (onConnected) onConnected();
+      return stompClient;
+    }
+
+    const token = getToken();
+    if (!token) {
+      if (onError) onError(new Error('No token'));
+      return;
+    }
+
+    // @stomp/stompjs 7.x UMD → 전역 StompJs 객체
+    const client = new StompJs.Client({
+      webSocketFactory: () => new SockJS('/ws-stomp'),
+      connectHeaders: {
+        'Authorization': 'Bearer ' + token,
+      },
+      reconnectDelay: 5000,
+      heartbeatIncoming: 10000,
+      heartbeatOutgoing: 10000,
+    });
+
+    client.onConnect = () => {
+      stompClient = client;
+      if (onConnected) onConnected();
+    };
+
+    client.onStompError = (frame) => {
+      console.error('STOMP error:', frame.headers?.message);
+      if (onError) onError(new Error(frame.headers?.message || 'STOMP error'));
+    };
+
+    client.onWebSocketClose = () => {
+      // reconnectDelay가 설정돼 있으므로 자동 재연결 시도
+    };
+
+    client.activate();
+    return client;
+  }
+
+  // 라이브 채팅 구독 — 서버가 300ms마다 배치(List) 전송
+  function subscribeLive(liveId, onBatch) {
+    if (!stompClient || !stompClient.connected) return null;
+    const subKey = `live:${liveId}`;
+    if (stompSubscriptions[subKey]) stompSubscriptions[subKey].unsubscribe();
+    const sub = stompClient.subscribe(`/sub/live/${liveId}`, (message) => {
+      try {
+        const batch = JSON.parse(message.body);
+        if (onBatch) onBatch(Array.isArray(batch) ? batch : [batch]);
+      } catch (e) {
+        console.error('Live chat parse error:', e);
+      }
+    });
+    stompSubscriptions[subKey] = sub;
+    return sub;
+  }
+
+  // 라이브 채팅 전송 — payload는 String (메시지 텍스트만)
+  function sendLiveChat(liveId, message) {
+    if (!stompClient || !stompClient.connected) return;
+    stompClient.publish({
+      destination: `/pub/live/${liveId}/chat`,
+      body: message,
+    });
+  }
+
+  // DM 구독 — 단건 메시지 수신
+  function subscribeDm(roomId, onMessage) {
+    if (!stompClient || !stompClient.connected) return null;
+    const subKey = `dm:${roomId}`;
+    if (stompSubscriptions[subKey]) stompSubscriptions[subKey].unsubscribe();
+    const sub = stompClient.subscribe(`/sub/dm/${roomId}`, (message) => {
+      try {
+        const msg = JSON.parse(message.body);
+        if (onMessage) onMessage(msg);
+      } catch (e) {
+        console.error('DM parse error:', e);
+      }
+    });
+    stompSubscriptions[subKey] = sub;
+    return sub;
+  }
+
+  // DM 전송 — payload는 String (메시지 텍스트만)
+  function sendDm(roomId, message) {
+    if (!stompClient || !stompClient.connected) return;
+    stompClient.publish({
+      destination: `/pub/dm/${roomId}`,
+      body: message,
+    });
+  }
+
+  function unsubscribe(key) {
+    if (stompSubscriptions[key]) {
+      stompSubscriptions[key].unsubscribe();
+      delete stompSubscriptions[key];
+    }
+  }
+
+  function disconnectStomp() {
+    Object.keys(stompSubscriptions).forEach(key => {
+      stompSubscriptions[key].unsubscribe();
+    });
+    stompSubscriptions = {};
+    if (stompClient) {
+      stompClient.deactivate();
+      stompClient = null;
+    }
+  }
+
   // ── Public API ──
   return {
     getToken,
@@ -161,6 +277,14 @@ const ConnectfinAPI = (() => {
     apiMultipart,
     formatTime,
     formatCount,
+    // STOMP
+    connectStomp,
+    subscribeLive,
+    sendLiveChat,
+    subscribeDm,
+    sendDm,
+    unsubscribe,
+    disconnectStomp,
   };
 })();
 

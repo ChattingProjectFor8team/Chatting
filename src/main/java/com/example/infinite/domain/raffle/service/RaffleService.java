@@ -248,7 +248,8 @@ public class RaffleService {
 
     public RaffleDetailResponse getRaffleDetail(Long artistId, Long raffleId, Long userId) {
         Raffle raffle = findRaffleWithArtistCheck(artistId, raffleId);
-        boolean entered = raffleEntryRepository.existsByRaffleIdAndUserId(raffleId, userId);
+        boolean entered = (userId != null)
+                && raffleEntryRepository.existsByRaffleIdAndUserId(raffleId, userId);
         return RaffleDetailResponse.of(raffle, entered);
     }
 

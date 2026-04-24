@@ -3,9 +3,34 @@
 // ──────────────── Home ────────────────
 function DesktopHome({ t, theme, onArtistOpen, onOpenLive, onNavGlobal }) {
   const [slideIdx, setSlideIdx] = React.useState(0);
+  const [liveNow, setLiveNow] = React.useState(ON_LIVE_NOW);
   React.useEffect(() => {
     const id = setInterval(() => setSlideIdx(i => (i + 1) % HERO_SLIDES.length), 4500);
     return () => clearInterval(id);
+  }, []);
+
+  React.useEffect(() => {
+    // 모든 아티스트의 라이브 목록에서 LIVE 상태만 필터
+    Promise.all(
+      ARTISTS.map(a =>
+        window.ConnectfinAPI.api(`/api/v1/artists/${a.id}/lives`)
+          .then(data => (data || []).filter(l => l.liveStatus === 'LIVE').map(l => ({
+            ...l, artistId: a.id, artistName: a.name, artistColor1: a.color1, artistColor2: a.color2,
+          })))
+          .catch(err => { console.warn('API batch item failed:', err?.message || err); return []; })
+      )
+    ).then(results => {
+      const allLive = results.flat();
+      if (allLive.length > 0) {
+        setLiveNow(allLive.map(l => ({
+          id: l.id, artistId: l.artistId, title: l.title,
+          host: l.hostDisplayName || l.artistName,
+          viewers: 0, // API에 viewerCount 없음
+          artistName: l.artistName, color1: l.artistColor1, color2: l.artistColor2,
+          status: 'LIVE',
+        })));
+      }
+    });
   }, []);
 
   return (
@@ -50,10 +75,10 @@ function DesktopHome({ t, theme, onArtistOpen, onOpenLive, onNavGlobal }) {
           <div style={{
             padding: '1px 8px', borderRadius: 10, background: t.hot,
             color: '#fff', fontSize: 11, fontWeight: 800,
-          }}>{ON_LIVE_NOW.length}</div>
+          }}>{liveNow.length}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-          {ON_LIVE_NOW.map(live => {
+          {liveNow.map(live => {
             const a = ARTISTS.find(x => x.id === live.artistId);
             return <OnLiveCard key={live.id} live={live} artist={a} t={t} onOpen={() => onOpenLive(live.artistId)}/>;
           })}

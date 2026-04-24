@@ -46,6 +46,17 @@ public class MemberHomeDashboardService {
     private final ArtistPostService artistPostService;
 
     public MemberHomeDashboardResponse getDashboard(MemberDetailsImpl memberDetails) {
+        /*
+         * 메인 홈 대시보드는 "하나의 큰 피드"를 그대로 내려주는 API가 아니다.
+         * 아래 3개 섹션을 각기 다른 규칙으로 조립해 한 응답에 묶어 주는 성격에 가깝다.
+         *
+         * 1) 인기 검색어
+         * 2) 내가 구독한 아티스트별 최신 글 묶음
+         * 3) 내가 follow 한 아티스트 멤버들의 최신 글 묶음
+         *
+         * 그래서 이 메서드는 단순 repository 1회 조회가 아니라
+         * "섹션별 정책에 맞는 서비스 호출"을 오케스트레이션하는 진입점으로 읽는 것이 맞다.
+         */
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
 
         return new MemberHomeDashboardResponse(
@@ -56,6 +67,14 @@ public class MemberHomeDashboardService {
     }
 
     private List<SubscribedArtistLatestPostsResponse> buildSubscribedArtistsLatestPosts(Long memberId) {
+        /*
+         * 구독 섹션은 "글 최신순 전역 2건"이 아니라
+         * "구독한 각 artist마다 최신 n건" 이 필요하다.
+         *
+         * 즉 기준 축이 writer 가 아니라 artist 다.
+         * 그래서 먼저 활성 구독 목록에서 artistId 들을 뽑고,
+         * 그 뒤 artist 단위 batch query 로 각 artist의 최신 글 묶음을 조립한다.
+         */
         List<FanMembership> activeMemberships = fanMembershipRepository.findByUserIdAndStatusAndExpiredAtAfterOrderByIdDesc(
                 memberId,
                 SubscriptionStatus.ACTIVE,
@@ -98,12 +117,28 @@ public class MemberHomeDashboardService {
     }
 
     private List<FollowedArtistMemberLatestPostResponse> buildFollowedArtistMembersLatestPosts(Long memberId) {
+        /*
+         * follow 섹션은 구독 섹션과 반대로 "artist별 묶음"이 아니라
+         * "내가 관심 있는 멤버들이 최근에 쓴 글을 한데 모은 전역 최신 목록" 이다.
+         *
+         * 그래서 여기서는 artistId 기준 그룹핑을 먼저 하지 않고,
+         * follow 중인 ArtistMember -> writerId 집합으로 바꾼 뒤
+         * writer 기준 최신 ArtistPost 를 모아 온다.
+         */
         List<ArtistMember> followedArtistMembers = followService.getFollowedArtistMembers(memberId);
         if (followedArtistMembers.isEmpty()) {
             return List.of();
         }
 
-        // 한 회원은 현재 정책상 한 ArtistMember에만 연결되므로 writerId -> ArtistMember 매핑이 단순하다.
+        /*
+         * 홈 카드 바깥쪽 메타데이터는 Follow 대상인 ArtistMember 에서 가져오고,
+         * 실제 글 본문/좋아요 수/작성 시각 등은 ArtistPostResponse 에서 가져온다.
+         *
+         * 현재 정책상 한 Member 가 동시에 여러 ArtistMember 로 존재하지 않는다고 보고 있으므로
+         * writerId -> ArtistMember 매핑을 단순 Map 으로 둘 수 있다.
+         * 만약 미래에 한 member 가 여러 artist 소속을 동시에 가질 수 있게 되면
+         * 이 매핑 정책은 다시 검토해야 한다.
+         */
         Map<Long, ArtistMember> artistMemberByWriterId = new LinkedHashMap<>();
         for (ArtistMember followedArtistMember : followedArtistMembers) {
             artistMemberByWriterId.putIfAbsent(followedArtistMember.getMember().getId(), followedArtistMember);
@@ -117,6 +152,8 @@ public class MemberHomeDashboardService {
             return List.of();
         }
 
+        // 여기서는 "글 1건"을 바로 반환하지 않고,
+        // 프론트가 카드에 바로 쓸 수 있게 ArtistMember 메타데이터를 한 번 더 감싸서 내려준다.
         return posts.stream()
                 .map(post -> {
                     ArtistMember artistMember = artistMemberByWriterId.get(post.writerId());

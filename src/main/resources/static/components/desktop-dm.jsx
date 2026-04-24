@@ -2,13 +2,34 @@
 // Layout: Thread list (left) · Active conversation (right)
 
 function DesktopDMScreen({ t, theme, onExit }) {
+  const [rooms, setRooms] = React.useState(DM_THREADS);
   const [activeId, setActiveId] = React.useState(DM_THREADS[0]?.id || 1);
   const [filter, setFilter] = React.useState('all'); // all | unread | subscribed
 
-  const activeThread = DM_THREADS.find(x => x.id === activeId) || DM_THREADS[0];
-  const activeArtist = ARTISTS.find(a => a.id === activeThread.artistId);
+  React.useEffect(() => {
+    if (!window.ConnectfinAPI.getToken()) return;
+    window.ConnectfinAPI.api('/api/v1/dm/rooms')
+      .then(data => {
+        if (data && data.length > 0) {
+          const mapped = data.map(room => ({
+            id: room.id,
+            artistId: room.artistId,
+            name: ARTISTS.find(a => a.id === room.artistId)?.name || `Artist ${room.artistId}`,
+            last: '',
+            unread: 0,
+            subscribed: true,
+          }));
+          setRooms(mapped);
+          setActiveId(mapped[0].id);
+        }
+      })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
+  }, []);
 
-  const filtered = DM_THREADS.filter(th => {
+  const activeThread = rooms.find(x => x.id === activeId) || rooms[0];
+  const activeArtist = ARTISTS.find(a => a.id === activeThread?.artistId);
+
+  const filtered = rooms.filter(th => {
     if (filter === 'unread') return (th.unread || 0) > 0;
     if (filter === 'subscribed') return th.subscribed;
     return true;
@@ -143,7 +164,7 @@ function DesktopDMScreen({ t, theme, onExit }) {
           padding: '12px 18px', borderTop: `1px solid ${t.line}`,
           fontSize: 10, color: t.textDim, fontFamily: t.fontMono, letterSpacing: 0.3,
         }}>
-          GET /dm/threads?cursor= · {DM_THREADS.length} threads cached
+          GET /dm/threads?cursor= · {rooms.length} threads cached
         </div>
       </div>
 
@@ -167,12 +188,66 @@ function DMConversationPanel({ thread, artist, t, theme }) {
   const listRef = React.useRef(null);
 
   React.useEffect(() => {
+    if (!window.ConnectfinAPI.getToken() || !thread?.id) return;
+    window.ConnectfinAPI.api(`/api/v1/dm/rooms/${thread.id}/messages`)
+      .then(data => {
+        if (data.content && data.content.length > 0) {
+          setMessages(data.content.map(msg => ({
+            from: msg.senderType === 'USER' ? 'me' : (artist?.name || 'Artist'),
+            m: msg.content,
+            time: window.ConnectfinAPI.formatTime(msg.sentAt),
+            mine: msg.senderType === 'USER',
+          })));
+        }
+      })
+      .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
+  }, [thread?.id]);
+
+  // STOMP DM 실시간 수신
+  React.useEffect(() => {
+    if (!window.ConnectfinAPI.getToken() || !thread?.id) return;
+
+    window.ConnectfinAPI.connectStomp(
+      () => {
+        window.ConnectfinAPI.subscribeDm(thread.id, (msg) => {
+          setMessages(prev => {
+            // 1차: 같은 id의 메시지가 이미 있으면 (optimistic 추가분) 스킵
+            if (msg.id && prev.some(m => m.id === msg.id)) return prev;
+            // 2차: 내가 보낸 optimistic 추가분의 에코 (id 매칭 실패 시 content + '방금' 체크)
+            if (msg.senderType === 'USER') {
+              const recentLocal = prev.filter(m => m.mine && m.time === '방금');
+              if (recentLocal.some(m => m.m === msg.content)) return prev;
+            }
+            return [...prev, {
+              from: msg.senderType === 'USER' ? 'me' : (artist?.name || 'Artist'),
+              m: msg.content,
+              time: window.ConnectfinAPI.formatTime(msg.sentAt),
+              mine: msg.senderType === 'USER',
+              id: msg.id,
+            }];
+          });
+        });
+      },
+      (err) => { console.warn('STOMP connect fallback:', err?.message || err); }
+    );
+
+    return () => {
+      window.ConnectfinAPI.unsubscribe(`dm:${thread.id}`);
+    };
+  }, [thread?.id]);
+
+  React.useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
   const send = () => {
     if (!input.trim() || remaining <= 0) return;
-    setMessages(m => [...m, { id: nextId.current++, from: 'me', m: input, time: '방금' }]);
+    // STOMP로 전송 (연결돼 있을 때만)
+    if (window.ConnectfinAPI.getToken() && thread?.id) {
+      window.ConnectfinAPI.sendDm(thread.id, input);
+    }
+    // 로컬에도 즉시 추가 (optimistic)
+    setMessages(m => [...m, { id: nextId.current++, from: 'me', m: input, time: '방금', mine: true }]);
     setInput('');
     setRemaining(r => r - 1);
   };

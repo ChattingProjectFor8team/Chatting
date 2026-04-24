@@ -52,7 +52,7 @@ public class DmMessageHandler {
         }
 
         try {
-            dmService.broadcast(artistId, content);
+            dmService.broadcast(artistId, senderId, content);
         } catch (Exception e) {
             log.warn("DM broadcast 실패: artistId={}, senderId={}, error={}",
                     artistId, senderId, e.getMessage());
