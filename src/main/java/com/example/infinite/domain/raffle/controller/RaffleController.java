@@ -46,7 +46,7 @@ public class RaffleController {
             @PathVariable Long artistId,
             @PathVariable Long raffleId,
             @AuthenticationPrincipal MemberDetailsImpl memberDetails) {
-        Long userId = memberDetails.getMemberId();
+        Long userId = (memberDetails != null) ? memberDetails.getMemberId() : null;
         RaffleDetailResponse response = raffleService.getRaffleDetail(artistId, raffleId, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
