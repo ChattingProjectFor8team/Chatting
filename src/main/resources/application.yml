@@ -24,12 +24,12 @@ spring:
         enabled: false
       secretsmanager:
         enabled: false
-datasource:
-  # 1. allowPublicKeyRetrieval=true 옵션을 추가하여 보안 접속 문제를 해결합니다.
-  url: jdbc:mysql://${RDS_HOST}:3306/infinite?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-  username: ${RDS_USERNAME}
-  password: ${RDS_PASSWORD}
-  driver-class-name: com.mysql.cj.jdbc.Driver
+  datasource:
+    # 1. allowPublicKeyRetrieval=true 옵션을 추가하여 보안 접속 문제를 해결합니다.
+    url: jdbc:mysql://${RDS_HOST}:3306/infinite?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${RDS_USERNAME}
+    password: ${RDS_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:

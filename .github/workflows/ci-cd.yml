@@ -143,23 +143,32 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # Step 2-1: .env 파일 생성 및 S3 업로드 (리뷰어 피드백 반영!)
+      # Step 2-1: .env 파일 생성 및 S3 업로드 (보안/성능 강화 버전)
       - name: Create and Upload .env to S3
+        env:
+          # 1. 깃허브 변수를 '환경 변수'로 먼저 안전하게 매핑 (이스케이핑 보장)
+          RDS_HOST: ${{ vars.RDS_HOST }}
+          RDS_USERNAME: ${{ vars.RDS_USERNAME }}
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+          REDIS_HOST: ${{ vars.REDIS_HOST }}
+          REDIS_PORT: ${{ vars.REDIS_PORT }}
+          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          # 💡 env: 섹션 없이 직접 ${{ }} 문법을 사용하여 파일 생성
-          cat <<EOF > .env
+          # 2. 작은따옴표('EOF')를 사용하여 쉘이 내부 변수를 함부로 해석하지 못하게 방어
+          cat <<'EOF' > .env
           SPRING_PROFILES_ACTIVE=prod
-          RDS_HOST=${{ vars.RDS_HOST }}
-          RDS_USERNAME=${{ vars.RDS_USERNAME }}
-          RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
-          REDIS_HOST=${{ vars.REDIS_HOST }}
-          REDIS_PORT=${{ vars.REDIS_PORT }}
-          S3_BUCKET_NAME=${{ vars.S3_BUCKET_NAME }}
-          JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+          RDS_HOST=${RDS_HOST}
+          RDS_USERNAME=${RDS_USERNAME}
+          RDS_PASSWORD=${RDS_PASSWORD}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
+          S3_BUCKET_NAME=${S3_BUCKET_NAME}
+          JWT_SECRET_KEY=${JWT_SECRET_KEY}
           EOF
           
-          # 업로드 시에도 직접 변수 참조
-          aws s3 cp .env s3://${{ vars.S3_BUCKET_NAME }}/deploy/.env
+          # 3. 업로드 (변수명 오타 주의!)
+          aws s3 cp .env s3://${S3_BUCKET_NAME}/deploy/.env
 
       # Step 2-2: Launch Template 새 버전 생성
       - name: Update Launch Template
