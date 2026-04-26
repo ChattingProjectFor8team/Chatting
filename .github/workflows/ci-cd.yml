@@ -59,7 +59,7 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
-      # Step 4: 실행 권한 부여 (추가 권장)
+      # Step 4-1: 실행 권한 부여 (추가 권장)
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -83,18 +83,6 @@ jobs:
           JWT_SECRET_KEY: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
 
           JWT_EXPIRATION: 3600000
-
-
-#          # 테스트 코드가 localhost:6379로 붙을 수 있게 설정
-#          SPRING_DATA_REDIS_HOST: localhost
-#          SPRING_DATA_REDIS_PORT: 6379
-#          # PlaceholderResolutionException 방지를 위한 필수 변수들 (임시값)
-#          AWS_REGION: ${{ vars.AWS_REGION }}
-#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }} # 변수 처리!
-#          # 필요한 다른 환경변수가 있다면 여기에 추가하세요
-#          CLOUDFRONT_DOMAIN: ${{ vars.CLOUDFRONT_DOMAIN || 'mock.cloudfront.net' }}
 
       # Step 5: AWS 자격증명 - OIDC
       - name: Configure AWS credentials
@@ -127,7 +115,7 @@ jobs:
 
   deploy:
     needs: build
-    if: contains(fromJson('["refs/heads/main", "refs/heads/develop", "refs/heads/hotfix/env/var"]'), github.ref)
+    if: contains(fromJson('["refs/heads/main", "refs/heads/develop"]'), github.ref)
     runs-on: ubuntu-latest
 
     steps:
@@ -265,7 +253,7 @@ jobs:
               exit 1
             fi
 
-            sleep 30
+            sleep 300
           done
 
           echo "❌ Instance Refresh 타임아웃 (15분 초과)"
