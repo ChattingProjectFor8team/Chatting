@@ -400,6 +400,30 @@ function TabFan({ t, theme, artist }) {
   const [hotNextScoreCursor, setHotNextScoreCursor] = React.useState(null);
   const [hotNextIdCursor, setHotNextIdCursor] = React.useState(null);
 
+  const [showWriteForm, setShowWriteForm] = React.useState(false);
+  const [writeContent, setWriteContent] = React.useState('');
+  const [writeSubmitting, setWriteSubmitting] = React.useState(false);
+
+  const submitFanPost = async () => {
+    if (!writeContent.trim() || writeSubmitting) return;
+    if (!window.ConnectfinAPI.getToken()) { alert('로그인이 필요합니다.'); return; }
+    setWriteSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('content', writeContent.trim());
+      await window.ConnectfinAPI.apiMultipart(`/api/post/v1/artists/${artist.id}/fan-posts`, formData);
+      setWriteContent('');
+      setShowWriteForm(false);
+      window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-posts`)
+        .then(data => { setPosts(data.content.map(mapFanPost)); setHasNext(data.hasNext); setNextCursor(data.nextCursor); })
+        .catch(err => { console.warn('Refresh failed:', err?.message || err); });
+    } catch (err) {
+      alert('작성 실패: ' + (err.message || '알 수 없는 오류'));
+    } finally {
+      setWriteSubmitting(false);
+    }
+  };
+
   React.useEffect(() => {
     setLoading(true);
     window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-posts`)
@@ -453,6 +477,26 @@ function TabFan({ t, theme, artist }) {
         <Chip t={t} active={activeTab === 'latest'} onClick={() => setActiveTab('latest')}>전체</Chip>
         <Chip t={t} active={activeTab === 'hot'} onClick={() => { setActiveTab('hot'); if (hotPosts.length === 0) loadHot(); }}><span>🔥</span> Hot</Chip>
       </div>
+      {!showWriteForm ? (
+        <button onClick={() => setShowWriteForm(true)} style={{
+          width: '100%', padding: '12px 0', marginBottom: 12, borderRadius: 10,
+          border: `1px solid ${t.line}`, background: 'transparent',
+          color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
+        }}>✏️ 팬포스트 작성</button>
+      ) : (
+        <div style={{ padding: 14, marginBottom: 12, borderRadius: 12, border: `1px solid ${t.accent}`, background: theme === 'dark' ? 'rgba(20,22,36,0.55)' : t.surface }}>
+          <textarea value={writeContent} onChange={e => setWriteContent(e.target.value)}
+            placeholder="팬포스트를 작성해 보세요..." maxLength={5000}
+            style={{ width: '100%', minHeight: 80, padding: 10, borderRadius: 8, border: `1px solid ${t.line}`, background: 'transparent', color: t.text, fontSize: 13, fontFamily: t.font, resize: 'vertical' }}/>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: t.textDim }}>{writeContent.length} / 5000</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => { setShowWriteForm(false); setWriteContent(''); }} style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${t.line}`, background: 'transparent', color: t.textDim, fontSize: 12, cursor: 'pointer' }}>취소</button>
+              <button onClick={submitFanPost} disabled={writeSubmitting || !writeContent.trim()} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: t.accent, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: writeSubmitting || !writeContent.trim() ? 0.5 : 1 }}>{writeSubmitting ? '작성 중...' : '게시'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {(activeTab === 'latest' ? posts : hotPosts).map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
       </div>
@@ -556,6 +600,32 @@ function TabFanLetter({ t, theme, artist }) {
   const [hotHasNext, setHotHasNext] = React.useState(false);
   const [hotNextOffset, setHotNextOffset] = React.useState(null);
 
+  const [showLetterForm, setShowLetterForm] = React.useState(false);
+  const [letterSubmitting, setLetterSubmitting] = React.useState(false);
+  const [letterRecipientType, setLetterRecipientType] = React.useState('ARTIST');
+  const [letterImage, setLetterImage] = React.useState(null);
+
+  const submitFanLetter = async () => {
+    if (letterSubmitting) return;
+    if (!window.ConnectfinAPI.getToken()) { alert('로그인이 필요합니다.'); return; }
+    setLetterSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('recipientType', letterRecipientType);
+      if (letterImage) formData.append('image', letterImage);
+      await window.ConnectfinAPI.apiMultipart(`/api/post/v1/artists/${artist.id}/fan-letters`, formData);
+      setLetterImage(null);
+      setShowLetterForm(false);
+      window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-letters`)
+        .then(data => { setLetters(data.content.map(mapFanLetterListItem)); setHasNext(data.hasNext); setNextCursor(data.nextCursor); })
+        .catch(err => { console.warn('Refresh failed:', err?.message || err); });
+    } catch (err) {
+      alert('작성 실패: ' + (err.message || '멤버십 구독이 필요합니다'));
+    } finally {
+      setLetterSubmitting(false);
+    }
+  };
+
   const loadHotLetters = (append = false) => {
     setLoading(true);
     let path = `/api/post/v1/artists/${artist.id}/fan-letters/hot`;
@@ -628,6 +698,38 @@ function TabFanLetter({ t, theme, artist }) {
         <div style={{ flex: 1 }}/>
         <Chip t={t}>🌐 한국어</Chip>
       </div>
+      {!showLetterForm ? (
+        <button onClick={() => setShowLetterForm(true)} style={{
+          width: '100%', padding: '12px 0', marginBottom: 12, borderRadius: 10,
+          border: `1px solid ${t.line}`, background: 'transparent',
+          color: t.textDim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: t.font,
+        }}>💌 팬레터 보내기</button>
+      ) : (
+        <div style={{ padding: 14, marginBottom: 12, borderRadius: 12, border: `1px solid ${t.accent}`, background: theme === 'dark' ? 'rgba(20,22,36,0.55)' : t.surface }}>
+          <div style={{ fontSize: 12, color: t.textDim, marginBottom: 8 }}>받는 대상</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {['ARTIST', 'ARTIST_MEMBER'].map(rt => (
+              <button key={rt} onClick={() => setLetterRecipientType(rt)} style={{
+                padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: t.font,
+                border: letterRecipientType === rt ? `1px solid ${t.accent}` : `1px solid ${t.line}`,
+                background: letterRecipientType === rt ? t.accent : 'transparent',
+                color: letterRecipientType === rt ? '#fff' : t.text,
+              }}>{rt === 'ARTIST' ? '그룹 전체' : '멤버 지정'}</button>
+            ))}
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: `1px dashed ${t.line}`, cursor: 'pointer', fontSize: 12, color: t.textDim, marginBottom: 12 }}>
+            📷 {letterImage ? letterImage.name : '이미지 선택 (선택사항)'}
+            <input type="file" accept="image/*" onChange={e => setLetterImage(e.target.files[0] || null)} style={{ display: 'none' }}/>
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: t.textDim }}>팬 멤버십 구독자만 작성 가능</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => { setShowLetterForm(false); setLetterImage(null); }} style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${t.line}`, background: 'transparent', color: t.textDim, fontSize: 12, cursor: 'pointer' }}>취소</button>
+              <button onClick={submitFanLetter} disabled={letterSubmitting} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: t.accent, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: letterSubmitting ? 0.5 : 1 }}>{letterSubmitting ? '전송 중...' : '보내기'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {(activeTab === 'latest' ? letters : hotLetters).map(l => <FanLetterCard key={l.id} letter={l} artist={artist} t={t} theme={theme} onClick={() => openDetail(l)}/>)}
       </div>
@@ -1014,6 +1116,48 @@ function moreBtn(t) {
 }
 
 function ArtistPostCard({ post, artist, t, inline }) {
+  const [commentInput, setCommentInput] = React.useState('');
+  const [commentSubmitting, setCommentSubmitting] = React.useState(false);
+  const [comments, setComments] = React.useState([]);
+  const [showComments, setShowComments] = React.useState(false);
+  const [expandedReplies, setExpandedReplies] = React.useState({});
+
+  const artistId = post.artistId || artist.id;
+  const artistPostId = post.artistPostId || post.id;
+
+  const loadComments = () => {
+    if (!artistPostId) return;
+    window.ConnectfinAPI.api(`/api/post/v1/artists/${artistId}/artist-posts/${artistPostId}`)
+      .then(data => { if (data.comments?.content) setComments(data.comments.content); })
+      .catch(err => { console.warn('Comments load failed:', err?.message || err); });
+  };
+
+  const submitComment = async () => {
+    if (!commentInput.trim() || commentSubmitting) return;
+    if (!window.ConnectfinAPI.getToken()) { alert('로그인이 필요합니다.'); return; }
+    setCommentSubmitting(true);
+    try {
+      await window.ConnectfinAPI.api(
+        `/api/post/v1/artists/${artistId}/artist-posts/${artistPostId}/comments`,
+        { method: 'POST', body: JSON.stringify({ content: commentInput.trim(), parentId: null }) }
+      );
+      setCommentInput('');
+      loadComments();
+    } catch (err) {
+      alert('댓글 작성 실패: ' + (err.message || ''));
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const loadReplies = (commentId) => {
+    window.ConnectfinAPI.api(`/api/post/v1/artists/${artistId}/artist-posts/${artistPostId}/comments/${commentId}/replies`)
+      .then(data => {
+        setExpandedReplies(prev => ({ ...prev, [commentId]: data.content || [] }));
+      })
+      .catch(err => { console.warn('Replies load failed:', err?.message || err); });
+  };
+
   return (
     <div style={{ padding: inline ? 0 : 18, border: inline ? 'none' : `1px solid ${t.line}`, borderRadius: 12, background: inline ? 'transparent' : 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -1046,11 +1190,92 @@ function ArtistPostCard({ post, artist, t, inline }) {
         )}
         <span>💬 {post.comments}</span>
       </div>
+      {artistPostId && !inline && (
+        <div style={{ marginTop: 12, borderTop: `1px solid ${t.line}`, paddingTop: 10 }}>
+          {post.comments > 0 && !showComments && (
+            <button onClick={() => { setShowComments(true); loadComments(); }} style={{
+              background: 'transparent', border: 'none', color: t.textDim, fontSize: 12, cursor: 'pointer', padding: 0, marginBottom: 8,
+            }}>💬 댓글 {post.comments}개 보기</button>
+          )}
+          {showComments && comments.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              {comments.map(c => (
+                <div key={c.commentId} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: `linear-gradient(135deg, ${artist.color1}, ${artist.color2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8, fontWeight: 800 }}>{(c.writerNickname || '?').slice(0, 2)}</div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontWeight: 600, marginRight: 6 }}>{c.writerNickname}</span>
+                      <span style={{ color: t.text }}>{c.content}</span>
+                      {c.replyCount > 0 && !expandedReplies[c.commentId] && (
+                        <button onClick={() => loadReplies(c.commentId)} style={{ display: 'block', background: 'transparent', border: 'none', color: t.accent, fontSize: 11, cursor: 'pointer', padding: 0, marginTop: 4 }}>답글 {c.replyCount}개 보기</button>
+                      )}
+                      {expandedReplies[c.commentId] && expandedReplies[c.commentId].map(r => (
+                        <div key={r.commentId} style={{ display: 'flex', gap: 6, marginTop: 6, marginLeft: 16, fontSize: 11 }}>
+                          <div style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, background: t.line, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: t.textDim }}>{(r.writerNickname || '?').slice(0, 2)}</div>
+                          <div><span style={{ fontWeight: 600, marginRight: 4 }}>{r.writerNickname}</span>{r.content}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="text" value={commentInput} onChange={e => setCommentInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+              placeholder="댓글 달기..." style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.line}`, background: 'transparent', color: t.text, fontSize: 12, fontFamily: t.font }}/>
+            <button onClick={submitComment} disabled={commentSubmitting || !commentInput.trim()} style={{
+              padding: '6px 12px', borderRadius: 8, border: 'none', background: t.accent, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: commentSubmitting || !commentInput.trim() ? 0.5 : 1,
+            }}>{commentSubmitting ? '...' : '게시'}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function FanPostFullCard({ post, artist, t, theme }) {
+  const [commentInput, setCommentInput] = React.useState('');
+  const [commentSubmitting, setCommentSubmitting] = React.useState(false);
+  const [comments, setComments] = React.useState([]);
+  const [showComments, setShowComments] = React.useState(false);
+  const [expandedReplies, setExpandedReplies] = React.useState({});
+
+  const loadComments = () => {
+    if (!post.artistId || !post.id) return;
+    window.ConnectfinAPI.api(`/api/post/v1/artists/${post.artistId}/fan-posts/${post.id}`)
+      .then(data => { if (data.comments?.content) setComments(data.comments.content); })
+      .catch(err => { console.warn('Comments load failed:', err?.message || err); });
+  };
+
+  const submitComment = async () => {
+    if (!commentInput.trim() || commentSubmitting) return;
+    if (!window.ConnectfinAPI.getToken()) { alert('로그인이 필요합니다.'); return; }
+    if (!post.artistId || !post.id) return;
+    setCommentSubmitting(true);
+    try {
+      await window.ConnectfinAPI.api(
+        `/api/post/v1/artists/${post.artistId}/fan-posts/${post.id}/comments`,
+        { method: 'POST', body: JSON.stringify({ content: commentInput.trim(), parentId: null }) }
+      );
+      setCommentInput('');
+      loadComments();
+    } catch (err) {
+      alert('댓글 작성 실패: ' + (err.message || ''));
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const loadReplies = (commentId) => {
+    window.ConnectfinAPI.api(`/api/post/v1/artists/${post.artistId}/fan-posts/${post.id}/comments/${commentId}/replies`)
+      .then(data => {
+        setExpandedReplies(prev => ({ ...prev, [commentId]: data.content || [] }));
+      })
+      .catch(err => { console.warn('Replies load failed:', err?.message || err); });
+  };
+
   return (
     <div style={{
       padding: 18, border: `1px solid ${t.line}`, borderRadius: 12,
@@ -1106,6 +1331,47 @@ function FanPostFullCard({ post, artist, t, theme }) {
         )}
         {post.comments !== null && <span>💬 {post.comments}</span>}
       </div>
+      {post.artistId && post.id && (
+        <div style={{ marginTop: 12, borderTop: `1px solid ${t.line}`, paddingTop: 10 }}>
+          {post.comments > 0 && !showComments && (
+            <button onClick={() => { setShowComments(true); loadComments(); }} style={{
+              background: 'transparent', border: 'none', color: t.textDim, fontSize: 12, cursor: 'pointer', padding: 0, marginBottom: 8,
+            }}>💬 댓글 {post.comments}개 보기</button>
+          )}
+          {showComments && comments.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              {comments.map(c => (
+                <div key={c.commentId} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: `linear-gradient(135deg, ${artist.color1}, ${artist.color2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8, fontWeight: 800 }}>{(c.writerNickname || '?').slice(0, 2)}</div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontWeight: 600, marginRight: 6 }}>{c.writerNickname}</span>
+                      <span style={{ color: t.text }}>{c.content}</span>
+                      {c.replyCount > 0 && !expandedReplies[c.commentId] && (
+                        <button onClick={() => loadReplies(c.commentId)} style={{ display: 'block', background: 'transparent', border: 'none', color: t.accent, fontSize: 11, cursor: 'pointer', padding: 0, marginTop: 4 }}>답글 {c.replyCount}개 보기</button>
+                      )}
+                      {expandedReplies[c.commentId] && expandedReplies[c.commentId].map(r => (
+                        <div key={r.commentId} style={{ display: 'flex', gap: 6, marginTop: 6, marginLeft: 16, fontSize: 11 }}>
+                          <div style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, background: t.line, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: t.textDim }}>{(r.writerNickname || '?').slice(0, 2)}</div>
+                          <div><span style={{ fontWeight: 600, marginRight: 4 }}>{r.writerNickname}</span>{r.content}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="text" value={commentInput} onChange={e => setCommentInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+              placeholder="댓글 달기..." style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.line}`, background: 'transparent', color: t.text, fontSize: 12, fontFamily: t.font }}/>
+            <button onClick={submitComment} disabled={commentSubmitting || !commentInput.trim()} style={{
+              padding: '6px 12px', borderRadius: 8, border: 'none', background: t.accent, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: commentSubmitting || !commentInput.trim() ? 0.5 : 1,
+            }}>{commentSubmitting ? '...' : '게시'}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

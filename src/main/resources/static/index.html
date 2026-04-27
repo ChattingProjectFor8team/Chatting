@@ -604,15 +604,31 @@ function LoginModal({ t, theme, onLogin, onClose }) {
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [mode, setMode] = React.useState('login'); // 'login' | 'signup'
+  const [nickname, setNickname] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [signupSuccess, setSignupSuccess] = React.useState(false);
 
   const submit = async () => {
     if (!email || !password) return;
+    if (mode === 'signup' && (!nickname || !phone)) return;
     setLoading(true);
     setError('');
     try {
-      await onLogin(email, password);
+      if (mode === 'signup') {
+        await window.ConnectfinAPI.api('/api/auth/v1/signup', {
+          method: 'POST',
+          body: JSON.stringify({ email, password, nickname, phoneNumber: phone }),
+        });
+        setSignupSuccess(true);
+        setMode('login');
+        setNickname('');
+        setPhone('');
+      } else {
+        await onLogin(email, password);
+      }
     } catch (err) {
-      setError(err.message || '로그인 실패');
+      setError(err.message || (mode === 'signup' ? '회원가입 실패' : '로그인 실패'));
     } finally {
       setLoading(false);
     }
@@ -635,8 +651,26 @@ function LoginModal({ t, theme, onLogin, onClose }) {
         border: `1px solid ${t.line}`,
         boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
       }}>
-        <div style={{ fontFamily: t.fontDisplay, fontSize: 22, fontWeight: 800, marginBottom: 6 }}>로그인</div>
-        <div style={{ fontSize: 13, color: t.textDim, marginBottom: 24 }}>Connectfin 계정으로 로그인하세요</div>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 6 }}>
+          <button onClick={() => { setMode('login'); setError(''); setSignupSuccess(false); }} style={{
+            fontFamily: t.fontDisplay, fontSize: 22, fontWeight: 800,
+            background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+            color: mode === 'login' ? t.text : t.textDim,
+            borderBottom: mode === 'login' ? `2px solid ${t.accent}` : '2px solid transparent',
+            paddingBottom: 4,
+          }}>로그인</button>
+          <button onClick={() => { setMode('signup'); setError(''); setSignupSuccess(false); }} style={{
+            fontFamily: t.fontDisplay, fontSize: 22, fontWeight: 800,
+            background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+            color: mode === 'signup' ? t.text : t.textDim,
+            borderBottom: mode === 'signup' ? `2px solid ${t.accent}` : '2px solid transparent',
+            paddingBottom: 4,
+          }}>회원가입</button>
+        </div>
+        <div style={{ fontSize: 13, color: t.textDim, marginBottom: 24 }}>
+          {signupSuccess && <span style={{ color: '#22c55e' }}>회원가입 완료! 로그인해 주세요. </span>}
+          {!signupSuccess && (mode === 'login' ? 'Connectfin 계정으로 로그인하세요' : '새 계정을 만들어 보세요')}
+        </div>
 
         <input
           type="email" placeholder="이메일" value={email}
@@ -658,21 +692,44 @@ function LoginModal({ t, theme, onLogin, onClose }) {
           }}
         />
 
+        {mode === 'signup' && (
+          <>
+            <input
+              type="text" placeholder="닉네임 (2~50자)" value={nickname}
+              onChange={e => setNickname(e.target.value)} onKeyDown={handleKeyDown}
+              style={{
+                width: '100%', padding: '12px 14px', marginBottom: 10, borderRadius: 10,
+                border: `1px solid ${t.line}`, background: t.surface2 || 'transparent',
+                color: t.text, fontSize: 14, fontFamily: t.font,
+              }}
+            />
+            <input
+              type="tel" placeholder="전화번호 (010-1234-5678)" value={phone}
+              onChange={e => setPhone(e.target.value)} onKeyDown={handleKeyDown}
+              style={{
+                width: '100%', padding: '12px 14px', marginBottom: 16, borderRadius: 10,
+                border: `1px solid ${t.line}`, background: t.surface2 || 'transparent',
+                color: t.text, fontSize: 14, fontFamily: t.font,
+              }}
+            />
+          </>
+        )}
+
         {error && (
           <div style={{ fontSize: 12, color: '#ff6b6b', marginBottom: 12, lineHeight: 1.4 }}>{error}</div>
         )}
 
-        <button onClick={submit} disabled={loading || !email || !password} style={{
+        <button onClick={submit} disabled={loading || !email || !password || (mode === 'signup' && (!nickname || !phone))} style={{
           width: '100%', padding: '13px 0', borderRadius: 12, border: 'none',
           background: (!email || !password) ? (t.line || '#333') : (t.gradient || t.accent),
           color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'wait' : 'pointer',
           fontFamily: t.font, opacity: loading ? 0.6 : 1,
         }}>
-          {loading ? '로그인 중...' : '로그인'}
+          {loading ? (mode === 'signup' ? '가입 중...' : '로그인 중...') : (mode === 'signup' ? '회원가입' : '로그인')}
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: t.textMuted, fontFamily: t.fontMono }}>
-          POST /api/auth/v1/login
+          {mode === 'login' ? 'POST /api/auth/v1/login' : 'POST /api/auth/v1/signup'}
         </div>
       </div>
     </div>
