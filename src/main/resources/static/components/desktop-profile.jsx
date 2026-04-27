@@ -245,11 +245,29 @@ function ArtistCoverBanner({ artist, t, theme }) {
 // Main desktop profile router
 function DesktopArtistProfile({ t, theme, artist, tab, onNavProfile, onOpenLive, onOpenDM, onOpenMembership }) {
   const [artistDetail, setArtistDetail] = React.useState(null);
+  const [activeLive, setActiveLive] = React.useState(null);
 
   React.useEffect(() => {
     window.ConnectfinAPI.api(`/api/member/v2/artists/${artist.id}`)
       .then(data => setArtistDetail(data))
       .catch(err => { console.warn('API fallback to mock:', err?.message || err); });
+  }, [artist.id]);
+
+  // 진행 중인 라이브 폴링 (10초마다) — 어드민이 시작/종료 시 반영
+  React.useEffect(() => {
+    let cancelled = false;
+    const fetchLive = () => {
+      window.ConnectfinAPI.api(`/api/v1/artists/${artist.id}/lives`)
+        .then(data => {
+          if (cancelled) return;
+          const live = (Array.isArray(data) ? data : []).find(l => (l.liveStatus || l.status) === 'LIVE');
+          setActiveLive(live || null);
+        })
+        .catch(() => {});
+    };
+    fetchLive();
+    const id = setInterval(fetchLive, 10000);
+    return () => { cancelled = true; clearInterval(id); };
   }, [artist.id]);
 
   const displayArtist = artistDetail ? {
@@ -274,6 +292,24 @@ function DesktopArtistProfile({ t, theme, artist, tab, onNavProfile, onOpenLive,
 
   return (
     <div>
+      {activeLive && (
+        <button onClick={() => onOpenLive(artist.id)} style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+          padding: '12px 28px', border: 'none', cursor: 'pointer', textAlign: 'left',
+          background: t.liveGradient || 'linear-gradient(90deg, #FF2D55, #FF6B9F)',
+          color: '#fff', fontFamily: t.font,
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%', background: '#fff',
+            animation: 'connectfin-pulse 1.2s ease-in-out infinite', flexShrink: 0,
+          }}/>
+          <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: 1.2, fontFamily: t.fontMono }}>LIVE NOW</span>
+          <span style={{ fontWeight: 700, fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {activeLive.title || `${artist.name} 라이브 진행 중`}
+          </span>
+          <span style={{ fontSize: 12, opacity: 0.95, fontWeight: 700 }}>지금 입장 →</span>
+        </button>
+      )}
       <ArtistCoverBanner artist={displayArtist} t={t} theme={theme}/>
       <div style={{ display: 'flex', maxWidth: 1320, margin: '0 auto', padding: '20px 24px 60px', gap: 24 }}>
         <div style={{ flex: 1, minWidth: 0 }}>{body}</div>
@@ -1650,6 +1686,53 @@ function TabAdmin({ t, theme, artist }) {
   const [youtubeUrl, setYoutubeUrl] = React.useState('');
   const [youtubeImporting, setYoutubeImporting] = React.useState(false);
 
+  // ── 신규 아티스트 생성 ──
+  const [newArtist, setNewArtist] = React.useState({
+    name: '', slug: '', stageName: '', intro: '',
+    profileImageUrl: '', coverImageUrl: '',
+  });
+  const [creatingArtist, setCreatingArtist] = React.useState(false);
+
+  const createArtist = async () => {
+    const a = newArtist;
+    if (!a.name.trim() || !a.slug.trim() || !a.stageName.trim() || creatingArtist) return;
+    setCreatingArtist(true);
+    try {
+      const res = await window.ConnectfinAPI.api('/api/member/v1/artists', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: a.name.trim(),
+          slug: a.slug.trim(),
+          stageName: a.stageName.trim(),
+          profileImageUrl: a.profileImageUrl.trim() || 'https://cdn.connectfin.com/default-profile.jpg',
+          coverImageUrl: a.coverImageUrl.trim() || 'https://cdn.connectfin.com/default-cover.jpg',
+          intro: a.intro.trim() || '소개 준비중',
+        }),
+      });
+      // 생성된 아티스트를 ARTISTS에 즉시 머지 + 갱신 알림
+      const id = res?.id || res?.artistId;
+      if (id && Array.isArray(window.ARTISTS)) {
+        const hue = (id * 47) % 360;
+        window.ARTISTS.push({
+          id, name: a.name.trim(), slug: a.slug.trim(),
+          stage: a.stageName.trim(), genre: 'NEW · ARTIST',
+          color1: `hsl(${hue}, 70%, 60%)`, color2: `hsl(${hue}, 70%, 80%)`,
+          members: 1, live: false, viewers: 0, followers: '0',
+          profileImageUrl: a.profileImageUrl.trim(), fromBackend: true,
+        });
+        window.dispatchEvent(new CustomEvent('connectfin:artists-changed'));
+      }
+      // 또한 백엔드에서 다시 풀로드 (정규화된 데이터 확보)
+      window.ConnectfinAPI.loadArtists();
+      setNewArtist({ name: '', slug: '', stageName: '', intro: '', profileImageUrl: '', coverImageUrl: '' });
+      alert(`아티스트 생성 완료! ID=${id}\n좌측 네비/검색에서 즉시 확인 가능`);
+    } catch (err) {
+      alert('생성 실패: ' + (err.message || ''));
+    } finally {
+      setCreatingArtist(false);
+    }
+  };
+
   const importYoutube = async () => {
     if (!youtubeUrl.trim() || youtubeImporting) return;
     setYoutubeImporting(true);
@@ -1769,6 +1852,43 @@ function TabAdmin({ t, theme, artist }) {
             onKeyDown={e => { if (e.key === 'Enter') importYoutube(); }}/>
           <button onClick={importYoutube} disabled={youtubeImporting || !youtubeUrl.trim()} style={adminBtnStyle(youtubeImporting || !youtubeUrl.trim())}>
             {youtubeImporting ? '...' : '등록'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── 신규 아티스트 생성 ── */}
+      <div style={{ padding: 16, background: t.surface2, borderRadius: 12, border: `1px solid ${t.line}`, marginTop: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>신규 아티스트 생성</div>
+          <div style={{ fontSize: 10, fontFamily: t.fontMono, color: t.textMuted }}>POST /api/member/v1/artists</div>
+        </div>
+        <div style={{ fontSize: 11, color: t.textDim, marginBottom: 12 }}>
+          생성 즉시 좌측 네비, 검색, 라이브 스피어에 반영됩니다 · SUPER_ADMIN 권한 필요
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <input value={newArtist.name} onChange={e => setNewArtist(p => ({ ...p, name: e.target.value }))}
+            placeholder="이름 (예: NEXUS9)" style={inputStyle}/>
+          <input value={newArtist.slug} onChange={e => setNewArtist(p => ({ ...p, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+            placeholder="슬러그 (예: nexus9, 영문/숫자/-)" style={{ ...inputStyle, fontFamily: t.fontMono }}/>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, marginBottom: 6 }}>
+          <input value={newArtist.stageName} onChange={e => setNewArtist(p => ({ ...p, stageName: e.target.value }))}
+            placeholder="활동명 (예: 넥서스나인)" style={inputStyle}/>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <input value={newArtist.profileImageUrl} onChange={e => setNewArtist(p => ({ ...p, profileImageUrl: e.target.value }))}
+            placeholder="프로필 이미지 URL (선택)" style={{ ...inputStyle, fontFamily: t.fontMono, fontSize: 11 }}/>
+          <input value={newArtist.coverImageUrl} onChange={e => setNewArtist(p => ({ ...p, coverImageUrl: e.target.value }))}
+            placeholder="커버 이미지 URL (선택)" style={{ ...inputStyle, fontFamily: t.fontMono, fontSize: 11 }}/>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input value={newArtist.intro} onChange={e => setNewArtist(p => ({ ...p, intro: e.target.value }))}
+            placeholder="소개 (선택)" style={inputStyle}/>
+          <button
+            onClick={createArtist}
+            disabled={creatingArtist || !newArtist.name.trim() || !newArtist.slug.trim() || !newArtist.stageName.trim()}
+            style={adminBtnStyle(creatingArtist || !newArtist.name.trim() || !newArtist.slug.trim() || !newArtist.stageName.trim())}>
+            {creatingArtist ? '...' : '생성'}
           </button>
         </div>
       </div>

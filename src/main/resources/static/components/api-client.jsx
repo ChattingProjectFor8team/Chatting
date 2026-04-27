@@ -54,14 +54,32 @@ const ConnectfinAPI = (() => {
     // 204 No Content
     if (response.status === 204) return null;
 
-    const json = await response.json();
+    // 응답을 텍스트로 먼저 읽고 → JSON 파싱 시도
+    // (JSON이 아니거나 깨진 경우 raw 텍스트를 에러 메시지에 포함시켜 디버깅 용이)
+    const rawText = await response.text();
+    let json;
+    try {
+      json = rawText ? JSON.parse(rawText) : null;
+    } catch (parseErr) {
+      console.error(`[ConnectfinAPI] JSON parse failed for ${path}:`, {
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+        rawText: rawText.slice(0, 500),
+      });
+      const err = new Error(
+        `서버 응답을 JSON으로 파싱할 수 없습니다 (HTTP ${response.status}): ${rawText.slice(0, 200)}`
+      );
+      err.status = response.status;
+      err.rawText = rawText;
+      throw err;
+    }
 
     // 에러 응답 (4xx, 5xx)
     if (!response.ok && response.status !== 202) {
-      const errMsg = json.error?.message || json.message || `HTTP ${response.status}`;
+      const errMsg = json?.error?.message || json?.message || `HTTP ${response.status}`;
       const err = new Error(errMsg);
       err.status = response.status;
-      err.code = json.error?.code;
+      err.code = json?.error?.code;
       err.response = json;
       throw err;
     }
@@ -285,8 +303,83 @@ const ConnectfinAPI = (() => {
     sendDm,
     unsubscribe,
     disconnectStomp,
+    // Artist store sync
+    loadArtists,
   };
 })();
+
+// ──────────────────────────────────────────────────────────────
+// 백엔드 ArtistSearchResponse → 프론트 ARTISTS 항목 변환
+// (이름·이미지만 백엔드 값으로 덮고, 색·장르 같은 visual prop은 mock 값을 보존)
+// ──────────────────────────────────────────────────────────────
+function mergeArtistFromBackend(backend, existing) {
+  return {
+    // 기본 visual mock (없으면 deterministic 색상 생성)
+    color1: existing?.color1 || hslFromId(backend.id, 60),
+    color2: existing?.color2 || hslFromId(backend.id, 80),
+    genre: existing?.genre || 'ARTIST',
+    members: existing?.members || 1,
+    live: existing?.live || false,
+    viewers: existing?.viewers || 0,
+    followers: existing?.followers || '—',
+    stage: existing?.stage || backend.name,
+    // 백엔드 우선 필드
+    id: backend.id,
+    name: backend.name,
+    slug: backend.slug,
+    profileImageUrl: backend.profileImageUrl,
+    fromBackend: true,
+  };
+}
+
+function hslFromId(id, lightness = 60) {
+  const hue = (Number(id) * 47) % 360;
+  return `hsl(${hue}, 70%, ${lightness}%)`;
+}
+
+// 백엔드의 모든 아티스트를 가져와 window.ARTISTS에 머지한다.
+// - 이미 있는 mock 아티스트는 visual prop을 보존
+// - 백엔드에만 있는 신규 아티스트는 새로 push
+// - mock에만 있고 백엔드에 없는 아티스트는 dev 모드에서 살려둠 (백엔드 미구동 시 화면 보존)
+async function loadArtists() {
+  try {
+    // v3 검색을 keyword 없이 호출 — 전체 아티스트 페이징
+    let allBackend = [];
+    let page = 1;
+    while (page <= 5) { // 안전장치: 최대 50개
+      const res = await ConnectfinAPI.api(`/api/member/v3/artists/search?page=${page}`);
+      const list = res?.content || [];
+      if (list.length === 0) break;
+      allBackend = allBackend.concat(list);
+      if (!res.hasNext) break;
+      page += 1;
+    }
+    if (!Array.isArray(window.ARTISTS)) return;
+
+    // 머지: 백엔드 id 기준
+    const merged = [];
+    const seenIds = new Set();
+    for (const b of allBackend) {
+      const existing = window.ARTISTS.find(a => a.id === b.id);
+      merged.push(mergeArtistFromBackend(b, existing));
+      seenIds.add(b.id);
+    }
+    // 백엔드에 없는 mock은 뒤에 보존 (오프라인 데모 호환)
+    for (const a of window.ARTISTS) {
+      if (!seenIds.has(a.id)) merged.push(a);
+    }
+
+    // 배열 mutate (다른 모듈이 같은 참조를 들고 있을 수 있으므로)
+    window.ARTISTS.length = 0;
+    window.ARTISTS.push(...merged);
+
+    // 갱신 알림
+    window.dispatchEvent(new CustomEvent('connectfin:artists-changed', { detail: merged }));
+    console.log(`[Connectfin] ARTISTS 동기화: 백엔드 ${allBackend.length} + mock 보존 ${merged.length - allBackend.length} = ${merged.length}`);
+  } catch (err) {
+    console.warn('[Connectfin] loadArtists 실패 (mock으로 동작):', err?.message || err);
+  }
+}
 
 // 전역 노출 — 다른 JSX 컴포넌트에서 window.ConnectfinAPI.api(...) 로 접근
 Object.assign(window, { ConnectfinAPI });

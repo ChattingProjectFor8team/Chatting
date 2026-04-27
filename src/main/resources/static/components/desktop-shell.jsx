@@ -8,7 +8,7 @@ function DesktopShell({ t, theme, children, activeArtist, onNavGlobal, globalVie
     }}>
       <DesktopLeftNav t={t} theme={theme} globalView={globalView} onNavGlobal={onNavGlobal} onArtistOpen={onArtistOpen}/>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <DesktopTopbar t={t} theme={theme} activeArtist={activeArtist} globalView={globalView} profileTab={profileTab} onNavProfile={onNavProfile} authUser={authUser} onShowLogin={onShowLogin} onLogout={onLogout}/>
+        <DesktopTopbar t={t} theme={theme} activeArtist={activeArtist} globalView={globalView} profileTab={profileTab} onNavProfile={onNavProfile} onNavGlobal={onNavGlobal} authUser={authUser} onShowLogin={onShowLogin} onLogout={onLogout}/>
         <div style={{ flex: 1, minWidth: 0 }}>
           {children}
         </div>
@@ -26,13 +26,18 @@ function DesktopLeftNav({ t, theme, globalView, onNavGlobal, onArtistOpen }) {
       padding: '18px 16px', position: 'sticky', top: 0, height: '100vh',
       overflowY: 'auto', background: dark ? 'rgba(10,11,16,0.5)' : 'rgba(255,255,255,0.5)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 18px' }}>
+      <button onClick={() => onNavGlobal('home')} aria-label="홈으로" style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 18px',
+        background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+        width: '100%', color: t.text,
+      }}>
         <Infinity8 size={26} color={t.accent} color2={t.accent2} stroke={8}/>
         <div style={{ fontFamily: t.fontDisplay, fontWeight: 800, fontSize: 18, letterSpacing: -0.4 }}>Connectfin</div>
-      </div>
+      </button>
 
       <NavItem t={t} icon="⌂" label="홈" active={globalView === 'home'} onClick={() => onNavGlobal('home')}/>
       <NavItem t={t} icon="✉" label="DM" active={globalView === 'dm'} onClick={() => onNavGlobal('dm')}/>
+      <NavItem t={t} icon="🎰" label="Raffle" active={globalView === 'raffle'} onClick={() => onNavGlobal('raffle')}/>
       <NavItem t={t} icon="⋯" label="더보기" />
 
       <NavSection t={t} label="내 커뮤니티"/>
@@ -103,7 +108,7 @@ function NavArtist({ artist, t, onClick }) {
 }
 
 // ───────── Top bar (profile tabs live here when on artist page) ─────────
-function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavProfile, authUser, onShowLogin, onLogout }) {
+function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavProfile, onNavGlobal, authUser, onShowLogin, onLogout }) {
   const dark = theme === 'dark';
   const [jellyBalance, setJellyBalance] = React.useState(null);
 
@@ -162,8 +167,15 @@ function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavPr
         </>
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16 }}>
+          {globalView === 'live' && (
+            <button onClick={() => onNavGlobal && onNavGlobal('home')} aria-label="뒤로" style={{
+              width: 36, height: 36, borderRadius: 10, border: `1px solid ${t.line}`,
+              background: 'transparent', color: t.text, fontSize: 16, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>←</button>
+          )}
           <div style={{ fontFamily: t.fontDisplay, fontSize: 17, fontWeight: 800 }}>
-            {globalView === 'home' ? '홈' : globalView === 'jelly' ? 'Jelly Shop' : globalView === 'shop' ? 'Shop' : globalView === 'dm' ? 'DM' : globalView === 'live' ? 'LIVE' : ''}
+            {globalView === 'home' ? '홈' : globalView === 'jelly' ? 'Jelly Shop' : globalView === 'shop' ? 'Shop' : globalView === 'dm' ? 'DM' : globalView === 'live' ? 'LIVE' : globalView === 'raffle' ? 'Raffle' : ''}
           </div>
         </div>
       )}
@@ -449,7 +461,21 @@ function ArtistSearchSection({ t, theme, onArtistOpen }) {
           {results.length === 0 ? (
             <div style={{ padding: '8px 10px', fontSize: 12, color: t.textDim }}>검색 결과가 없습니다</div>
           ) : results.map(a => (
-            <button key={a.id} onClick={() => { onArtistOpen(a.id); setShowSearch(false); setQuery(''); setResults(null); }} style={{
+            <button key={a.id} onClick={() => {
+              // ARTISTS에 없는 백엔드 결과면 즉시 머지 → 프로필이 빈 화면이 되는 것을 방지
+              if (Array.isArray(window.ARTISTS) && !window.ARTISTS.some(x => x.id === a.id)) {
+                const hue = (a.id * 47) % 360;
+                window.ARTISTS.push({
+                  id: a.id, name: a.name, slug: a.slug,
+                  stage: a.name, genre: 'ARTIST',
+                  color1: `hsl(${hue}, 70%, 60%)`, color2: `hsl(${hue}, 70%, 80%)`,
+                  members: 1, live: false, viewers: 0, followers: '—',
+                  profileImageUrl: a.profileImageUrl, fromBackend: true,
+                });
+                window.dispatchEvent(new CustomEvent('connectfin:artists-changed'));
+              }
+              onArtistOpen(a.id); setShowSearch(false); setQuery(''); setResults(null);
+            }} style={{
               display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
               padding: '8px 10px', borderRadius: 8,
               background: 'transparent', border: 'none', cursor: 'pointer', color: t.text,
