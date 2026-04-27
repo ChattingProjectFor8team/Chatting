@@ -17,9 +17,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.example.infinite.global.common.dto.CursorSliceResponse;
 
 @RestController
 @RequestMapping("/api/post")
@@ -76,24 +77,26 @@ public class CommentController {
     }
 
     @GetMapping("/v1/artists/{artistId}/fan-posts/{fanPostId}/comments/{commentId}/replies")
-    public ResponseEntity<ApiResponse<List<CommentResponse>>> getFanPostReplies(
+    public ResponseEntity<ApiResponse<CursorSliceResponse<CommentResponse>>> getFanPostReplies(
             @PathVariable Long artistId,
             @PathVariable Long fanPostId,
-            @PathVariable Long commentId
+            @PathVariable Long commentId,
+            @RequestParam(required = false) Long cursor
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                commentService.getFanPostReplies(artistId, fanPostId, commentId)
+                commentService.getFanPostReplies(artistId, fanPostId, commentId, cursor)
         ));
     }
 
     @GetMapping("/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}/replies")
-    public ResponseEntity<ApiResponse<List<CommentResponse>>> getArtistPostReplies(
+    public ResponseEntity<ApiResponse<CursorSliceResponse<CommentResponse>>> getArtistPostReplies(
             @PathVariable Long artistId,
             @PathVariable Long artistPostId,
-            @PathVariable Long commentId
+            @PathVariable Long commentId,
+            @RequestParam(required = false) Long cursor
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                commentService.getArtistPostReplies(artistId, artistPostId, commentId)
+                commentService.getArtistPostReplies(artistId, artistPostId, commentId, cursor)
         ));
     }
 

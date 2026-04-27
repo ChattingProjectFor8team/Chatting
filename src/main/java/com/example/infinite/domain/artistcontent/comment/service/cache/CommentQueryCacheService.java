@@ -13,7 +13,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -68,13 +67,14 @@ public class CommentQueryCacheService {
      * replies는 특정 thread만 갑자기 뜨거워질 수 있으므로 admission을 더 공격적으로 잡는다.
      * reply 수가 많거나, 조회 heat가 높으면 캐시한다.
      */
-    public List<CommentResponse> getReplies(
+    public CursorSliceResponse<CommentResponse> getReplies(
             PostType targetType,
             Long artistId,
             Long targetId,
             Long parentCommentId,
+            Long cursor,
             long replyCount,
-            Supplier<List<CommentResponse>> loader
+            Supplier<CursorSliceResponse<CommentResponse>> loader
     ) {
         long heat = increaseHeat(buildReplyHeatKey(targetType, targetId, parentCommentId));
         boolean shouldCache = replyCount >= REPLY_COUNT_THRESHOLD || heat >= HEAT_THRESHOLD;
@@ -83,13 +83,13 @@ public class CommentQueryCacheService {
         }
 
         Cache cache = cacheManager.getCache(CacheNames.COMMENT_REPLY_LIST);
-        String cacheKey = buildReplyCacheKey(targetType, artistId, targetId, parentCommentId);
+        String cacheKey = buildReplyCacheKey(targetType, artistId, targetId, parentCommentId, cursor);
         CommentReplyListCacheEntry cached = cache == null ? null : cache.get(cacheKey, CommentReplyListCacheEntry.class);
         if (cached != null) {
             return cached.value();
         }
 
-        List<CommentResponse> loaded = loader.get();
+        CursorSliceResponse<CommentResponse> loaded = loader.get();
         if (cache != null) {
             cache.put(cacheKey, new CommentReplyListCacheEntry(loaded));
             registerScopeKey(buildReplyScopeKey(targetType, targetId, parentCommentId), cacheKey);
@@ -136,8 +136,8 @@ public class CommentQueryCacheService {
         return targetType.name() + ":" + artistId + ":" + targetId + ":" + (cursor == null ? "first" : cursor);
     }
 
-    private String buildReplyCacheKey(PostType targetType, Long artistId, Long targetId, Long parentCommentId) {
-        return targetType.name() + ":" + artistId + ":" + targetId + ":" + parentCommentId;
+    private String buildReplyCacheKey(PostType targetType, Long artistId, Long targetId, Long parentCommentId, Long cursor) {
+        return targetType.name() + ":" + artistId + ":" + targetId + ":" + parentCommentId + ":" + (cursor == null ? "first" : cursor);
     }
 
     private String buildRootScopeKey(PostType targetType, Long targetId) {

@@ -149,6 +149,7 @@ jobs:
           REDIS_PORT: ${{ vars.REDIS_PORT }}
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          YOUTUBE_DATA_API_KEY: ${{ secrets.YOUTUBE_DATA_API_KEY }}
         run: |
           # 2. 작은따옴표('EOF')를 사용하여 쉘이 내부 변수를 함부로 해석하지 못하게 방어
           cat <<EOF > .env
@@ -160,6 +161,7 @@ jobs:
           REDIS_PORT=${REDIS_PORT}
           S3_BUCKET_NAME=${S3_BUCKET_NAME}
           JWT_SECRET_KEY=${JWT_SECRET_KEY}
+          YOUTUBE_DATA_API_KEY=${YOUTUBE_DATA_API_KEY}
           EOF
           
           # 3. 업로드 (변수명 오타 주의!)

@@ -7,10 +7,6 @@ spring:
     hibernate:
       ddl-auto: validate # 운영은 스키마 보호를 위해 validate가 필수!!!!
       show-sql: false
-  cloud:
-    aws:
-      s3:
-        bucket: ${S3_BUCKET_NAME}
   data:
     redis:
       host: ${REDIS_HOST}

@@ -10,6 +10,8 @@ public interface ArtistYoutubeVideoRepository extends JpaRepository<ArtistYoutub
 
     boolean existsByArtistIdAndYoutubeVideoId(Long artistId, String youtubeVideoId);
 
+    long countByArtistId(Long artistId);
+
     List<ArtistYoutubeVideo> findByArtistIdOrderByIdDesc(Long artistId, Pageable pageable);
 
     List<ArtistYoutubeVideo> findByArtistIdAndIdLessThanOrderByIdDesc(Long artistId, Long cursor, Pageable pageable);

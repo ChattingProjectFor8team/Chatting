@@ -2,6 +2,7 @@ package com.example.infinite.domain.member.artist.service;
 
 import com.example.infinite.domain.member.artist.dto.response.ArtistPopularSearchResponse;
 import com.example.infinite.domain.member.artist.repository.ArtistSearchKeywordRepository;
+import com.example.infinite.global.common.dto.OffsetSliceResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -16,8 +17,7 @@ import java.util.Locale;
 @Transactional(readOnly = true)
 public class ArtistSearchKeywordService {
 
-    private static final int DEFAULT_POPULAR_KEYWORD_LIMIT = 10;
-    private static final int MAX_POPULAR_KEYWORD_LIMIT = 50;
+    private static final int POPULAR_KEYWORD_PAGE_SIZE = 10;
 
     private final ArtistSearchKeywordRepository artistSearchKeywordRepository;
 
@@ -33,15 +33,15 @@ public class ArtistSearchKeywordService {
         artistSearchKeywordRepository.incrementScoreIfFirstSearch(normalizedUserKey, normalizedKeyword);
     }
 
-    public List<ArtistPopularSearchResponse> getPopularKeywords(Integer limit) {
-        // 비정상적으로 큰 limit 요청이 Redis 대량 조회로 이어지지 않도록 상한을 둔다.
-        int resolvedLimit = (limit == null || limit <= 0)
-                ? DEFAULT_POPULAR_KEYWORD_LIMIT
-                : Math.min(limit, MAX_POPULAR_KEYWORD_LIMIT);
+    public OffsetSliceResponse<ArtistPopularSearchResponse> getPopularKeywords(Integer offset) {
+        int resolvedOffset = offset == null || offset < 0 ? 0 : offset;
 
-        return artistSearchKeywordRepository.findTopKeywords(resolvedLimit).stream()
+        List<ArtistPopularSearchResponse> rows = artistSearchKeywordRepository
+                .findTopKeywords(resolvedOffset, resolvedOffset + POPULAR_KEYWORD_PAGE_SIZE)
+                .stream()
                 .map(this::toResponse)
                 .toList();
+        return OffsetSliceResponse.of(rows, resolvedOffset, POPULAR_KEYWORD_PAGE_SIZE);
     }
 
     private ArtistPopularSearchResponse toResponse(ZSetOperations.TypedTuple<String> tuple) {

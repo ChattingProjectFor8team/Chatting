@@ -11,7 +11,7 @@ public interface CommentRepositoryCustom {
 
     List<Comment> findRootSliceByTargetTypeAndTargetId(PostType targetType, Long targetId, Long cursor, int limit);
 
-    List<Comment> findRepliesByParentId(Long parentId, int limit);
+    List<Comment> findRepliesByParentId(Long parentId, Long cursor, int limit);
 
     Map<Long, Integer> findReplyCountsByParentIds(Collection<Long> parentIds);
 

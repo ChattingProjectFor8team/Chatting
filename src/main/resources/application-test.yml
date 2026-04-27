@@ -1,13 +1,4 @@
 spring:
-  cloud:
-    aws:
-      s3:
-        bucket: mock-bucket
-      region:
-        static: ap-northeast-2
-      credentials:
-        access-key: mock-key
-        secret-key: mock-secret
   data:
     redis:
       host: localhost
