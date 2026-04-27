@@ -94,7 +94,10 @@ const ConnectfinAPI = (() => {
 
     if (response.status === 204) return null;
 
-    const json = await response.json();
+    const contentType = response.headers.get('content-type') || '';
+    const json = contentType.includes('application/json')
+      ? await response.json()
+      : { message: (await response.text()).trim() };
 
     if (!response.ok) {
       const errMsg = json.error?.message || json.message || `HTTP ${response.status}`;

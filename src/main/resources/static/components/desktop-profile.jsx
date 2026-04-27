@@ -614,24 +614,56 @@ function TabFanLetter({ t, theme, artist }) {
   const [showLetterForm, setShowLetterForm] = React.useState(false);
   const [letterSubmitting, setLetterSubmitting] = React.useState(false);
   const [letterRecipientType, setLetterRecipientType] = React.useState('ARTIST');
+  const [letterRecipientArtistMemberId, setLetterRecipientArtistMemberId] = React.useState(null);
   const [letterImage, setLetterImage] = React.useState(null);
+
+  React.useEffect(() => {
+    const artistMembers = (artist.artistMembers || []).slice().sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    if (letterRecipientType !== 'ARTIST_MEMBER') {
+      if (letterRecipientArtistMemberId != null) {
+        setLetterRecipientArtistMemberId(null);
+      }
+      return;
+    }
+    if (artistMembers.length === 0) {
+      if (letterRecipientArtistMemberId != null) {
+        setLetterRecipientArtistMemberId(null);
+      }
+      return;
+    }
+    const hasCurrent = artistMembers.some(member => String(member.artistMemberId) === String(letterRecipientArtistMemberId));
+    if (!hasCurrent) {
+      setLetterRecipientArtistMemberId(artistMembers[0].artistMemberId);
+    }
+  }, [artist.artistMembers, letterRecipientArtistMemberId, letterRecipientType]);
 
   const submitFanLetter = async () => {
     if (letterSubmitting) return;
     if (!window.ConnectfinAPI.getToken()) { alert('로그인이 필요합니다.'); return; }
+    if (!letterImage) { alert('팬레터는 이미지를 한 장 선택해야 합니다.'); return; }
+    if (letterRecipientType === 'ARTIST_MEMBER' && !letterRecipientArtistMemberId) {
+      alert('받는 아티스트 멤버를 선택해 주세요.');
+      return;
+    }
     setLetterSubmitting(true);
     try {
       const formData = new FormData();
       formData.append('recipientType', letterRecipientType);
-      if (letterImage) formData.append('image', letterImage);
+      if (letterRecipientType === 'ARTIST_MEMBER') {
+        formData.append('recipientArtistMemberId', String(letterRecipientArtistMemberId));
+      }
+      formData.append('image', letterImage);
       await window.ConnectfinAPI.apiMultipart(`/api/post/v1/artists/${artist.id}/fan-letters`, formData);
       setLetterImage(null);
+      setLetterRecipientType('ARTIST');
+      setLetterRecipientArtistMemberId(null);
       setShowLetterForm(false);
       window.ConnectfinAPI.api(`/api/post/v1/artists/${artist.id}/fan-letters`)
         .then(data => { setLetters(data.content.map(mapFanLetterListItem)); setHasNext(data.hasNext); setNextCursor(data.nextCursor); })
         .catch(err => { console.warn('Refresh failed:', err?.message || err); });
     } catch (err) {
-      alert('작성 실패: ' + (err.message || '멤버십 구독이 필요합니다'));
+      const debugSuffix = [err?.code, err?.status].filter(Boolean).join(' / ');
+      alert('작성 실패: ' + (err.message || '멤버십 구독이 필요합니다') + (debugSuffix ? ` (${debugSuffix})` : ''));
     } finally {
       setLetterSubmitting(false);
     }
@@ -728,14 +760,46 @@ function TabFanLetter({ t, theme, artist }) {
               }}>{rt === 'ARTIST' ? '그룹 전체' : '멤버 지정'}</button>
             ))}
           </div>
+          {letterRecipientType === 'ARTIST_MEMBER' && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: t.textDim, marginBottom: 8 }}>받는 멤버</div>
+              <select
+                value={letterRecipientArtistMemberId || ''}
+                onChange={e => setLetterRecipientArtistMemberId(e.target.value ? Number(e.target.value) : null)}
+                disabled={!artist.artistMembers || artist.artistMembers.length === 0}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: `1px solid ${t.line}`,
+                  background: 'transparent',
+                  color: t.text,
+                  fontSize: 12,
+                  fontFamily: t.font,
+                }}
+              >
+                {(!artist.artistMembers || artist.artistMembers.length === 0) && (
+                  <option value="">선택 가능한 멤버가 없습니다</option>
+                )}
+                {(artist.artistMembers || [])
+                  .slice()
+                  .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                  .map(member => (
+                    <option key={member.artistMemberId} value={member.artistMemberId}>
+                      {member.stageName}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: `1px dashed ${t.line}`, cursor: 'pointer', fontSize: 12, color: t.textDim, marginBottom: 12 }}>
-            📷 {letterImage ? letterImage.name : '이미지 선택 (선택사항)'}
+            📷 {letterImage ? letterImage.name : '이미지 선택 (필수)'}
             <input type="file" accept="image/*" onChange={e => setLetterImage(e.target.files[0] || null)} style={{ display: 'none' }}/>
           </label>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: t.textDim }}>팬 멤버십 구독자만 작성 가능</span>
+            <span style={{ fontSize: 10, color: t.textDim }}>팬 멤버십 구독자만 작성 가능 · 팬레터는 이미지 1장 필수</span>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => { setShowLetterForm(false); setLetterImage(null); }} style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${t.line}`, background: 'transparent', color: t.textDim, fontSize: 12, cursor: 'pointer' }}>취소</button>
+              <button onClick={() => { setShowLetterForm(false); setLetterImage(null); setLetterRecipientType('ARTIST'); setLetterRecipientArtistMemberId(null); }} style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${t.line}`, background: 'transparent', color: t.textDim, fontSize: 12, cursor: 'pointer' }}>취소</button>
               <button onClick={submitFanLetter} disabled={letterSubmitting} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: t.accent, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: letterSubmitting ? 0.5 : 1 }}>{letterSubmitting ? '전송 중...' : '보내기'}</button>
             </div>
           </div>
