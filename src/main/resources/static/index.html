@@ -104,12 +104,21 @@ function App() {
         body: JSON.stringify({ email, password }),
       });
       window.ConnectfinAPI.setToken(res.accessToken);
-      setAuthUser({ token: res.accessToken, email });
+      const meData = await window.ConnectfinAPI.api('/api/member/v1/me');
+      setAuthUser({ token: res.accessToken, email, id: meData.id, nickname: meData.nickname });
       setShowLogin(false);
     } catch (err) {
       throw err;
     }
   };
+
+  React.useEffect(() => {
+    if (authUser?.token && !authUser?.id) {
+      window.ConnectfinAPI.api('/api/member/v1/me')
+        .then(data => setAuthUser(prev => ({ ...prev, id: data.id, nickname: data.nickname })))
+        .catch(err => { console.warn('Auto /me failed:', err?.message || err); });
+    }
+  }, []);
 
   const handleLogout = () => {
     window.ConnectfinAPI.clearToken();
