@@ -289,7 +289,10 @@ function ArtistSearchSection({ t, theme, onArtistOpen }) {
   // 인기 검색어 로드 (최초 1회)
   React.useEffect(() => {
     window.ConnectfinAPI.api('/api/member/v1/artists/search/popular?offset=0')
-      .then(data => setPopular((data || []).slice(0, 5)))
+      // ConnectfinAPI.api는 ApiResponse 래퍼를 벗긴 뒤 json.data만 반환한다.
+      // 이 엔드포인트의 data는 배열이 아니라 OffsetSliceResponse이므로
+      // data.content를 읽어야 하고, 그대로 data.slice(...)를 호출하면 런타임에서 깨진다.
+      .then(data => setPopular(Array.isArray(data?.content) ? data.content.slice(0, 5) : []))
       .catch(err => { console.warn('API error suppressed:', err?.message || err); });
   }, []);
 

@@ -63,15 +63,31 @@ public class RedisCacheConfig {
         // - Jackson 3에서 제거된 EVERYTHING 대신 NON_FINAL_AND_RECORDS 로
         //   record 응답과 컬렉션/비final 컨테이너의 타입 복원을 유지한다
         // - DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS 비활성화로 날짜 필드를 사람이 읽기 쉬운 JSON으로 유지
+        // Redis value JSON 안에 실제 Java 타입 힌트를 어떤 필드명으로 넣을지 정한다.
+        // 예: {"@class":"com.example...PageResponse","content":[...]}
+        //
+        // Spring Cache는 메서드 반환 타입이 Object/제네릭으로 다뤄지는 구간이 많아서
+        // 이 메타데이터가 없으면 역직렬화 시 DTO 대신 LinkedHashMap으로 돌아오기 쉽다.
         String typeHintProperty = "@class";
         GenericJacksonJsonRedisSerializer jsonSerializer = GenericJacksonJsonRedisSerializer.create(builder -> {
+            // Spring Cache는 내부적으로 null 캐시를 위해 NullValue sentinel을 쓸 수 있다.
+            // 이 설정을 켜 두면 serializer가 그 sentinel도 같은 타입 힌트 규칙으로 처리한다.
             builder.enableSpringCacheNullValueSupport(typeHintProperty);
             builder.customize(mapperBuilder -> mapperBuilder
+                    // Jackson 3에서는 날짜 timestamp on/off 설정이
+                    // 기존 SerializationFeature가 아니라 DateTimeFeature로 이동했다.
                     .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
                     .activateDefaultTypingAsProperty(
+                            // 현재 Redis는 "우리 애플리케이션이 직접 쓴 내부 캐시"라는 전제라
+                            // 타입 검증을 넓게 허용한다.
+                            // 만약 외부/불신 입력을 읽는 구조라면 package prefix 기준으로 더 좁혀야 안전하다.
                             BasicPolymorphicTypeValidator.builder()
                                     .allowIfSubType(Object.class)
                                     .build(),
+                            // Jackson 2의 EVERYTHING은 Jackson 3에서 제거되었다.
+                            // 여기서는 record DTO가 많이 쓰이므로 NON_FINAL만으로는 부족하다.
+                            // record는 final이라 타입 힌트가 빠지면 다시 읽을 때 Map으로 풀릴 수 있어
+                            // NON_FINAL_AND_RECORDS로 맞춰 "비final + record"를 함께 복원한다.
                             DefaultTyping.NON_FINAL_AND_RECORDS,
                             typeHintProperty
                     ));
