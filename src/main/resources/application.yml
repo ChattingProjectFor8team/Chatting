@@ -3,6 +3,10 @@ spring:
     name: demo
   config:
     import: optional:classpath:application-local.yml
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 120MB
 
   data:
     redis:

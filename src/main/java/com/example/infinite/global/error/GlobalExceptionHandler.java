@@ -7,6 +7,7 @@ import com.example.infinite.domain.dm.error.DmException;
 import com.example.infinite.domain.member.artist.error.ArtistException;
 import com.example.infinite.domain.member.member.error.MemberErrorCode;
 import com.example.infinite.domain.member.member.error.MemberException;
+import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.domain.raffle.error.RaffleException;
 import com.example.infinite.domain.realtimelive.error.LiveException;
@@ -22,6 +23,8 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.time.LocalDateTime;
 
@@ -80,6 +83,43 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(ApiResponse.fail(buildErrorResponse(ErrorCode.INVALID_INPUT_VALUE, errorMessage, request.getRequestURI())));
+    }
+
+    /**
+     * multipart 업로드가 스프링 레벨 최대 크기를 넘긴 경우를 명시적으로 처리한다.
+     * 그렇지 않으면 팬레터/미디어 업로드에서 500 일반 에러로 보여 원인 파악이 어려워진다.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException e,
+            HttpServletRequest request
+    ) {
+        log.warn("MaxUploadSizeExceededException : {}", e.getMessage());
+        return ResponseEntity
+                .status(ArtistContentErrorCode.MEDIA_SIZE_EXCEEDED.getStatus())
+                .body(ApiResponse.fail(buildErrorResponse(
+                        ArtistContentErrorCode.MEDIA_SIZE_EXCEEDED,
+                        ArtistContentErrorCode.MEDIA_SIZE_EXCEEDED.getMessage(),
+                        request.getRequestURI()
+                )));
+    }
+
+    /**
+     * boundary 누락 등 multipart 파싱 실패를 400으로 돌려 프론트가 일반 500으로 오해하지 않게 한다.
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipartException(
+            MultipartException e,
+            HttpServletRequest request
+    ) {
+        log.warn("MultipartException : {}", e.getMessage());
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.fail(buildErrorResponse(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "파일 업로드 요청 형식이 올바르지 않습니다.",
+                        request.getRequestURI()
+                )));
     }
 
     /**

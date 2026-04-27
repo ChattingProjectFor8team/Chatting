@@ -138,6 +138,8 @@ jobs:
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           YOUTUBE_DATA_API_KEY: ${{ secrets.YOUTUBE_DATA_API_KEY }}
+          APP_SEED_SHOWCASE_DATA: ${{ vars.APP_SEED_SHOWCASE_DATA }}
+          APP_SEED_SHOWCASE_PASSWORD: ${{ secrets.APP_SEED_SHOWCASE_PASSWORD }}
         run: |
           # 2. 여기서는 실제 .env 값을 만들어야 하므로 quoted heredoc(<<'EOF')를 쓰면 안 된다.
           #    quoted heredoc은 ${JWT_SECRET_KEY} 같은 변수를 literal 문자열로 남겨
@@ -154,8 +156,8 @@ jobs:
           S3_BUCKET_NAME=${S3_BUCKET_NAME}
           JWT_SECRET_KEY=${JWT_SECRET_KEY}
           YOUTUBE_DATA_API_KEY=${YOUTUBE_DATA_API_KEY}
-          APP_SEED_SHOWCASE_DATA=true
-          APP_SEED_SHOWCASE_PASSWORD=demo1234!
+          APP_SEED_SHOWCASE_DATA=${APP_SEED_SHOWCASE_DATA}
+          APP_SEED_SHOWCASE_PASSWORD=${APP_SEED_SHOWCASE_PASSWORD}
           EOF
           
           # 3. 업로드 (변수명 오타 주의!)

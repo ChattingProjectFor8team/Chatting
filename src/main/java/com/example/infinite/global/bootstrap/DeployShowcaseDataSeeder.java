@@ -60,8 +60,6 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
 
     private static final String LOCK_NAME = "deploy-showcase-data-seed-v1";
 
-    private static final String DEFAULT_PASSWORD = "demo1234!";
-
     private static final List<FanSeed> FAN_SEEDS = List.of(
             new FanSeed("fan.01@connectfin.demo", "starlit_one", "010-9700-0001"),
             new FanSeed("fan.02@connectfin.demo", "midnight_loop", "010-9700-0002"),
@@ -188,12 +186,17 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
     @PersistenceContext
     private EntityManager entityManager;
 
-    @Value("${app.seed.showcase-password:" + DEFAULT_PASSWORD + "}")
+    @Value("${app.seed.showcase-password:}")
     private String showcasePassword;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (showcasePassword == null || showcasePassword.isBlank()) {
+            log.warn("app.seed.showcase-data=true 이지만 app.seed.showcase-password 가 비어 있어 시연 데이터 시드를 건너뜁니다.");
+            return;
+        }
+
         if (!acquireLock()) {
             log.info("배포 시연 데이터 시드 잠금을 획득하지 못해 이번 인스턴스는 건너뜁니다.");
             return;
@@ -201,10 +204,21 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
 
         try {
             List<Member> fanMembers = ensureFanMembers();
+            int seededArtistCount = 0;
+            int seededArtistMemberCount = 0;
+            int skippedArtistCount = 0;
 
             for (ArtistSeed artistSeed : ARTIST_SEEDS) {
-                Artist artist = ensureArtist(artistSeed);
+                Optional<Artist> artistOptional = ensureArtist(artistSeed);
+                if (artistOptional.isEmpty()) {
+                    skippedArtistCount++;
+                    continue;
+                }
+
+                Artist artist = artistOptional.get();
                 List<ArtistMember> artistMembers = ensureArtistMembers(artist, artistSeed.members());
+                seededArtistCount++;
+                seededArtistMemberCount += artistMembers.size();
 
                 ensureFanSubscriptions(artist, fanMembers);
                 ensureDmSubscriptions(artist, fanMembers);
@@ -223,9 +237,10 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
             }
 
             log.info(
-                    "배포 시연 데이터 시드 완료: artists={}, artistMembers={}, fans={}",
-                    ARTIST_SEEDS.size(),
-                    ARTIST_SEEDS.stream().mapToInt(seed -> seed.members().size()).sum(),
+                    "배포 시연 데이터 시드 완료: artistsSeeded={}, artistsSkipped={}, artistMembersSeeded={}, fans={}",
+                    seededArtistCount,
+                    skippedArtistCount,
+                    seededArtistMemberCount,
                     FAN_SEEDS.size()
             );
         } finally {
@@ -249,29 +264,31 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
         return fanMembers;
     }
 
-    private Artist ensureArtist(ArtistSeed seed) {
+    private Optional<Artist> ensureArtist(ArtistSeed seed) {
         Artist artistById = artistRepository.findById(seed.id()).orElse(null);
         Artist artistBySlug = artistRepository.findBySlug(seed.slug()).orElse(null);
 
-        if (artistById != null) {
-            if (artistBySlug != null && !artistBySlug.getId().equals(artistById.getId())) {
-                log.warn(
-                        "artistId={} 는 이미 다른 slug={} 로 존재하고 slug={} 는 다른 id={} 에 연결되어 있습니다. id 기준으로만 갱신합니다.",
-                        seed.id(),
-                        artistById.getSlug(),
-                        seed.slug(),
-                        artistBySlug.getId()
-                );
-                artistById.updateProfile(
-                        seed.name(),
-                        artistById.getSlug(),
-                        profileImageUrl("artist", seed.slug()),
-                        coverImageUrl("artist", seed.slug()),
-                        seed.intro()
-                );
-                return artistById;
-            }
+        if (artistById != null && !seed.slug().equals(artistById.getSlug())) {
+            log.warn(
+                    "artistId={} 는 이미 slug={} 에 연결되어 있어 showcase slug={} 로 덮어쓰지 않습니다. 이 아티스트 시드는 건너뜁니다.",
+                    seed.id(),
+                    artistById.getSlug(),
+                    seed.slug()
+            );
+            return Optional.empty();
+        }
 
+        if (artistBySlug != null && !artistBySlug.getId().equals(seed.id())) {
+            log.warn(
+                    "showcase slug={} 는 이미 artistId={} 에 연결되어 있어 고정 artistId={} 로 시드하지 않습니다. 이 아티스트 시드는 건너뜁니다.",
+                    seed.slug(),
+                    artistBySlug.getId(),
+                    seed.id()
+            );
+            return Optional.empty();
+        }
+
+        if (artistById != null) {
             artistById.updateProfile(
                     seed.name(),
                     seed.slug(),
@@ -279,16 +296,10 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
                     coverImageUrl("artist", seed.slug()),
                     seed.intro()
             );
-            return artistById;
+            return Optional.of(artistById);
         }
 
         if (artistBySlug != null) {
-            log.warn(
-                    "artist slug={} 가 이미 id={} 로 존재합니다. 프론트 mock artistId={} 와 불일치할 수 있습니다.",
-                    seed.slug(),
-                    artistBySlug.getId(),
-                    seed.id()
-            );
             artistBySlug.updateProfile(
                     seed.name(),
                     seed.slug(),
@@ -296,12 +307,12 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
                     coverImageUrl("artist", seed.slug()),
                     seed.intro()
             );
-            return artistBySlug;
+            return Optional.of(artistBySlug);
         }
 
         insertArtistWithFixedId(seed);
-        return artistRepository.findById(seed.id())
-                .orElseThrow(() -> new IllegalStateException("시드 아티스트 생성 후 조회에 실패했습니다. id=" + seed.id()));
+        return Optional.of(artistRepository.findById(seed.id())
+                .orElseThrow(() -> new IllegalStateException("시드 아티스트 생성 후 조회에 실패했습니다. id=" + seed.id())));
     }
 
     private List<ArtistMember> ensureArtistMembers(Artist artist, List<ArtistMemberSeed> seeds) {
