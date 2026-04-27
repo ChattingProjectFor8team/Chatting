@@ -105,6 +105,25 @@ function NavArtist({ artist, t, onClick }) {
 // ───────── Top bar (profile tabs live here when on artist page) ─────────
 function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavProfile, authUser, onShowLogin, onLogout }) {
   const dark = theme === 'dark';
+  const [jellyBalance, setJellyBalance] = React.useState(null);
+
+  const fetchJelly = React.useCallback(() => {
+    if (!authUser?.id) { setJellyBalance(null); return; }
+    window.ConnectfinAPI.api('/api/payment/v1/jelly/balance', {
+      headers: { 'X-User-Id': String(authUser.id) }
+    })
+      .then(data => setJellyBalance(data.currentBalance))
+      .catch(err => { console.warn('Jelly balance failed:', err?.message || err); });
+  }, [authUser?.id]);
+
+  React.useEffect(() => { fetchJelly(); }, [fetchJelly]);
+
+  React.useEffect(() => {
+    const handler = () => fetchJelly();
+    window.addEventListener('connectfin:jelly-changed', handler);
+    return () => window.removeEventListener('connectfin:jelly-changed', handler);
+  }, [fetchJelly]);
+
   return (
     <header style={{
       height: 56, flexShrink: 0, display: 'flex', alignItems: 'center',
@@ -150,7 +169,9 @@ function DesktopTopbar({ t, theme, activeArtist, globalView, profileTab, onNavPr
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginLeft: 'auto' }}>
-        <span style={{ fontFamily: t.fontMono, fontSize: 11, color: t.textDim }}>142 🍮</span>
+        <span style={{ fontFamily: t.fontMono, fontSize: 11, color: t.textDim }}>
+          {jellyBalance !== null ? jellyBalance : '—'} 🍮
+        </span>
         <span style={{ fontSize: 18, cursor: 'pointer' }}>🔔</span>
         {authUser ? (
           <button onClick={onLogout} style={{
@@ -179,11 +200,59 @@ const PROFILE_TABS = [
   { k: 'live', label: 'LIVE' },
   { k: 'notice', label: 'Notice' },
   { k: 'shop', label: 'Shop', external: true },
+  { k: 'admin', label: 'Admin' },
 ];
 
 // ───────── Right sidebar ─────────
 function DesktopRightSidebar({ t, theme, artist, onOpenDM, onOpenMembership }) {
   const dark = theme === 'dark';
+  const hasToken = !!window.ConnectfinAPI?.getToken();
+
+  const [membershipStatus, setMembershipStatus] = React.useState(null);
+  const [dmStatus, setDmStatus] = React.useState(null);
+  const [purchasingMembership, setPurchasingMembership] = React.useState(false);
+  const [purchasingDm, setPurchasingDm] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!hasToken || !artist?.id) return;
+    window.ConnectfinAPI.api(`/api/v1/subscriptions/membership/${artist.id}/status`)
+      .then(data => setMembershipStatus(data))
+      .catch(err => { console.warn('Membership status failed:', err?.message || err); });
+    window.ConnectfinAPI.api(`/api/v1/subscriptions/dm/${artist.id}/status`)
+      .then(data => setDmStatus(data))
+      .catch(err => { console.warn('DM status failed:', err?.message || err); });
+  }, [hasToken, artist?.id]);
+
+  const purchaseMembership = async () => {
+    if (purchasingMembership || !hasToken) return;
+    setPurchasingMembership(true);
+    try {
+      await window.ConnectfinAPI.api(`/api/v1/subscriptions/membership/${artist.id}`, { method: 'POST' });
+      setMembershipStatus({ active: true, expiredAt: null });
+      window.dispatchEvent(new CustomEvent('connectfin:jelly-changed'));
+      alert('팬 멤버십 구매 완료!');
+    } catch (err) {
+      alert('구매 실패: ' + (err.message || '젤리가 부족합니다'));
+    } finally {
+      setPurchasingMembership(false);
+    }
+  };
+
+  const purchaseDm = async () => {
+    if (purchasingDm || !hasToken) return;
+    setPurchasingDm(true);
+    try {
+      await window.ConnectfinAPI.api(`/api/v1/subscriptions/dm/${artist.id}`, { method: 'POST' });
+      setDmStatus({ active: true, expiredAt: null });
+      window.dispatchEvent(new CustomEvent('connectfin:jelly-changed'));
+      alert('DM 구독 완료!');
+    } catch (err) {
+      alert('구매 실패: ' + (err.message || '젤리가 부족합니다'));
+    } finally {
+      setPurchasingDm(false);
+    }
+  };
+
   return (
     <aside style={{ width: 320, flexShrink: 0, padding: '20px 20px 20px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Digital membership */}
@@ -198,11 +267,20 @@ function DesktopRightSidebar({ t, theme, artist, onOpenDM, onOpenMembership }) {
         <div style={{ fontSize: 12, color: t.textDim, lineHeight: 1.5, marginBottom: 12 }}>
           디지털 멤버십에 가입하고 다양한 혜택을 즐겨보세요.
         </div>
-        <button onClick={onOpenMembership} style={{
-          width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
-          background: t.accent2, color: dark ? '#071014' : '#fff',
-          fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: t.font,
-        }}>디지털 멤버십 가입하기</button>
+        {dmStatus?.active ? (
+          <div style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, textAlign: 'center',
+            background: t.surface, border: `1px solid ${t.line}`,
+            fontWeight: 700, fontSize: 13, color: t.accent2, fontFamily: t.font,
+          }}>✓ DM 구독 중{dmStatus.expiredAt ? ` (~ ${new Date(dmStatus.expiredAt).toLocaleDateString()})` : ''}</div>
+        ) : (
+          <button onClick={purchaseDm} disabled={purchasingDm} style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
+            background: t.accent2, color: dark ? '#071014' : '#fff',
+            fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: t.font,
+            opacity: purchasingDm ? 0.5 : 1,
+          }}>{purchasingDm ? '구매 중...' : 'DM 구독하기 (15 Jelly)'}</button>
+        )}
       </div>
 
       {/* Premium membership */}
@@ -217,11 +295,20 @@ function DesktopRightSidebar({ t, theme, artist, onOpenDM, onOpenMembership }) {
         <div style={{ fontSize: 12, color: t.textDim, lineHeight: 1.5, marginBottom: 12 }}>
           지금 멤버십에 가입하고 특별한 혜택을 누려보세요.
         </div>
-        <button onClick={onOpenMembership} style={{
-          width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
-          background: t.accent2, color: dark ? '#071014' : '#fff',
-          fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: t.font,
-        }}>멤버십 가입하기</button>
+        {membershipStatus?.active ? (
+          <div style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, textAlign: 'center',
+            background: t.surface, border: `1px solid ${t.line}`,
+            fontWeight: 700, fontSize: 13, color: t.accent, fontFamily: t.font,
+          }}>✓ 멤버십 구독 중{membershipStatus.expiredAt ? ` (~ ${new Date(membershipStatus.expiredAt).toLocaleDateString()})` : ''}</div>
+        ) : (
+          <button onClick={purchaseMembership} disabled={purchasingMembership} style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
+            background: t.accent2, color: dark ? '#071014' : '#fff',
+            fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: t.font,
+            opacity: purchasingMembership ? 0.5 : 1,
+          }}>{purchasingMembership ? '구매 중...' : '멤버십 가입하기 (9 Jelly)'}</button>
+        )}
       </div>
 
       {/* DM widget */}
@@ -241,11 +328,20 @@ function DesktopRightSidebar({ t, theme, artist, onOpenDM, onOpenMembership }) {
             }}>지금 뭐해?</div>
           </div>
         </div>
-        <button onClick={onOpenDM} style={{
-          width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
-          background: t.accent2, color: dark ? '#071014' : '#fff',
-          fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: t.font,
-        }}>DM 시작하기</button>
+        {dmStatus?.active ? (
+          <button onClick={onOpenDM} style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
+            background: t.accent2, color: dark ? '#071014' : '#fff',
+            fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: t.font,
+          }}>DM 보내기</button>
+        ) : (
+          <button onClick={purchaseDm} disabled={purchasingDm} style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
+            background: t.line, color: t.textDim,
+            fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: t.font,
+            opacity: purchasingDm ? 0.5 : 1,
+          }}>{purchasingDm ? '구매 중...' : 'DM 구독 필요 (15 Jelly)'}</button>
+        )}
       </div>
 
       {/* About artist */}
