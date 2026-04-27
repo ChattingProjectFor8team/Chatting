@@ -2,6 +2,7 @@ package com.example.infinite.domain.artistcontent.comment.service.artistpoststre
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -31,6 +32,12 @@ public class ArtistPostCommentStreamConsumer {
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ArtistPostCommentStreamProcessor processor;
+    // 좋아요 consumer와 동일한 이유로 auto-run 스위치를 둔다.
+    // 아티스트포스트 트래픽 테스트는 stream consumer를 직접 한 틱씩 진행시키는데,
+    // 스케줄러가 동시에 돌면 댓글 command도 이중 소비되어
+    // "테스트가 의도한 시점 관찰"이 깨지고 실패 원인 분석이 어려워진다.
+    @Value("${artist-post.scheduler.enabled:true}")
+    private boolean schedulerEnabled;
 
     /**
      * 댓글 v2 consumer.
@@ -43,7 +50,17 @@ public class ArtistPostCommentStreamConsumer {
      * 으로 분기한다.
      */
     @Scheduled(fixedDelayString = "${artist-post.comment-v2.consumer-delay-ms:300}")
+    public void consumeOnSchedule() {
+        if (!schedulerEnabled) {
+            // 테스트에서는 여기서 멈추고, consume()만 수동으로 호출한다.
+            return;
+        }
+        consume();
+    }
+
     public void consume() {
+        // 수동 호출용 public 메서드로 분리해
+        // 운영 스케줄러와 테스트 drain이 동일한 소비 로직을 공유하게 한다.
         // pending 을 먼저 재처리하되, 독성 메시지 하나 때문에 새 댓글 명령이 굶지 않게
         // 이번 poll 에서 new message도 계속 읽는다.
         consumeRecords(readPendingRecords());

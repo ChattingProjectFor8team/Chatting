@@ -48,7 +48,7 @@ public class PostHotDataCacheService {
         List<Long> missedPostIds = new ArrayList<>();
 
         for (Long postId : distinctPostIds) {
-            PostHotData cachedHotData = cache == null ? null : cache.get(buildCacheKey(postType, postId), PostHotData.class);
+            PostHotData cachedHotData = cache == null ? null : readCachedHotData(cache, buildCacheKey(postType, postId));
             if (cachedHotData != null) {
                 result.put(postId, cachedHotData);
                 continue;
@@ -75,5 +75,51 @@ public class PostHotDataCacheService {
 
     private String buildCacheKey(PostType postType, Long postId) {
         return postType.name() + ":" + postId;
+    }
+
+    private PostHotData readCachedHotData(Cache cache, String cacheKey) {
+        // mixed read/write 테스트에서 실제로 터졌던 문제:
+        // Redis cache에서 읽은 값이 PostHotData record가 아니라 LinkedHashMap으로 돌아왔다.
+        //
+        // 원인:
+        // - JSON 직렬화 캐시는 serializer 설정에 따라 타입 메타데이터가 빠질 수 있다
+        // - 그러면 Spring Cache가 "원래 DTO" 대신 Map 형태로 역직렬화해 버린다
+        //
+        // 그래서 여기서는 "정상 타입이면 그대로 사용, Map이면 수동 복원"의 두 경로를 모두 허용한다.
+        // 이렇게 해 두면 serializer 변경 전후나 기존 캐시 잔존 데이터에도 읽기 코드가 덜 깨진다.
+        Cache.ValueWrapper valueWrapper = cache.get(cacheKey);
+        if (valueWrapper == null) {
+            return null;
+        }
+        Object cachedValue = valueWrapper.get();
+        if (cachedValue == null) {
+            return null;
+        }
+        if (cachedValue instanceof PostHotData hotData) {
+            return hotData;
+        }
+        if (cachedValue instanceof Map<?, ?> valueMap) {
+            return PostHotData.of(
+                    toLong(valueMap.get("likeCount")),
+                    toLong(valueMap.get("commentCount"))
+            );
+        }
+        // 여기까지 왔다는 것은 "우리가 예상한 캐시 shape가 아니다"라는 뜻이므로
+        // 조용히 삼키지 말고 즉시 실패시켜 원인 파악이 가능하게 한다.
+        throw new IllegalStateException(
+                "Cached value is not of required type [PostHotData]: " + cachedValue
+        );
+    }
+
+    private Long toLong(Object value) {
+        // Redis JSON 숫자는 Long, Integer, String 등 여러 모습으로 들어올 수 있어
+        // 복원 코드는 느슨하게 받아 주는 편이 안전하다.
+        if (value == null) {
+            return 0L;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(value.toString());
     }
 }

@@ -2,6 +2,7 @@ package com.example.infinite.domain.artistcontent.interaction.service.artistpost
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -31,6 +32,13 @@ public class ArtistPostLikeStreamConsumer {
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ArtistPostLikeStreamProcessor processor;
+    // 테스트에서는 consume()/flush()를 직접 호출해 단계별 정합성을 보고 싶다.
+    // 그런데 @Scheduled 경로까지 같이 살아 있으면
+    // "테스트 수동 consumer"와 "실서비스용 자동 consumer"가 같은 stream을 동시에 먹는 레이스가 생긴다.
+    // 실제로 이 문제 때문에 중복 소비/중복 insert/수렴 실패가 재현됐고,
+    // 그래서 auto-run을 끌 수 있는 스위치를 따로 둔다.
+    @Value("${artist-post.scheduler.enabled:true}")
+    private boolean schedulerEnabled;
 
     /**
      * poll 기반 consumer.
@@ -43,7 +51,21 @@ public class ArtistPostLikeStreamConsumer {
      * scale-out 시에는 consumer group 분산, pending 재처리 전략까지 추가 설계가 필요하다.
      */
     @Scheduled(fixedDelayString = "${artist-post.like-v3.consumer-delay-ms:300}")
+    public void consumeOnSchedule() {
+        if (!schedulerEnabled) {
+            // 메서드를 없애지 않고 early-return으로 둔 이유:
+            // - 운영에서는 기존 스케줄 진입점을 그대로 유지
+            // - 테스트에서는 동일 빈을 주입받아 consume()만 수동 호출
+            // - 즉 "자동 실행"과 "직접 호출"을 같은 로직으로 공유하기 위해서다.
+            return;
+        }
+        consume();
+    }
+
     public void consume() {
+        // 실제 소비 로직은 별도 메서드로 빼 둔다.
+        // 이렇게 해야 스케줄러가 켜진 운영 경로와,
+        // 테스트가 직접 호출하는 수동 drain 경로가 완전히 같은 코드를 타게 된다.
         // 먼저 같은 consumer에 남아 있는 PEL(pending entries)을 재시도한다.
         // 그렇지 않으면 한 번 실패한 메시지는 lastConsumed() 경로에서 다시 안 읽혀 영구 미처리 상태가 된다.
         //

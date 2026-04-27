@@ -47,20 +47,34 @@ public class ArtistService {
     private final ArtistReader artistReader;
     private final AssetImageService assetImageService;
 
-    public PageResponse<ArtistSearchResponse> searchArtistsV1(String keyword) {
+    public PageResponse<ArtistSearchResponse> searchArtistsV1(String keyword, Integer page) {
         // v1은 과제 요구사항상 캐시를 적용하지 않는 원본 조회 API다.
-        return new PageResponse<>(artistRepository.searchArtists(keyword, ARTIST_SEARCH_SIZE));
+        return new PageResponse<>(artistRepository.searchArtists(keyword, normalizeSearchPage(page) - 1, ARTIST_SEARCH_SIZE));
     }
 
     // v2는 동일한 검색 결과를 로컬 캐시에 저장해 반복 조회 비용을 줄인다.
     @Cacheable(
             cacheManager = "caffeineCacheManager",
             value = CacheConfig.ARTIST_SEARCH_V2_CACHE,
-            key = "'keyword:' + (#keyword == null ? '' : #keyword.trim().toLowerCase(T(java.util.Locale).ROOT))"
+            key = "'keyword:' + (#keyword == null ? '' : #keyword.trim().toLowerCase(T(java.util.Locale).ROOT)) + ':page:' + (#page == null || #page < 1 ? 1 : #page)"
     )
-    public PageResponse<ArtistSearchResponse> searchArtistsV2(String keyword) {
+    public PageResponse<ArtistSearchResponse> searchArtistsV2(String keyword, Integer page) {
         // 캐시 적용 전까지는 동일한 조회 로직을 재사용한다.
-        return searchArtistsV1(keyword);
+        return searchArtistsV1(keyword, page);
+    }
+
+    @Cacheable(
+            value = CacheNames.ARTIST_SEARCH_V3,
+            key = "'keyword:' + (#keyword == null ? '' : #keyword.trim().toLowerCase(T(java.util.Locale).ROOT)) + ':page:' + (#page == null || #page < 1 ? 1 : #page)"
+    )
+    public PageResponse<ArtistSearchResponse> searchArtistsV3(String keyword, Integer page) {
+        // v3는 실제 서비스 관점의 remote cache 비교 버전이다.
+        // 조회 로직 자체는 v1과 같고, 캐시 저장소만 Redis로 바꾼다.
+        return searchArtistsV1(keyword, page);
+    }
+
+    private int normalizeSearchPage(Integer page) {
+        return page == null || page < 1 ? 1 : page;
     }
 
     @Transactional

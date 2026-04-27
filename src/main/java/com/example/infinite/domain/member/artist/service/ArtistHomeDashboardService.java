@@ -28,6 +28,8 @@ public class ArtistHomeDashboardService {
     public ArtistHomeDashboardResponse getArtistHomeDashboard(Long artistId) {
         // 대시보드는 별도 집계 테이블 없이 "지금 시점의 최신 1건 + HOT 첫 묶음"을 조립한다.
         // 현재 단계에서는 캐시보다 응답 정책을 먼저 고정하는 것이 중요하다고 보고 논캐시로 둔다.
+        // 또 포스트 상세/피드처럼 같은 사용자가 짧은 시간에 반복 새로고침하는 화면이 아니라고 봐,
+        // 읽기 캐시를 붙였을 때 얻는 이득도 상대적으로 작다고 판단했다.
         ArtistPostResponse latestArtistPost = artistPostService.getLatestArtistPost(artistId);
         List<FanPostResponse> hotFanPosts = fanPostService
                 .getHotFanPosts(artistId, null, null, DASHBOARD_HOT_FAN_POST_SIZE)

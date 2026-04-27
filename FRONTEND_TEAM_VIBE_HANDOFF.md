@@ -111,9 +111,10 @@
 
 실제 구현 완료 API:
 
-- `GET /api/member/v1/artists/search`
-- `GET /api/member/v2/artists/search`
-- `GET /api/member/v1/artists/search/popular`
+- `GET /api/member/v1/artists/search?keyword=...&page=1`
+- `GET /api/member/v2/artists/search?keyword=...&page=1`
+- `GET /api/member/v3/artists/search?keyword=...&page=1`
+- `GET /api/member/v1/artists/search/popular?offset=0`
 
 현재 응답 필드:
 
@@ -124,8 +125,12 @@
 
 - v1은 캐시 없음
 - v2는 Caffeine 캐시
+- v3는 Redis remote cache
 - 인기 검색어는 Redis ZSet
 - 동일 사용자의 반복 검색은 TTL 동안 중복 집계 방지
+- 검색 결과는 `page`를 넘겨 계속 조회할 수 있고, `size`는 서버에서 `10`으로 고정된다
+- 인기 검색어도 `offset`을 넘겨 다음 묶음을 볼 수 있고, 한 번에 보는 크기는 `10개`로 고정된다
+- 실제 기본 검색 경로는 `v3`로 붙이고, `v2`는 과제 비교용 경로로 보면 된다
 - 구현은 되어 있지만 보안 설정상 로그인 후 사용하는 흐름으로 보는 편이 안전하다
 
 프론트가 지금 바로 만들 수 있는 화면:
@@ -217,7 +222,7 @@
 - `POST /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}/likes/toggle`
 - `POST /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}/comments`
 - `DELETE /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}/comments/{commentId}`
-- `GET /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}/comments/{commentId}/replies`
+- `GET /api/post/v1/artists/{artistId}/fan-posts/{fanPostId}/comments/{commentId}/replies?cursor=...`
 
 FanPost 리스트 카드 필드:
 
@@ -268,6 +273,7 @@ FanPost 현재 정책:
 - 루트 댓글 정렬은 `id DESC`
 - 대댓글은 별도 API 온디맨드 조회
 - 대댓글 정렬은 `id ASC`
+- 대댓글도 `cursor`를 넘겨 다음 묶음을 계속 조회할 수 있고, 한 번에 내려오는 크기는 `20`으로 고정된다
 - 수정/삭제는 작성자 본인만 가능
 - soft delete
 
@@ -480,7 +486,7 @@ VOD 카드 응답 필드:
 - `POST /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/likes/toggle`
 - `POST /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments`
 - `DELETE /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}`
-- `GET /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}/replies`
+- `GET /api/post/v1/artists/{artistId}/artist-posts/{artistPostId}/comments/{commentId}/replies?cursor=...`
 - 추가 비동기 버전 API도 생김:
 - `POST /api/post/v3/artists/{artistId}/artist-posts/{artistPostId}/likes/toggle`
 - `POST /api/post/v2/artists/{artistId}/artist-posts/{artistPostId}/comments`
@@ -656,6 +662,7 @@ VOD 카드 응답 필드:
   - `post.commentCount >= 20 AND 10초 안에 5회 조회`
 - 자식댓글(replies)은 더 공격적으로 조건부 캐시한다
   - `replyCount >= 20 OR 10초 안에 5회 조회`
+- 여기서 `20`은 "대댓글을 20개까지만 본다"는 뜻이 아니라, "한 번에 캐시/조회하는 묶음 크기"다
 - 댓글 캐시 TTL은 현재 `3초`다
 
 프론트 준비 포인트:
@@ -864,7 +871,7 @@ FanLetter HOT은 아래 응답을 사용한다.
 
 로그인 필요:
 
-- 아티스트 검색 v1/v2
+- 아티스트 검색 v1/v2/v3
 - 인기 검색어
 - 메인 홈 대시보드
 - FanPost 작성

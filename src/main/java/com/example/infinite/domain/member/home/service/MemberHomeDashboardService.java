@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,7 +35,7 @@ import java.util.stream.Collectors;
 // 메인 홈은 "서비스 전체 탐색 허브"라서 여러 도메인의 가벼운 요약만 한 번에 모은다.
 public class MemberHomeDashboardService {
 
-    private static final int POPULAR_KEYWORD_LIMIT = 10;
+    private static final int POPULAR_KEYWORD_FIRST_OFFSET = 0;
     private static final int SUBSCRIBED_ARTIST_POST_LIMIT = 2;
     private static final int FOLLOWED_ARTIST_MEMBER_POST_LIMIT = 6;
 
@@ -60,7 +61,7 @@ public class MemberHomeDashboardService {
         Member member = memberReader.findByEmailOrThrow(MemberInputSupport.extractEmail(memberDetails));
 
         return new MemberHomeDashboardResponse(
-                artistSearchKeywordService.getPopularKeywords(POPULAR_KEYWORD_LIMIT),
+                artistSearchKeywordService.getPopularKeywords(POPULAR_KEYWORD_FIRST_OFFSET).content(),
                 buildSubscribedArtistsLatestPosts(member.getId()),
                 buildFollowedArtistMembersLatestPosts(member.getId())
         );
@@ -112,7 +113,7 @@ public class MemberHomeDashboardService {
                             posts
                     );
                 })
-                .filter(response -> response != null)
+                .filter(Objects::nonNull)
                 .toList();
     }
 

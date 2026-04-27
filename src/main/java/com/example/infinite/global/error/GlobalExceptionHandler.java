@@ -13,7 +13,6 @@ import com.example.infinite.domain.realtimelive.error.LiveException;
 import com.example.infinite.global.common.dto.ApiResponse;
 import com.example.infinite.global.common.dto.ErrorResponse;
 import com.example.infinite.global.exception.BusinessException;
-import com.example.infinite.global.s3.s3error.S3Exception;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -227,14 +226,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e, HttpServletRequest request) {
         return handleCustomException("BusinessException", e.getErrorCode(), e, request);
-    }
-
-    /**
-     * 4xx/5xx: S3 파일 업로드 예외 처리
-     */
-    @ExceptionHandler(S3Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleS3Exception(S3Exception e, HttpServletRequest request) {
-        return handleCustomException("S3Exception", e.getErrorCode(), e, request);
     }
 
     /**

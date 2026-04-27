@@ -13,6 +13,8 @@ public interface RealtimeLiveRepository extends JpaRepository<RealtimeLive, Long
 
     List<RealtimeLive> findByArtistIdAndLiveStatusOrderByCreatedAtDesc(Long artistId, LiveStatus liveStatus);
 
+    long countByArtistIdAndLiveStatus(Long artistId, LiveStatus liveStatus);
+
     List<RealtimeLive> findByArtistIdAndLiveStatusOrderByIdDesc(Long artistId, LiveStatus liveStatus, Pageable pageable);
 
     List<RealtimeLive> findByArtistIdAndLiveStatusAndIdLessThanOrderByIdDesc(
