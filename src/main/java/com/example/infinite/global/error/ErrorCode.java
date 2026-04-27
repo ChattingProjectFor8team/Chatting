@@ -17,6 +17,7 @@ public enum ErrorCode implements ErrorCodeType {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C005", "서버 내부 오류가 발생했습니다."),
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "C006", "도배 방지를 위해 요청 횟수가 제한되었습니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C007", "잘못된 입력값입니다."),
+    PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "C008", "업로드 가능한 최대 용량을 초과했습니다."),
 
     // 2. Payment / Jelly (결제 및 재화)
     JELLY_INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, "P001", "보유한 젤리 잔액이 부족합니다."),

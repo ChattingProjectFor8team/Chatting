@@ -698,8 +698,8 @@ function TabFanLetter({ t, theme, artist }) {
         .then(data => { setLetters(data.content.map(mapFanLetterListItem)); setHasNext(data.hasNext); setNextCursor(data.nextCursor); })
         .catch(err => { console.warn('Refresh failed:', err?.message || err); });
     } catch (err) {
-      const debugSuffix = [err?.code, err?.status].filter(Boolean).join(' / ');
-      alert('작성 실패: ' + (err.message || '멤버십 구독이 필요합니다') + (debugSuffix ? ` (${debugSuffix})` : ''));
+      console.error('Fan letter create failed', err);
+      alert('작성 실패: ' + (err.message || '잠시 후 다시 시도해주세요.'));
     } finally {
       setLetterSubmitting(false);
     }
