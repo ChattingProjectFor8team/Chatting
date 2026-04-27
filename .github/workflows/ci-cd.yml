@@ -154,6 +154,8 @@ jobs:
           S3_BUCKET_NAME=${S3_BUCKET_NAME}
           JWT_SECRET_KEY=${JWT_SECRET_KEY}
           YOUTUBE_DATA_API_KEY=${YOUTUBE_DATA_API_KEY}
+          APP_SEED_SHOWCASE_DATA=true
+          APP_SEED_SHOWCASE_PASSWORD=demo1234!
           EOF
           
           # 3. 업로드 (변수명 오타 주의!)

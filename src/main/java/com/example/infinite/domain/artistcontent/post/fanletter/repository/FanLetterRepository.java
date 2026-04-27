@@ -17,6 +17,19 @@ public interface FanLetterRepository extends JpaRepository<FanLetter, Long>, Fan
     // 다른 아티스트의 팬레터를 잘못 건드리지 않는다.
     Optional<FanLetter> findByIdAndArtistId(Long fanLetterId, Long artistId);
 
+    Optional<FanLetter> findByArtistIdAndWriterIdAndRecipientTypeAndRecipientArtistMemberIsNull(
+            Long artistId,
+            Long writerId,
+            com.example.infinite.domain.artistcontent.post.fanletter.enums.FanLetterRecipientType recipientType
+    );
+
+    Optional<FanLetter> findByArtistIdAndWriterIdAndRecipientTypeAndRecipientArtistMemberId(
+            Long artistId,
+            Long writerId,
+            com.example.infinite.domain.artistcontent.post.fanletter.enums.FanLetterRecipientType recipientType,
+            Long recipientArtistMemberId
+    );
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update FanLetter fanLetter
