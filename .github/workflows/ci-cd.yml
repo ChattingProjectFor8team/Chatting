@@ -59,7 +59,7 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
-      # Step 4: 실행 권한 부여 (추가 권장)
+      # Step 4-1: 실행 권한 부여 (추가 권장)
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -83,18 +83,6 @@ jobs:
           JWT_SECRET_KEY: dGhpcy1pcy1hLXNhbXBsZS1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLWJhc2U2NA==
 
           JWT_EXPIRATION: 3600000
-
-
-#          # 테스트 코드가 localhost:6379로 붙을 수 있게 설정
-#          SPRING_DATA_REDIS_HOST: localhost
-#          SPRING_DATA_REDIS_PORT: 6379
-#          # PlaceholderResolutionException 방지를 위한 필수 변수들 (임시값)
-#          AWS_REGION: ${{ vars.AWS_REGION }}
-#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }} # 변수 처리!
-#          # 필요한 다른 환경변수가 있다면 여기에 추가하세요
-#          CLOUDFRONT_DOMAIN: ${{ vars.CLOUDFRONT_DOMAIN || 'mock.cloudfront.net' }}
 
       # Step 5: AWS 자격증명 - OIDC
       - name: Configure AWS credentials
@@ -127,7 +115,7 @@ jobs:
 
   deploy:
     needs: build
-    if: contains(fromJson('["refs/heads/main", "refs/heads/develop", "refs/heads/hotfix/env/var"]'), github.ref)
+    if: contains(fromJson('["refs/heads/main", "refs/heads/develop"]'), github.ref)
     runs-on: ubuntu-latest
 
     steps:
@@ -181,7 +169,6 @@ jobs:
           LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
         run: |
-          # ⚠️ 이제 sed 치환에 민감한 비밀번호가 전혀 들어가지 않습니다!
           USER_DATA=$(cat <<'USERDATA' | sed \
             "s|__IMAGE_TAG__|${IMAGE_TAG}|g; \
              s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; \
@@ -191,24 +178,53 @@ jobs:
           #!/bin/bash
           set -e
           
+          # 동적 변수 선언 (리뷰어 피드백 반영: 하드코딩 제거)
+          APP_CONTAINER_NAME="infinite-app-container"
+          
           dnf update -y
           dnf install -y docker
           systemctl enable docker
           systemctl start docker
           
-          # 🌟 핵심 1: EC2 부팅 시 S3에서 .env 파일을 몰래 다운로드
+          # EC2 부팅 시 S3에서 .env 파일 다운로드
           aws s3 cp s3://__S3_BUCKET_NAME__/deploy/.env /tmp/.env
           chmod 600 /tmp/.env
           
+          # ECR 로그인 및 이미지 Pull
           aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com
           docker pull __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          # 🌟 핵심 2: 길고 위험했던 -e 옵션들 대신 --env-file 하나로 안전하게 주입
-          docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo \
+          # 컨테이너 실행 (변수 사용)
+          docker run -d -p 8080:8080 --restart unless-stopped --name ${APP_CONTAINER_NAME} \
             --env-file /tmp/.env \
             __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          # 🌟 핵심 3: 컨테이너 실행 후 서버에 남은 .env 파일 삭제 (보안)
+          # Spring Boot 헬스체크 폴링 (리뷰어 피드백 반영: 들여쓰기 완벽 정렬)
+          echo "Starting health check polling..."
+          SUCCESS=false
+          
+          for i in $(seq 1 30); do
+            # HTTP 상태 코드 추출 (명령어 실패 시 000 반환하도록 예외 처리 추가)
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health || echo "000")
+          
+            if [ "$STATUS_CODE" -eq 200 ]; then
+              echo "✅ Application is healthy!"
+              SUCCESS=true
+              break
+            fi
+          
+            echo "Waiting for application to start... ($i/30)"
+            sleep 10
+          done
+          
+          if [ "$SUCCESS" = false ]; then
+            echo "❌ Application did not start within 300 seconds."
+            # 실패 시 동적 변수를 활용하여 해당 컨테이너 로그 출력
+            docker logs ${APP_CONTAINER_NAME}
+            exit 1
+          fi
+          
+          # 사용이 끝난 .env 파일 삭제 (보안)
           rm -f /tmp/.env
           USERDATA
           )
