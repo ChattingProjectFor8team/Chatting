@@ -2,7 +2,8 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'spring-boot-app'
+  - job_name: 'spring-actuator'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['infiniteentertainment.shop:8080']
+      # hardcoding no no
+      - targets: ['host.docker.internal:8080']

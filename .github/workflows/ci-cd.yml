@@ -259,7 +259,7 @@ jobs:
               exit 1
             fi
 
-            sleep 300
+            sleep 30
           done
 
           echo "❌ Instance Refresh 타임아웃 (15분 초과)"
