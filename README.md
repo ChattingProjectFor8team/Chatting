@@ -21,6 +21,8 @@ INFINITE는 Weverse를 모티브로 한 팬 커뮤니티 플랫폼입니다. 아
 
 ### 1. 로컬 인프라 기동
 
+저장소에 포함된 `docker-compose.yml` 기준으로 MySQL/Redis를 함께 띄웁니다.
+
 ```bash
 docker compose up -d
 ```
