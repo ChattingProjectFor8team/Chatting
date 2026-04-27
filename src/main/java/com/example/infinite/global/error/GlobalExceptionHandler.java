@@ -7,7 +7,6 @@ import com.example.infinite.domain.dm.error.DmException;
 import com.example.infinite.domain.member.artist.error.ArtistException;
 import com.example.infinite.domain.member.member.error.MemberErrorCode;
 import com.example.infinite.domain.member.member.error.MemberException;
-import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
 import com.example.infinite.domain.raffle.error.RaffleException;
 import com.example.infinite.domain.realtimelive.error.LiveException;
@@ -96,10 +95,10 @@ public class GlobalExceptionHandler {
     ) {
         log.warn("MaxUploadSizeExceededException : {}", e.getMessage());
         return ResponseEntity
-                .status(ArtistContentErrorCode.MEDIA_SIZE_EXCEEDED.getStatus())
+                .status(ErrorCode.PAYLOAD_TOO_LARGE.getStatus())
                 .body(ApiResponse.fail(buildErrorResponse(
-                        ArtistContentErrorCode.MEDIA_SIZE_EXCEEDED,
-                        ArtistContentErrorCode.MEDIA_SIZE_EXCEEDED.getMessage(),
+                        ErrorCode.PAYLOAD_TOO_LARGE,
+                        ErrorCode.PAYLOAD_TOO_LARGE.getMessage(),
                         request.getRequestURI()
                 )));
     }

@@ -193,8 +193,7 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         if (showcasePassword == null || showcasePassword.isBlank()) {
-            log.warn("app.seed.showcase-data=true 이지만 app.seed.showcase-password 가 비어 있어 시연 데이터 시드를 건너뜁니다.");
-            return;
+            throw new IllegalStateException("app.seed.showcase-data=true 이면 app.seed.showcase-password 는 필수입니다.");
         }
 
         if (!acquireLock()) {
@@ -206,16 +205,9 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
             List<Member> fanMembers = ensureFanMembers();
             int seededArtistCount = 0;
             int seededArtistMemberCount = 0;
-            int skippedArtistCount = 0;
 
             for (ArtistSeed artistSeed : ARTIST_SEEDS) {
-                Optional<Artist> artistOptional = ensureArtist(artistSeed);
-                if (artistOptional.isEmpty()) {
-                    skippedArtistCount++;
-                    continue;
-                }
-
-                Artist artist = artistOptional.get();
+                Artist artist = ensureArtist(artistSeed);
                 List<ArtistMember> artistMembers = ensureArtistMembers(artist, artistSeed.members());
                 seededArtistCount++;
                 seededArtistMemberCount += artistMembers.size();
@@ -237,9 +229,8 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
             }
 
             log.info(
-                    "배포 시연 데이터 시드 완료: artistsSeeded={}, artistsSkipped={}, artistMembersSeeded={}, fans={}",
+                    "배포 시연 데이터 시드 완료: artistsSeeded={}, artistMembersSeeded={}, fans={}",
                     seededArtistCount,
-                    skippedArtistCount,
                     seededArtistMemberCount,
                     FAN_SEEDS.size()
             );
@@ -264,28 +255,26 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
         return fanMembers;
     }
 
-    private Optional<Artist> ensureArtist(ArtistSeed seed) {
+    private Artist ensureArtist(ArtistSeed seed) {
         Artist artistById = artistRepository.findById(seed.id()).orElse(null);
         Artist artistBySlug = artistRepository.findBySlug(seed.slug()).orElse(null);
 
         if (artistById != null && !seed.slug().equals(artistById.getSlug())) {
-            log.warn(
-                    "artistId={} 는 이미 slug={} 에 연결되어 있어 showcase slug={} 로 덮어쓰지 않습니다. 이 아티스트 시드는 건너뜁니다.",
+            throw new IllegalStateException(
+                    "showcase artistId=%d 충돌: 기존 slug=%s, 요청 slug=%s".formatted(
                     seed.id(),
                     artistById.getSlug(),
                     seed.slug()
-            );
-            return Optional.empty();
+            ));
         }
 
         if (artistBySlug != null && !artistBySlug.getId().equals(seed.id())) {
-            log.warn(
-                    "showcase slug={} 는 이미 artistId={} 에 연결되어 있어 고정 artistId={} 로 시드하지 않습니다. 이 아티스트 시드는 건너뜁니다.",
+            throw new IllegalStateException(
+                    "showcase slug=%s 충돌: 기존 artistId=%d, 요청 artistId=%d".formatted(
                     seed.slug(),
                     artistBySlug.getId(),
                     seed.id()
-            );
-            return Optional.empty();
+            ));
         }
 
         if (artistById != null) {
@@ -296,7 +285,7 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
                     coverImageUrl("artist", seed.slug()),
                     seed.intro()
             );
-            return Optional.of(artistById);
+            return artistById;
         }
 
         if (artistBySlug != null) {
@@ -307,12 +296,12 @@ public class DeployShowcaseDataSeeder implements ApplicationRunner {
                     coverImageUrl("artist", seed.slug()),
                     seed.intro()
             );
-            return Optional.of(artistBySlug);
+            return artistBySlug;
         }
 
         insertArtistWithFixedId(seed);
-        return Optional.of(artistRepository.findById(seed.id())
-                .orElseThrow(() -> new IllegalStateException("시드 아티스트 생성 후 조회에 실패했습니다. id=" + seed.id())));
+        return artistRepository.findById(seed.id())
+                .orElseThrow(() -> new IllegalStateException("시드 아티스트 생성 후 조회에 실패했습니다. id=" + seed.id()));
     }
 
     private List<ArtistMember> ensureArtistMembers(Artist artist, List<ArtistMemberSeed> seeds) {

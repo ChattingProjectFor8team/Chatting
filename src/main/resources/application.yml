@@ -5,6 +5,7 @@ spring:
     import: optional:classpath:application-local.yml
   servlet:
     multipart:
+      file-size-threshold: 0B
       max-file-size: 100MB
       max-request-size: 120MB
 
