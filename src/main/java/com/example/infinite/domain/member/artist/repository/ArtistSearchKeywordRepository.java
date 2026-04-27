@@ -32,14 +32,14 @@ public class ArtistSearchKeywordRepository {
     }
 
 
-    public Set<ZSetOperations.TypedTuple<String>> findTopKeywords(int limit) {
-        if (limit <= 0) {
+    public Set<ZSetOperations.TypedTuple<String>> findTopKeywords(long start, long end) {
+        if (end < start) {
             //검색결과가 없음 비워주기
             return Collections.emptySet();
         }
 
         Set<ZSetOperations.TypedTuple<String>> keywords = stringRedisTemplate.opsForZSet()
-                .reverseRangeWithScores(POPULAR_ARTIST_SEARCH_KEY, 0, limit - 1L);
+                .reverseRangeWithScores(POPULAR_ARTIST_SEARCH_KEY, start, end);
 
         return keywords == null ? Collections.emptySet() : keywords;
     }

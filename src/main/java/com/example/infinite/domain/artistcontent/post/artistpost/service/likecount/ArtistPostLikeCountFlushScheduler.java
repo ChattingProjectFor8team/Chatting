@@ -3,6 +3,7 @@ package com.example.infinite.domain.artistcontent.post.artistpost.service.likeco
 import com.example.infinite.domain.artistcontent.post.artistpost.repository.ArtistPostRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,11 @@ public class ArtistPostLikeCountFlushScheduler {
 
     private final ArtistPostLikeDeltaBuffer artistPostLikeDeltaBuffer;
     private final ArtistPostRepository artistPostRepository;
+    // consumer와 같은 이유다.
+    // 트래픽 테스트는 flush 시점을 직접 제어해야 "이번 poll에서 어디까지 반영됐는지"를 볼 수 있다.
+    // 자동 스케줄 flush가 뒤에서 같이 돌면 수동 테스트가 반쯤 benchmark처럼 변해 버리므로 끌 수 있게 둔다.
+    @Value("${artist-post.scheduler.enabled:true}")
+    private boolean schedulerEnabled;
 
     /**
      * 1차 배치: flush
@@ -37,7 +43,18 @@ public class ArtistPostLikeCountFlushScheduler {
      */
     @Scheduled(fixedDelayString = "${artist-post.like-count.flush-delay-ms:3000}")
     @Transactional
+    public void flushOnSchedule() {
+        if (!schedulerEnabled) {
+            return;
+        }
+        flush();
+    }
+
+    @Transactional
     public void flush() {
+        // 실제 flush 로직은 별도 메서드에 둔다.
+        // 운영에서는 flushOnSchedule() -> flush()로 타고,
+        // 테스트에서는 flush()를 직접 호출해 매 drain tick 뒤의 count 변화를 관찰한다.
         List<ArtistPostLikeDelta> deltas = artistPostLikeDeltaBuffer.drainAll();
         if (deltas.isEmpty()) {
             return;

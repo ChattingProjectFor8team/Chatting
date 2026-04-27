@@ -21,9 +21,9 @@ public class ArtistRepositoryImpl implements ArtistRepositoryCustom {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public Page<ArtistSearchResponse> searchArtists(String keyword, int size) {
+    public Page<ArtistSearchResponse> searchArtists(String keyword, int page, int size) {
         QArtist artist = QArtist.artist;
-        PageRequest pageRequest = PageRequest.of(0, size);
+        PageRequest pageRequest = PageRequest.of(page, size);
 
         BooleanBuilder where = new BooleanBuilder()
                 .and(QuerydslUtils.likeAnyOf(keyword, artist.name, artist.slug));
@@ -39,6 +39,7 @@ public class ArtistRepositoryImpl implements ArtistRepositoryCustom {
                 .from(artist)
                 .where(where)
                 .orderBy(artist.id.desc())
+                .offset(pageRequest.getOffset())
                 .limit(size)
                 .fetch();
 

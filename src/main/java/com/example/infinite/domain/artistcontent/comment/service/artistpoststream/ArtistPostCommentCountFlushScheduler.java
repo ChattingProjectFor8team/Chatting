@@ -3,6 +3,7 @@ package com.example.infinite.domain.artistcontent.comment.service.artistpoststre
 import com.example.infinite.domain.artistcontent.post.artistpost.repository.ArtistPostRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,11 @@ public class ArtistPostCommentCountFlushScheduler {
 
     private final ArtistPostCommentDeltaBuffer artistPostCommentDeltaBuffer;
     private final ArtistPostRepository artistPostRepository;
+    // 댓글 count flush도 테스트에서 수동 제어가 필요하다.
+    // 자동 flush와 수동 flush가 섞이면 "이번 mixed traffic 중 실제 읽기 모델이 어떤 단계였는지"
+    // 설명하기 어려워지므로 같은 플래그를 공유한다.
+    @Value("${artist-post.scheduler.enabled:true}")
+    private boolean schedulerEnabled;
 
     /**
      * 댓글 수 1차 반영 배치.
@@ -29,7 +35,16 @@ public class ArtistPostCommentCountFlushScheduler {
      */
     @Scheduled(fixedDelayString = "${artist-post.comment-count.flush-delay-ms:3000}")
     @Transactional
+    public void flushOnSchedule() {
+        if (!schedulerEnabled) {
+            return;
+        }
+        flush();
+    }
+
+    @Transactional
     public void flush() {
+        // 운영/테스트가 같은 flush 본문을 재사용하도록 분리한 메서드다.
         List<ArtistPostCommentDelta> deltas = artistPostCommentDeltaBuffer.drainAll();
         if (deltas.isEmpty()) {
             return;

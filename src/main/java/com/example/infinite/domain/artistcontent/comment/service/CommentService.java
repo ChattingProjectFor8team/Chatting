@@ -106,14 +106,14 @@ public class CommentService {
         return getComments(PostType.ARTIST_POST, artistId, artistPostId, cursor);
     }
 
-    public List<CommentResponse> getFanPostReplies(Long artistId, Long fanPostId, Long parentCommentId) {
+    public CursorSliceResponse<CommentResponse> getFanPostReplies(Long artistId, Long fanPostId, Long parentCommentId, Long cursor) {
         validateCommentTarget(PostType.FAN_POST, artistId, fanPostId);
-        return getReplies(PostType.FAN_POST, artistId, fanPostId, parentCommentId);
+        return getReplies(PostType.FAN_POST, artistId, fanPostId, parentCommentId, cursor);
     }
 
-    public List<CommentResponse> getArtistPostReplies(Long artistId, Long artistPostId, Long parentCommentId) {
+    public CursorSliceResponse<CommentResponse> getArtistPostReplies(Long artistId, Long artistPostId, Long parentCommentId, Long cursor) {
         validateCommentTarget(PostType.ARTIST_POST, artistId, artistPostId);
-        return getReplies(PostType.ARTIST_POST, artistId, artistPostId, parentCommentId);
+        return getReplies(PostType.ARTIST_POST, artistId, artistPostId, parentCommentId, cursor);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -198,7 +198,13 @@ public class CommentService {
     }
 
     // 대댓글조회
-    private List<CommentResponse> getReplies(PostType targetType, Long artistId, Long targetId, Long parentCommentId) {
+    private CursorSliceResponse<CommentResponse> getReplies(
+            PostType targetType,
+            Long artistId,
+            Long targetId,
+            Long parentCommentId,
+            Long cursor
+    ) {
         Comment parentComment = commentReader.findByIdAndTargetTypeAndTargetIdOrThrow(parentCommentId, targetType, targetId);
         if (!parentComment.isRootComment()) {
             throw new CommentException(CommentErrorCode.INVALID_PARENT_COMMENT);
@@ -211,8 +217,9 @@ public class CommentService {
                 artistId,
                 targetId,
                 parentCommentId,
+                cursor,
                 replyCount,
-                () -> loadReplies(artistId, parentCommentId)
+                () -> loadReplies(artistId, parentCommentId, cursor)
         );
     }
 
@@ -384,14 +391,14 @@ public class CommentService {
         return new CursorSliceResponse<>(content, nextCursor, hasNext, COMMENT_SLICE_SIZE);
     }
 
-    private List<CommentResponse> loadReplies(Long artistId, Long parentCommentId) {
-        List<Comment> replies = commentRepository.findRepliesByParentId(parentCommentId, COMMENT_REPLY_LIMIT);
+    private CursorSliceResponse<CommentResponse> loadReplies(Long artistId, Long parentCommentId, Long cursor) {
+        List<Comment> replies = commentRepository.findRepliesByParentId(parentCommentId, cursor, COMMENT_REPLY_LIMIT + 1);
         Map<Long, CommentMentionResponse> mentionByCommentId = loadMentionByCommentId(replies);
         Map<Long, WriterSubscriptionBadge> badgeByWriterId = loadWriterBadges(
                 artistId,
                 replies.stream().map(reply -> reply.getWriter().getId()).toList()
         );
-        return replies.stream()
+        List<CommentResponse> rows = replies.stream()
                 .map(reply -> {
                     WriterSubscriptionBadge writerBadge = badgeByWriterId.getOrDefault(
                             reply.getWriter().getId(),
@@ -405,6 +412,7 @@ public class CommentService {
                     );
                 })
                 .toList();
+        return CursorSliceResponse.of(rows, COMMENT_REPLY_LIMIT, CommentResponse::commentId);
     }
 
     private Map<Long, CommentMentionResponse> loadMentionByCommentId(List<Comment> comments) {

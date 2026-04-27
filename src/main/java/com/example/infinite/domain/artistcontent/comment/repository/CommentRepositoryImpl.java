@@ -41,7 +41,7 @@ public class CommentRepositoryImpl implements CommentRepositoryCustom {
     }
 
     @Override
-    public List<Comment> findRepliesByParentId(Long parentId, int limit) {
+    public List<Comment> findRepliesByParentId(Long parentId, Long cursor, int limit) {
         if (parentId == null) {
             return List.of();
         }
@@ -52,7 +52,10 @@ public class CommentRepositoryImpl implements CommentRepositoryCustom {
         return queryFactory
                 .selectFrom(comment)
                 .join(comment.writer, member).fetchJoin()
-                .where(comment.parent.id.eq(parentId))
+                .where(
+                        comment.parent.id.eq(parentId),
+                        CursorSliceUtils.gtCursor(comment.id, cursor)
+                )
                 // 같은 스레드의 대댓글은 오래된 순으로 읽히게 둔다.
                 .orderBy(comment.id.asc())
                 .limit(limit)

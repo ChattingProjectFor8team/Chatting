@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface ArtistRepositoryCustom {
 
-    Page<ArtistSearchResponse> searchArtists(String keyword, int size);
+    Page<ArtistSearchResponse> searchArtists(String keyword, int page, int size);
 
     List<ArtistDetailRow> findArtistDetailRows(Long artistId);
 }

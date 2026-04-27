@@ -1,13 +1,6 @@
 package com.example.infinite.domain.member.artist.controller;
 
-import com.example.infinite.domain.member.artist.dto.request.ArtistCreateRequest;
-import com.example.infinite.domain.member.artist.dto.request.ArtistCreateMultipartRequest;
-import com.example.infinite.domain.member.artist.dto.request.ArtistMemberCreateRequest;
-import com.example.infinite.domain.member.artist.dto.request.ArtistMemberCreateMultipartRequest;
-import com.example.infinite.domain.member.artist.dto.request.ArtistMemberUpdateRequest;
-import com.example.infinite.domain.member.artist.dto.request.ArtistMemberUpdateMultipartRequest;
-import com.example.infinite.domain.member.artist.dto.request.ArtistUpdateRequest;
-import com.example.infinite.domain.member.artist.dto.request.ArtistUpdateMultipartRequest;
+import com.example.infinite.domain.member.artist.dto.request.*;
 import com.example.infinite.domain.member.artist.dto.response.ArtistMemberResponse;
 import com.example.infinite.domain.member.artist.dto.response.ArtistPopularSearchResponse;
 import com.example.infinite.domain.member.artist.dto.response.ArtistResponse;
@@ -26,14 +19,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RequestMapping("/api/member")
 @RestController
@@ -50,11 +40,13 @@ public class ArtistController {
     public ResponseEntity<PageResponse<ArtistSearchResponse>> searchArtistsV1(
             @AuthenticationPrincipal MemberDetailsImpl memberDetails,
             @Parameter(description = "검색 키워드", example = "seventeen")
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "페이지 번호(1부터 시작, size는 10으로 고정)", example = "1")
+            @RequestParam(defaultValue = "1") Integer page
     ) {
         // 동일 사용자의 반복 검색은 TTL 동안 한 번만 집계
         artistSearchKeywordService.recordSearchKeyword(memberDetails.getEmail(), keyword);
-        return ResponseEntity.ok(artistService.searchArtistsV1(keyword));
+        return ResponseEntity.ok(artistService.searchArtistsV1(keyword, page));
     }
 
     @Operation(summary = "아티스트 검색 v2", description = "로컬 캐시를 적용한 아티스트 검색 버전입니다.")
@@ -62,20 +54,36 @@ public class ArtistController {
     public ResponseEntity<PageResponse<ArtistSearchResponse>> searchArtistsV2(
             @AuthenticationPrincipal MemberDetailsImpl memberDetails,
             @Parameter(description = "검색 키워드", example = "newjeans")
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "페이지 번호(1부터 시작, size는 10으로 고정)", example = "1")
+            @RequestParam(defaultValue = "1") Integer page
     ) {
         // 검색 결과 캐시 hit 여부와 무관하게 사용자 기준 인기검색어는 집계
         artistSearchKeywordService.recordSearchKeyword(memberDetails.getEmail(), keyword);
-        return ResponseEntity.ok(artistService.searchArtistsV2(keyword));
+        return ResponseEntity.ok(artistService.searchArtistsV2(keyword, page));
+    }
+
+    @Operation(summary = "아티스트 검색 v3", description = "Redis remote cache를 적용한 아티스트 검색 버전입니다.")
+    @GetMapping("v3/artists/search")
+    public ResponseEntity<PageResponse<ArtistSearchResponse>> searchArtistsV3(
+            @AuthenticationPrincipal MemberDetailsImpl memberDetails,
+            @Parameter(description = "검색 키워드", example = "newjeans")
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "페이지 번호(1부터 시작, size는 10으로 고정)", example = "1")
+            @RequestParam(defaultValue = "1") Integer page
+    ) {
+        // 실제 서비스 비교 축에서는 v3(remote cache)를 기본 선택지로 본다.
+        artistSearchKeywordService.recordSearchKeyword(memberDetails.getEmail(), keyword);
+        return ResponseEntity.ok(artistService.searchArtistsV3(keyword, page));
     }
 
     @Operation(summary = "인기 아티스트 검색어 조회", description = "Redis ZSet 기준 인기 검색어 랭킹을 조회합니다.")
     @GetMapping("v1/artists/search/popular")
-    public ResponseEntity<ApiResponse<List<ArtistPopularSearchResponse>>> getPopularArtistSearchKeywords(
-            @Parameter(description = "조회할 인기 검색어 개수", example = "10")
-            @RequestParam(defaultValue = "10") Integer limit
+    public ResponseEntity<ApiResponse<com.example.infinite.global.common.dto.OffsetSliceResponse<ArtistPopularSearchResponse>>> getPopularArtistSearchKeywords(
+            @Parameter(description = "조회 시작 offset (size는 10으로 고정)", example = "0")
+            @RequestParam(defaultValue = "0") Integer offset
     ) {
-        return ResponseEntity.ok(ApiResponse.success(artistSearchKeywordService.getPopularKeywords(limit)));
+        return ResponseEntity.ok(ApiResponse.success(artistSearchKeywordService.getPopularKeywords(offset)));
     }
 
     @Operation(summary = "아티스트 생성", description = "아티스트 권한을 가진 미소속 회원이 본인 아티스트를 생성합니다.")

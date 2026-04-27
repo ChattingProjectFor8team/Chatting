@@ -137,8 +137,13 @@ jobs:
           REDIS_PORT: ${{ vars.REDIS_PORT }}
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          YOUTUBE_DATA_API_KEY: ${{ secrets.YOUTUBE_DATA_API_KEY }}
         run: |
-          # 2. 작은따옴표('EOF')를 사용하여 쉘이 내부 변수를 함부로 해석하지 못하게 방어
+          # 2. 여기서는 실제 .env 값을 만들어야 하므로 quoted heredoc(<<'EOF')를 쓰면 안 된다.
+          #    quoted heredoc은 ${JWT_SECRET_KEY} 같은 변수를 literal 문자열로 남겨
+          #    애플리케이션 런타임 설정을 깨뜨린다.
+          #    현재 방식은 runner env 값을 파일로만 리다이렉트하며,
+          #    로그 노출 방어는 GitHub Secrets masking + 불필요한 cat/set -x 금지로 관리한다.
           cat <<EOF > .env
           SPRING_PROFILES_ACTIVE=prod
           RDS_HOST=${RDS_HOST}
@@ -148,6 +153,7 @@ jobs:
           REDIS_PORT=${REDIS_PORT}
           S3_BUCKET_NAME=${S3_BUCKET_NAME}
           JWT_SECRET_KEY=${JWT_SECRET_KEY}
+          YOUTUBE_DATA_API_KEY=${YOUTUBE_DATA_API_KEY}
           EOF
           
           # 3. 업로드 (변수명 오타 주의!)
