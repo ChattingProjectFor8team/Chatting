@@ -35,6 +35,23 @@ services:
       timeout: 5s
       retries: 10
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: springchatting-local-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--enable-feature=envvar-expansion' # 환경 변수 사용을 위해 반드시 필요!
+    environment:
+      # 로컬 개발 환경이므로 로컬 애플리케이션 포트를 가리키도록 설정
+      - PROMETHEUS_TARGET=host.docker.internal:8080
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # 도커 컨테이너에서 로컬 호스트에 접속하기 위함
+
 volumes:
   springchatting-mysql-data:
   springchatting-redis-data:
