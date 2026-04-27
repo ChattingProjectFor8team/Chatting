@@ -169,7 +169,6 @@ jobs:
           LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
           S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
         run: |
-          # ⚠️ 이제 sed 치환에 민감한 비밀번호가 전혀 들어가지 않습니다!
           USER_DATA=$(cat <<'USERDATA' | sed \
             "s|__IMAGE_TAG__|${IMAGE_TAG}|g; \
              s|__AWS_ACCOUNT_ID__|${AWS_ACCOUNT_ID}|g; \
@@ -179,66 +178,71 @@ jobs:
           #!/bin/bash
           set -e
           
+          # 동적 변수 선언 (리뷰어 피드백 반영: 하드코딩 제거)
+          APP_CONTAINER_NAME="infinite-app-container"
+          
           dnf update -y
           dnf install -y docker
           systemctl enable docker
           systemctl start docker
           
-          # 🌟 핵심 1: EC2 부팅 시 S3에서 .env 파일을 몰래 다운로드
+          # EC2 부팅 시 S3에서 .env 파일 다운로드
           aws s3 cp s3://__S3_BUCKET_NAME__/deploy/.env /tmp/.env
           chmod 600 /tmp/.env
           
+          # ECR 로그인 및 이미지 Pull
           aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com
           docker pull __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          # 🌟 핵심 2: 길고 위험했던 -e 옵션들 대신 --env-file 하나로 안전하게 주입
-          docker run -d -p 8080:8080 --restart unless-stopped --name ci-demo \
+          # 컨테이너 실행 (변수 사용)
+          docker run -d -p 8080:8080 --restart unless-stopped --name ${APP_CONTAINER_NAME} \
             --env-file /tmp/.env \
             __AWS_ACCOUNT_ID__.dkr.ecr.__AWS_REGION__.amazonaws.com/__ECR_REPOSITORY__:__IMAGE_TAG__
           
-          # 🌟 리뷰어 피드백 반영: 컨테이너 실행 후 Spring Boot 헬스체크 폴링
-               echo "Starting health check polling..."
-               SUCCESS=false
-               for i in $(seq 1 30); do
-          # curl로 HTTP 상태 코드만 추출 (200이면 성공)
-               STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health)
-               
-               if [ "$STATUS_CODE" -eq 200 ]; then
-               echo "✅ Application is healthy!"
-               SUCCESS=true
-               break
-               fi
-               
-               echo "Waiting for application to start... ($i/30)"
-               sleep 10
-               done
-               
-               if [ "$SUCCESS" = false ]; then
-               echo "❌ Application did not start within 300 seconds."
-          # 실패 시 컨테이너 로그 출력 (디버깅 용이)
-               docker logs ci-demo
-               exit 1
-               fi
+          # Spring Boot 헬스체크 폴링 (리뷰어 피드백 반영: 들여쓰기 완벽 정렬)
+          echo "Starting health check polling..."
+          SUCCESS=false
+          
+          for i in $(seq 1 30); do
+            # HTTP 상태 코드 추출 (명령어 실패 시 000 반환하도록 예외 처리 추가)
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health || echo "000")
+          
+            if [ "$STATUS_CODE" -eq 200 ]; then
+              echo "✅ Application is healthy!"
+              SUCCESS=true
+              break
+            fi
+          
+            echo "Waiting for application to start... ($i/30)"
+            sleep 10
+          done
+          
+          if [ "$SUCCESS" = false ]; then
+            echo "❌ Application did not start within 300 seconds."
+            # 실패 시 동적 변수를 활용하여 해당 컨테이너 로그 출력
+            docker logs ${APP_CONTAINER_NAME}
+            exit 1
+          fi
+          
+          # 사용이 끝난 .env 파일 삭제 (보안)
+          rm -f /tmp/.env
+          USERDATA
+          )
 
-          # 🌟 핵심 3: 컨테이너 실행 후 서버에 남은 .env 파일 삭제 (보안)
-               rm -f /tmp/.env
-               USERDATA
-               )
-               
-               NEW_VERSION=$(aws ec2 create-launch-template-version \
-               --launch-template-id "$LAUNCH_TEMPLATE_ID" \
-               --source-version '$Latest' \
-               --launch-template-data "{\"UserData\":\"$USER_DATA\"}" \
-               --query 'LaunchTemplateVersion.VersionNumber' \
-               --output text)
-               
-               echo "✅ Launch Template v${NEW_VERSION} 생성 완료"
-               
-               aws ec2 modify-launch-template \
-               --launch-template-id "$LAUNCH_TEMPLATE_ID" \
-               --default-version "$NEW_VERSION"
-               
-               echo "✅ 기본 버전 → v${NEW_VERSION} 변경 완료"
+          NEW_VERSION=$(aws ec2 create-launch-template-version \
+            --launch-template-id "$LAUNCH_TEMPLATE_ID" \
+            --source-version '$Latest' \
+            --launch-template-data "{\"UserData\":\"$USER_DATA\"}" \
+            --query 'LaunchTemplateVersion.VersionNumber' \
+            --output text)
+
+          echo "✅ Launch Template v${NEW_VERSION} 생성 완료"
+
+          aws ec2 modify-launch-template \
+            --launch-template-id "$LAUNCH_TEMPLATE_ID" \
+            --default-version "$NEW_VERSION"
+
+          echo "✅ 기본 버전 → v${NEW_VERSION} 변경 완료"
 
       # Step 3: Instance Refresh 시작
       - name: Start Instance Refresh
