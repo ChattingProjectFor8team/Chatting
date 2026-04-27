@@ -120,6 +120,10 @@ function App() {
     }
   }, []);
 
+  React.useEffect(() => {
+    window.__connectfinAuthUser = authUser;
+  }, [authUser]);
+
   const handleLogout = () => {
     window.ConnectfinAPI.clearToken();
     setAuthUser(null);

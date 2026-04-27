@@ -91,6 +91,19 @@ function RaffleListScreen({ t, onBack, onOpenRaffle }) {
   const [filter, setFilter] = React.useState('all');
   const [raffles, setRaffles] = React.useState(RAFFLES);
 
+  const [activeTab, setActiveTab] = React.useState('list'); // 'list' | 'myEntries'
+  const [myEntries, setMyEntries] = React.useState([]);
+  const [myEntriesLoading, setMyEntriesLoading] = React.useState(false);
+
+  const loadMyEntries = () => {
+    if (!window.ConnectfinAPI.getToken()) { alert('로그인이 필요합니다.'); return; }
+    setMyEntriesLoading(true);
+    window.ConnectfinAPI.api('/api/v1/users/me/raffle-entries')
+      .then(data => { setMyEntries(Array.isArray(data) ? data : []); setActiveTab('myEntries'); })
+      .catch(err => { console.warn('My entries failed:', err?.message || err); })
+      .finally(() => setMyEntriesLoading(false));
+  };
+
   React.useEffect(() => {
     // 모든 아티스트의 래플을 한번에 로드
     Promise.all(
@@ -124,6 +137,23 @@ function RaffleListScreen({ t, onBack, onOpenRaffle }) {
         }}>DM+ TIER</div>
       </div>
 
+      {/* Tab chips */}
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px' }}>
+        <button onClick={() => setActiveTab('list')} style={{
+          padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          border: activeTab === 'list' ? 'none' : `1px solid ${t.line}`,
+          background: activeTab === 'list' ? t.accent : 'transparent',
+          color: activeTab === 'list' ? '#fff' : t.text, fontFamily: t.font,
+        }}>전체 래플</button>
+        <button onClick={loadMyEntries} style={{
+          padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          border: activeTab === 'myEntries' ? 'none' : `1px solid ${t.line}`,
+          background: activeTab === 'myEntries' ? t.accent : 'transparent',
+          color: activeTab === 'myEntries' ? '#fff' : t.text, fontFamily: t.font,
+        }}>내 응모 이력</button>
+      </div>
+
+      {activeTab === 'list' && (<>
       {/* Hero featured */}
       {(() => {
         const hero = RAFFLES.find(r => r.hot);
@@ -231,6 +261,38 @@ function RaffleListScreen({ t, onBack, onOpenRaffle }) {
         GET /raffles?cursor=...&status=active<br/>
         가중치 계산: base × membership_tier × jelly_spent
       </div>
+      </>)}
+
+      {activeTab === 'myEntries' && (
+        <div style={{ padding: '0 16px' }}>
+          {myEntriesLoading && (
+            <div style={{ textAlign: 'center', color: t.textDim, padding: 20, fontSize: 13 }}>로딩 중...</div>
+          )}
+          {!myEntriesLoading && myEntries.length === 0 && (
+            <div style={{ textAlign: 'center', color: t.textDim, padding: 40, fontSize: 13 }}>응모 이력이 없습니다.</div>
+          )}
+          {!myEntriesLoading && myEntries.map((entry, idx) => (
+            <div key={entry.raffleId ?? idx} style={{
+              padding: 14, marginBottom: 8, borderRadius: 12,
+              border: `1px solid ${t.line}`, background: 'transparent',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{entry.raffleTitle || '래플'}</div>
+                  <div style={{ fontSize: 11, color: t.textDim, fontFamily: t.fontMono, marginTop: 2 }}>
+                    {entry.enteredAt ? new Date(entry.enteredAt).toLocaleString() : ''}
+                  </div>
+                </div>
+                <div style={{
+                  padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  background: entry.won ? t.accent : t.line,
+                  color: entry.won ? '#fff' : t.textDim,
+                }}>{entry.won ? '당첨' : '응모 완료'}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

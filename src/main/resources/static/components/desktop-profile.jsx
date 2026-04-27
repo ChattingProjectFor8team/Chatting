@@ -20,6 +20,7 @@ function mapFanPost(fp) {
     fanMembershipSubscribed: fp.fanMembershipSubscribed,
     dmSubscribed: fp.dmSubscribed,
     writerProfileImageUrl: fp.writerProfileImageUrl,
+    writerId: fp.writerId,
   };
 }
 
@@ -41,6 +42,7 @@ function mapArtistPost(ap) {
     hashtags: ap.hashtags || [],
     artistBadge: ap.artistBadge,
     writerProfileImageUrl: ap.writerProfileImageUrl,
+    writerId: ap.writerId,
   };
 }
 
@@ -498,7 +500,15 @@ function TabFan({ t, theme, artist }) {
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {(activeTab === 'latest' ? posts : hotPosts).map(p => <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}/>)}
+        {(activeTab === 'latest' ? posts : hotPosts).map(p => (
+          <FanPostFullCard key={p.id} post={p} artist={artist} t={t} theme={theme}
+            authUser={window.__connectfinAuthUser}
+            onDeleted={(deletedId) => {
+              setPosts(prev => prev.filter(x => x.id !== deletedId));
+              setHotPosts(prev => prev.filter(x => x.id !== deletedId));
+            }}
+          />
+        ))}
       </div>
       {activeTab === 'latest' && hasNext && (
         <button onClick={loadMore} disabled={loading} style={{
@@ -1158,6 +1168,31 @@ function ArtistPostCard({ post, artist, t, inline }) {
       .catch(err => { console.warn('Replies load failed:', err?.message || err); });
   };
 
+  const deleteComment = async (commentId) => {
+    if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
+    try {
+      await window.ConnectfinAPI.api(
+        `/api/post/v1/artists/${artistId}/artist-posts/${artistPostId}/comments/${commentId}`,
+        { method: 'DELETE' }
+      );
+      loadComments();
+    } catch (err) {
+      alert('삭제 실패: ' + (err.message || ''));
+    }
+  };
+
+  const toggleCommentLike = async (commentId) => {
+    try {
+      await window.ConnectfinAPI.api(
+        `/api/post/v1/artists/${artistId}/artist-posts/${artistPostId}/comments/${commentId}/likes/toggle`,
+        { method: 'POST' }
+      );
+      loadComments();
+    } catch (err) {
+      console.warn('Comment like failed:', err?.message || err);
+    }
+  };
+
   return (
     <div style={{ padding: inline ? 0 : 18, border: inline ? 'none' : `1px solid ${t.line}`, borderRadius: 12, background: inline ? 'transparent' : 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -1206,6 +1241,12 @@ function ArtistPostCard({ post, artist, t, inline }) {
                     <div style={{ flex: 1 }}>
                       <span style={{ fontWeight: 600, marginRight: 6 }}>{c.writerNickname}</span>
                       <span style={{ color: t.text }}>{c.content}</span>
+                      <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 11, color: t.textDim }}>
+                        <button onClick={() => toggleCommentLike(c.commentId)} style={{ background: 'transparent', border: 'none', color: t.textDim, fontSize: 11, cursor: 'pointer', padding: 0 }}>♡ {c.likeCount || 0}</button>
+                        {window.__connectfinAuthUser?.id && c.writerId && window.__connectfinAuthUser.id === c.writerId && (
+                          <button onClick={() => deleteComment(c.commentId)} style={{ background: 'transparent', border: 'none', color: t.textDim, fontSize: 11, cursor: 'pointer', padding: 0 }}>삭제</button>
+                        )}
+                      </div>
                       {c.replyCount > 0 && !expandedReplies[c.commentId] && (
                         <button onClick={() => loadReplies(c.commentId)} style={{ display: 'block', background: 'transparent', border: 'none', color: t.accent, fontSize: 11, cursor: 'pointer', padding: 0, marginTop: 4 }}>답글 {c.replyCount}개 보기</button>
                       )}
@@ -1235,7 +1276,7 @@ function ArtistPostCard({ post, artist, t, inline }) {
   );
 }
 
-function FanPostFullCard({ post, artist, t, theme }) {
+function FanPostFullCard({ post, artist, t, theme, authUser, onDeleted }) {
   const [commentInput, setCommentInput] = React.useState('');
   const [commentSubmitting, setCommentSubmitting] = React.useState(false);
   const [comments, setComments] = React.useState([]);
@@ -1276,6 +1317,44 @@ function FanPostFullCard({ post, artist, t, theme }) {
       .catch(err => { console.warn('Replies load failed:', err?.message || err); });
   };
 
+  const deletePost = async () => {
+    if (!confirm('이 게시글을 삭제하시겠습니까?')) return;
+    try {
+      await window.ConnectfinAPI.api(
+        `/api/post/v1/artists/${post.artistId}/fan-posts/${post.id}`,
+        { method: 'DELETE' }
+      );
+      if (onDeleted) onDeleted(post.id);
+    } catch (err) {
+      alert('삭제 실패: ' + (err.message || ''));
+    }
+  };
+
+  const deleteComment = async (commentId) => {
+    if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
+    try {
+      await window.ConnectfinAPI.api(
+        `/api/post/v1/artists/${post.artistId}/fan-posts/${post.id}/comments/${commentId}`,
+        { method: 'DELETE' }
+      );
+      loadComments();
+    } catch (err) {
+      alert('삭제 실패: ' + (err.message || ''));
+    }
+  };
+
+  const toggleCommentLike = async (commentId) => {
+    try {
+      await window.ConnectfinAPI.api(
+        `/api/post/v1/artists/${post.artistId}/fan-posts/${post.id}/comments/${commentId}/likes/toggle`,
+        { method: 'POST' }
+      );
+      loadComments();
+    } catch (err) {
+      console.warn('Comment like failed:', err?.message || err);
+    }
+  };
+
   return (
     <div style={{
       padding: 18, border: `1px solid ${t.line}`, borderRadius: 12,
@@ -1288,7 +1367,7 @@ function FanPostFullCard({ post, artist, t, theme }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontWeight: 800, fontSize: 11,
         }}>{post.author.slice(0, 2)}</div>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 13 }}>
             {post.author}
             {post.fanMembershipSubscribed && <span style={{ color: t.accent2, marginLeft: 4 }}>✓</span>}
@@ -1297,6 +1376,11 @@ function FanPostFullCard({ post, artist, t, theme }) {
           </div>
           <div style={{ fontSize: 11, color: t.textDim, fontFamily: t.fontMono }}>{post.timeAgo}</div>
         </div>
+        {authUser?.id && post.writerId && authUser.id === post.writerId && (
+          <button onClick={deletePost} style={{
+            background: 'transparent', border: 'none', color: t.textDim, fontSize: 11, cursor: 'pointer', padding: 0,
+          }}>삭제</button>
+        )}
       </div>
       {post.tag && <div style={{ color: t.hot, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{post.tag}</div>}
       {post.hashtags && post.hashtags.length > 0 && (
@@ -1347,6 +1431,12 @@ function FanPostFullCard({ post, artist, t, theme }) {
                     <div style={{ flex: 1 }}>
                       <span style={{ fontWeight: 600, marginRight: 6 }}>{c.writerNickname}</span>
                       <span style={{ color: t.text }}>{c.content}</span>
+                      <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 11, color: t.textDim }}>
+                        <button onClick={() => toggleCommentLike(c.commentId)} style={{ background: 'transparent', border: 'none', color: t.textDim, fontSize: 11, cursor: 'pointer', padding: 0 }}>♡ {c.likeCount || 0}</button>
+                        {authUser?.id && c.writerId && authUser.id === c.writerId && (
+                          <button onClick={() => deleteComment(c.commentId)} style={{ background: 'transparent', border: 'none', color: t.textDim, fontSize: 11, cursor: 'pointer', padding: 0 }}>삭제</button>
+                        )}
+                      </div>
                       {c.replyCount > 0 && !expandedReplies[c.commentId] && (
                         <button onClick={() => loadReplies(c.commentId)} style={{ display: 'block', background: 'transparent', border: 'none', color: t.accent, fontSize: 11, cursor: 'pointer', padding: 0, marginTop: 4 }}>답글 {c.replyCount}개 보기</button>
                       )}
