@@ -200,6 +200,7 @@ const PROFILE_TABS = [
   { k: 'live', label: 'LIVE' },
   { k: 'notice', label: 'Notice' },
   { k: 'shop', label: 'Shop', external: true },
+  { k: 'admin', label: 'Admin' },
 ];
 
 // ───────── Right sidebar ─────────
