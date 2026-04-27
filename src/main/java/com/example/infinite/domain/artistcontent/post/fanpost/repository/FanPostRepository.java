@@ -14,6 +14,10 @@ import java.util.Optional;
 public interface FanPostRepository extends JpaRepository<FanPost, Long>, FanPostRepositoryCustom {
     Optional<FanPost> findByIdAndArtistId(Long fanPostId, Long artistId);
 
+    boolean existsByArtistIdAndWriterIdAndContent(Long artistId, Long writerId, String content);
+
+    Optional<FanPost> findByArtistIdAndWriterIdAndContent(Long artistId, Long writerId, String content);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update FanPost fanPost

@@ -15,6 +15,10 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long>, A
 
     Optional<ArtistPost> findByIdAndArtistId(Long artistPostId, Long artistId);
 
+    boolean existsByArtistIdAndWriterIdAndContent(Long artistId, Long writerId, String content);
+
+    Optional<ArtistPost> findByArtistIdAndWriterIdAndContent(Long artistId, Long writerId, String content);
+
     /**
      * flush 단계에서 사용되는 원자 update.
      *
