@@ -52,6 +52,20 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway" # 도커 컨테이너에서 로컬 호스트에 접속하기 위함
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: springchatting-local-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    volumes:
+      - springchatting-grafana-data:/var/lib/grafana
+
 volumes:
   springchatting-mysql-data:
   springchatting-redis-data:
+  springchatting-grafana-data:
