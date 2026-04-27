@@ -63,21 +63,30 @@
 <script type="text/babel" src="components/desktop-profile.jsx"></script>
 <script type="text/babel" src="components/desktop-global.jsx"></script>
 <script type="text/babel" src="components/desktop-dm.jsx"></script>
+<script type="text/babel" src="components/desktop-raffle.jsx"></script>
 
 <script type="text/babel" data-presets="react">
 const TWEAKS = /*EDITMODE-BEGIN*/{
   "theme": "dark",
   "liveOn": true,
   "simSpeed": 0.5,
-  "viewMode": "mobile",
+  "viewMode": "desktop",
   "accentHue": 150,
-  "desktopView": false
+  "desktopView": true
 }/*EDITMODE-END*/;
 
 function App() {
   const [tweaks, setTweaks] = React.useState(() => {
-    try { return { ...TWEAKS, ...(JSON.parse(localStorage.getItem('connectfin_tweaks') || '{}')) }; }
-    catch { return TWEAKS; }
+    try {
+      const stored = JSON.parse(localStorage.getItem('connectfin_tweaks') || '{}');
+      // v2 마이그레이션: 데스크톱이 기본 — 한 번만 stored.viewMode 비움
+      if (!localStorage.getItem('connectfin_tweaks_v2')) {
+        delete stored.viewMode;
+        delete stored.desktopView;
+        localStorage.setItem('connectfin_tweaks_v2', '1');
+      }
+      return { ...TWEAKS, ...stored };
+    } catch { return TWEAKS; }
   });
   const [showTweaks, setShowTweaks] = React.useState(false);
 
@@ -118,6 +127,18 @@ function App() {
         .then(data => setAuthUser(prev => ({ ...prev, id: data.id, nickname: data.nickname })))
         .catch(err => { console.warn('Auto /me failed:', err?.message || err); });
     }
+  }, []);
+
+  // ── ARTISTS 동기화 ──
+  // 부팅 시 백엔드의 모든 아티스트를 가져와 window.ARTISTS와 머지.
+  // 이후 다른 컴포넌트(어드민 생성/검색 등)가 'connectfin:artists-changed' 이벤트를 발생시키면
+  // 같은 콜백이 다시 트리거되어 화면이 갱신된다.
+  const [artistsVersion, setArtistsVersion] = React.useState(0);
+  React.useEffect(() => {
+    window.ConnectfinAPI.loadArtists().then(() => setArtistsVersion(v => v + 1));
+    const handler = () => setArtistsVersion(v => v + 1);
+    window.addEventListener('connectfin:artists-changed', handler);
+    return () => window.removeEventListener('connectfin:artists-changed', handler);
   }, []);
 
   React.useEffect(() => {
@@ -186,8 +207,9 @@ function App() {
     else if (globalView === 'artist') body = <DesktopArtistProfile t={t} theme={tweaks.theme} artist={artist} tab={profileTab} onNavProfile={setProfileTab} onOpenLive={goLive} onOpenDM={openDM} onOpenMembership={openMembership}/>;
     else if (globalView === 'jelly') body = <DesktopJellyShop t={t} theme={tweaks.theme}/>;
     else if (globalView === 'shop') body = <DesktopShop t={t} theme={tweaks.theme}/>;
-    else if (globalView === 'live') body = <DesktopLiveViewer t={t} theme={tweaks.theme} artistId={artistId} speed={tweaks.simSpeed} liveOn={tweaks.liveOn} onExit={() => setGlobalView('artist')}/>;
+    else if (globalView === 'live') body = <DesktopLiveViewer t={t} theme={tweaks.theme} artistId={artistId} speed={tweaks.simSpeed} liveOn={tweaks.liveOn} onExit={() => setGlobalView('home')} onSwitchLive={goLive}/>;
     else if (globalView === 'dm') body = <DesktopDMScreen t={t} theme={tweaks.theme} onExit={() => setGlobalView('home')}/>;
+    else if (globalView === 'raffle') body = <DesktopRaffleScreen t={t} theme={tweaks.theme} onArtistOpen={openArtist}/>;
 
     return (
       <>
@@ -416,14 +438,29 @@ function HiddenTweaksTrigger({ show, onShow, t }) {
 }
 
 // ───────── Desktop Live Viewer (uses same layout as artist) ─────────
-function DesktopLiveViewer({ t, theme, artistId, speed, liveOn, onExit }) {
+function DesktopLiveViewer({ t, theme, artistId, speed, liveOn, onExit, onSwitchLive }) {
   const a = ARTISTS.find(x => x.id === artistId) || ARTISTS[0];
   const [messages, setMessages] = React.useState(() => LIVE_SEEDS.map((s, i) => ({ ...s, id: i, t: s.t || 'fan' })));
   const [viewers, setViewers] = React.useState(a.viewers || 58_000);
   const [input, setInput] = React.useState('');
   const [hearts, setHearts] = React.useState([]);
+  const [otherLives, setOtherLives] = React.useState([]);
   const nextId = React.useRef(100);
   const listRef = React.useRef(null);
+
+  // 다른 라이브 목록 로드 — 전 아티스트 대상
+  React.useEffect(() => {
+    Promise.all(
+      ARTISTS.map(ar =>
+        window.ConnectfinAPI.api(`/api/v1/artists/${ar.id}/lives`)
+          .then(data => (data || [])
+            .filter(l => l.liveStatus === 'LIVE' && ar.id !== artistId)
+            .map(l => ({ ...l, artistId: ar.id, artistName: ar.name, color1: ar.color1, color2: ar.color2 }))
+          )
+          .catch(() => [])
+      )
+    ).then(results => setOtherLives(results.flat()));
+  }, [artistId]);
 
   React.useEffect(() => {
     if (!liveOn) return;
@@ -449,7 +486,7 @@ function DesktopLiveViewer({ t, theme, artistId, speed, liveOn, onExit }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', height: 'calc(100vh - 56px)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px 280px', height: 'calc(100vh - 56px)' }}>
       <div style={{ position: 'relative', overflow: 'hidden', background: '#000' }}>
         <div style={{
           position: 'absolute', inset: 0,
@@ -494,7 +531,7 @@ function DesktopLiveViewer({ t, theme, artistId, speed, liveOn, onExit }) {
             <div style={{ position: 'absolute', inset: 0, width: '100%', background: t.liveGradient, borderRadius: 2 }}/>
           </div>
           <span style={{ fontFamily: t.fontMono, fontSize: 11 }}>LIVE</span>
-          <button onClick={onExit} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid rgba(255,255,255,0.3)`, background: 'transparent', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: t.fontMono }}>← 프로필</button>
+          <button onClick={onExit} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid rgba(255,255,255,0.3)`, background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: t.fontMono, fontWeight: 700 }}>← 나가기</button>
         </div>
       </div>
 
@@ -544,6 +581,74 @@ function DesktopLiveViewer({ t, theme, artistId, speed, liveOn, onExit }) {
           <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="채팅 · Enter로 전송"
             style={{ flex: 1, padding: '10px 14px', borderRadius: 20, border: `1px solid ${t.line}`, background: theme === 'dark' ? '#12141C' : '#fff', color: t.text, fontSize: 13 }}/>
           <button onClick={send} style={{ padding: '0 16px', borderRadius: 20, border: 'none', background: t.gradient, color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>SEND</button>
+        </div>
+      </div>
+
+      {/* ───── 우측 라이브 목록 패널 ───── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        borderLeft: `1px solid ${t.line}`,
+        background: theme === 'dark' ? '#080A12' : t.surface2 || t.surface,
+        color: t.text, overflowY: 'auto',
+      }}>
+        <div style={{ padding: '14px 16px 10px', borderBottom: `1px solid ${t.line}`, position: 'sticky', top: 0, background: 'inherit', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.hot, animation: 'connectfin-pulse 1.2s ease-in-out infinite' }}/>
+            <div style={{ fontFamily: t.fontDisplay, fontWeight: 800, fontSize: 14 }}>다른 LIVE</div>
+            <div style={{ marginLeft: 'auto', fontFamily: t.fontMono, fontSize: 10, color: t.textDim }}>{otherLives.length}개</div>
+          </div>
+          <div style={{ fontSize: 10, color: t.textMuted, fontFamily: t.fontMono, marginTop: 4, letterSpacing: 0.3 }}>
+            GET /artists/&#123;id&#125;/lives
+          </div>
+        </div>
+
+        <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {otherLives.length === 0 && (
+            <div style={{
+              padding: '24px 12px', textAlign: 'center', fontSize: 12,
+              color: t.textDim, fontFamily: t.fontMono, lineHeight: 1.6,
+            }}>
+              현재 진행 중인<br/>다른 라이브가 없어요
+            </div>
+          )}
+          {otherLives.map(live => (
+            <button key={live.id} onClick={() => onSwitchLive && onSwitchLive(live.artistId)} style={{
+              textAlign: 'left', padding: 0, border: `1px solid ${t.line}`,
+              borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
+              background: 'transparent', color: t.text,
+            }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = t.accent}
+              onMouseLeave={e => e.currentTarget.style.borderColor = t.line}
+            >
+              <div style={{
+                position: 'relative', height: 90,
+                background: `repeating-linear-gradient(30deg, ${live.color1} 0 18px, ${live.color2} 18px 36px)`,
+              }}>
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.7))' }}/>
+                <div style={{
+                  position: 'absolute', top: 6, left: 6,
+                  padding: '2px 6px', borderRadius: 4, background: t.liveGradient,
+                  fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.4,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#fff' }}/>
+                  LIVE
+                </div>
+                <div style={{
+                  position: 'absolute', bottom: 6, left: 8, right: 8,
+                  fontSize: 11, fontWeight: 700, color: '#fff',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                }}>{live.title || '라이브 방송'}</div>
+              </div>
+              <div style={{ padding: '8px 10px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>{live.artistName}</div>
+                <div style={{ fontSize: 10, color: t.textDim, fontFamily: t.fontMono, marginTop: 2 }}>
+                  @{live.hostDisplayName || live.artistName?.toLowerCase()}
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     </div>
