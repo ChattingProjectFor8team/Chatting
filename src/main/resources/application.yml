@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: demo
+  config:
+    import: optional:classpath:application-local.yml
+  servlet:
+    multipart:
+      file-size-threshold: 0B
+      max-file-size: 100MB
+      max-request-size: 120MB
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+# 🚨 datasource, jpa 설정은 여기서 완전히 제거되었습니다! 🚨
+
+# --- 이하 설정은 기존과 동일 ---
+jwt:
+  secret: ${JWT_SECRET_KEY:aW5maW5pdGVMb2NhbERldlNlY3JldEtleU1pbmltdW0zMkJ5dGVz}
+  expiration: 3600000
+
+portone:
+  api-secret: ${PORTONE_API_SECRET:test_dummy_secret_for_local}
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET:test_dummy_webhook_secret_for_local}
+
+jelly:
+  price-per-unit: 300
+  fan-membership-cost: 9
+  dm-subscription-cost: 15
+
+artist-post:
+  like-count:
+    flush-delay-ms: 3000
+    reconcile-cron: 0 0 4 * * *
+  like-v3:
+    consumer-delay-ms: 300
+  comment-count:
+    flush-delay-ms: 3000
+    reconcile-cron: 0 10 4 * * *
+  comment-v2:
+    consumer-delay-ms: 300
+
+media:
+  storage:
+    enabled: ${MEDIA_STORAGE_ENABLED:false}
+    bucket: ${MEDIA_STORAGE_BUCKET:${S3_BUCKET_NAME:${AWS_S3_BUCKET:}}}
+    region: ${MEDIA_STORAGE_REGION:${AWS_REGION:ap-northeast-2}}
+    endpoint: ${MEDIA_STORAGE_ENDPOINT:}
+    public-base-url: ${MEDIA_STORAGE_PUBLIC_BASE_URL:}
+    access-key: ${MEDIA_STORAGE_ACCESS_KEY:${AWS_ACCESS_KEY_ID:}}
+    secret-key: ${MEDIA_STORAGE_SECRET_KEY:${AWS_SECRET_ACCESS_KEY:}}
+    path-style-access: ${MEDIA_STORAGE_PATH_STYLE_ACCESS:false}
+    key-prefix: ${MEDIA_STORAGE_KEY_PREFIX:post-media}
+    max-image-count: 10
+    max-video-count: 1
+    max-image-size-bytes: 10485760
+    max-video-size-bytes: 104857600
+    allowed-image-extensions: jpg,jpeg,png,gif,webp
+    allowed-video-extensions: mp4,mov,webm
+  youtube:
+    api-key: ${YOUTUBE_DATA_API_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus, health, info
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always

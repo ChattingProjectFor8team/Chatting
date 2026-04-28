@@ -1,0 +1,113 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+description = 'infinite'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    google()         // 2순위: 구글 저장소
+
+    // 3순위: Spring Milestone 저장소 (4.0.0 같은 최신 버전이 위치하는 곳)
+    maven { url 'https://repo.spring.io/milestone' }
+
+    // 4순위: Spring Snapshot 저장소 (개발 중인 버전이 위치하는 곳)
+    maven { url 'https://repo.spring.io/snapshot' }
+
+    mavenLocal()     // 5순위: 내 PC에 이미 다운로드된 로컬 저장소
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "software.amazon.awssdk:bom:2.25.70"
+    }
+}
+
+dependencies {
+    // 1. Web & 핵심 인프라 (버전 생략: Boot가 자동 통제)
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // 2. Security & JWT (Jakarta 대응 최신 버전)
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // 3. Database & JPA (Hibernate 7 호환)
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    runtimeOnly 'com.h2database:h2'
+
+    // QueryDSL (Jakarta 분류기 필수 탑재)
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    // 4. Redis 분산 락 및 로컬 캐싱
+    implementation 'org.redisson:redisson-spring-boot-starter:4.0.0'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
+    // 5. 실시간 통신 (WebSocket)
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // 6. 테스트 및 모니터링
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.awaitility:awaitility:4.2.2'
+
+    // Testcontainers (통합 테스트용)
+    testImplementation 'org.testcontainers:testcontainers:1.21.0'
+    testImplementation 'org.testcontainers:junit-jupiter:1.21.0'
+    testImplementation 'org.testcontainers:mysql:1.21.0'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // 프로메테우스
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+
+    // Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
+
+    //env 설정
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+    implementation 'software.amazon.awssdk:s3'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.add('-parameters')
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+
+// Jar boot
+bootJar {
+    enabled = true
+}
+
+jar {
+    enabled = false
+}

@@ -1,0 +1,9 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus        # 그라파나 UI에 표시될 이름
+    type: prometheus       # 데이터 소스 타입
+    access: proxy          # 그라파나 서버를 통해 접근
+    url: http://host.docker.internal:9090 # 프로메테우스 서버 주소
+    isDefault: true        # 기본 데이터 소스로 설정
+    editable: true         # UI에서 수정 가능하도록 설정
