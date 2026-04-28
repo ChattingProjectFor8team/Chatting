@@ -3,6 +3,7 @@ package com.example.infinite.domain.artistcontent.media.storage;
 import com.example.infinite.domain.artistcontent.media.config.MediaStorageProperties;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentErrorCode;
 import com.example.infinite.domain.artistcontent.post.error.ArtistContentException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -21,6 +22,7 @@ import java.io.IOException;
  *
  * 즉 "인프라 연동"만 책임지고, 비즈니스 정책은 MediaService 쪽에 남겨 둔다.
  */
+@Slf4j
 public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private final S3Client s3Client;
@@ -54,6 +56,16 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                     file.getSize()
             );
         } catch (IOException | RuntimeException e) {
+            log.error(
+                    "S3 upload failed: bucket={}, key={}, region={}, contentType={}, size={}, causeType={}, message={}",
+                    properties.bucket(),
+                    key,
+                    properties.region(),
+                    file.getContentType(),
+                    file.getSize(),
+                    e.getClass().getSimpleName(),
+                    e.getMessage()
+            );
             throw new ArtistContentException(ArtistContentErrorCode.MEDIA_UPLOAD_FAILED);
         }
     }
@@ -67,6 +79,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                     .key(key)
                     .build());
         } catch (RuntimeException e) {
+            log.error(
+                    "S3 delete failed: bucket={}, key={}, region={}, causeType={}, message={}",
+                    properties.bucket(),
+                    key,
+                    properties.region(),
+                    e.getClass().getSimpleName(),
+                    e.getMessage()
+            );
             throw new ArtistContentException(ArtistContentErrorCode.MEDIA_UPLOAD_FAILED);
         }
     }
